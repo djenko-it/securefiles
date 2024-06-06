@@ -1,0 +1,12 @@
+{
+    "name": "file-sharing-app",
+    "version": "1.0.0",
+    "scripts": {
+      "build:css": "tailwindcss build src/styles.css -o static/css/tailwind.css"
+    },
+    "dependencies": {
+      "tailwindcss": "^2.2.19"
+    },
+    "devDependencies": {}
+  }
+  
