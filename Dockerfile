@@ -1,3 +1,4 @@
+# Utiliser une image Python officielle comme image de base
 FROM python:3.9
 
 # Installer Node.js et npm
