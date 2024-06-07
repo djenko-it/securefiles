@@ -16,6 +16,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Installer les dépendances Node.js
 RUN npm install
 
+# Construire le CSS avec Tailwind
+RUN npm run build:css
+
 # Copier le script d'entrée et définir les permissions
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

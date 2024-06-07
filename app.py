@@ -135,10 +135,15 @@ def download_file(file_id):
                 return redirect(url_for('file_expired'))
             
             g.db.execute('UPDATE files SET views = views + 1 WHERE id = ?', (file_id,))
-            return send_from_directory(app.config['UPLOAD_FOLDER'], file_id, as_attachment=True, attachment_filename=original_filename)
+            
+            return render_template('download.html', filename=original_filename, file_id=file_id, settings=get_settings())
         else:
             flash("Le fichier n'a pas été trouvé.")
             return redirect(url_for('file_not_found'))
+
+@app.route('/download_direct/<file_id>', methods=['GET'])
+def download_direct(file_id):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], file_id, as_attachment=True)
 
 @app.route('/file_not_found')
 def file_not_found():
