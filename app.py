@@ -2,13 +2,17 @@ import os
 import uuid
 import sqlite3
 from datetime import datetime, timedelta
-from flask import Flask, request, redirect, render_template, url_for, flash, g
+from flask import Flask, request, redirect, render_template, url_for, flash, send_from_directory, g
 from werkzeug.utils import secure_filename
+from flask_wtf import FlaskForm
+from wtforms import FileField, SelectField, SubmitField
+from wtforms.validators import DataRequired
 from flask_wtf.csrf import CSRFProtect
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from redis import Redis
 
+# Configuration de l'application
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'supersecretkey')
 csrf = CSRFProtect(app)
@@ -30,6 +34,13 @@ ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'zip', 'rar'}
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
+# Définition du formulaire WTForms
+class FileUploadForm(FlaskForm):
+    file = FileField('Choisissez un fichier', validators=[DataRequired()])
+    expiry = SelectField('Durée de validité', choices=[('3h', '3 heures'), ('1d', '1 jour'), ('1w', '1 semaine'), ('1m', '1 mois')])
+    submit = SubmitField('Téléverser')
+
+# Fonctions de base de données
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
@@ -61,26 +72,41 @@ def close_connection(exception):
     if db is not None:
         db.close()
 
+def get_expiry_time(expiry_option):
+    if expiry_option == '3h':
+        return datetime.now() + timedelta(hours=3)
+    elif expiry_option == '1d':
+        return datetime.now() + timedelta(days=1)
+    elif expiry_option == '1w':
+        return datetime.now() + timedelta(weeks=1)
+    elif expiry_option == '1m':
+        return datetime.now() + timedelta(days=30)
+    return None
+
+def get_settings():
+    return {
+        'software_name': os.environ.get('SOFTWARE_NAME', 'FileShareApp'),
+        'contact_email': os.environ.get('CONTACT_EMAIL', 'newcontact@example.com'),
+        'title_upload_file': os.environ.get('TITLE_UPLOAD_FILE', 'Téléverser un Fichier'),
+        'title_download_file': os.environ.get('TITLE_DOWNLOAD_FILE', 'Télécharger un Fichier')
+    }
+
+# Routes
 @app.route('/')
 def index():
     return render_template('index.html', settings=get_settings())
 
 @app.route('/upload', methods=['GET', 'POST'])
 def upload_file():
-    if request.method == 'POST':
-        if 'file' not in request.files:
-            flash('No file part')
-            return redirect(request.url)
-        file = request.files['file']
-        if file.filename == '':
-            flash('No selected file')
-            return redirect(request.url)
+    form = FileUploadForm()
+    if form.validate_on_submit():
+        file = form.file.data
         if file and allowed_file(file.filename):
             filename = secure_filename(file.filename)
             unique_filename = str(uuid.uuid4())
             file.save(os.path.join(app.config['UPLOAD_FOLDER'], unique_filename))
             
-            expiry_option = request.form.get('expiry')
+            expiry_option = form.expiry.data
             expiry_time = get_expiry_time(expiry_option)
             
             with g.db:
@@ -90,7 +116,7 @@ def upload_file():
             link = url_for('download_file', file_id=unique_filename, _external=True)
             flash(f'File uploaded successfully. Download link: {link}')
             return redirect(url_for('index'))
-    return render_template('upload.html', settings=get_settings())
+    return render_template('upload.html', form=form, settings=get_settings())
 
 @app.route('/download/<file_id>', methods=['GET'])
 def download_file(file_id):
@@ -121,25 +147,7 @@ def file_not_found():
 def file_expired():
     return render_template('file_expired.html', settings=get_settings())
 
-def get_expiry_time(expiry_option):
-    if expiry_option == '3h':
-        return datetime.now() + timedelta(hours=3)
-    elif expiry_option == '1d':
-        return datetime.now() + timedelta(days=1)
-    elif expiry_option == '1w':
-        return datetime.now() + timedelta(weeks=1)
-    elif expiry_option == '1m':
-        return datetime.now() + timedelta(days=30)
-    return None
-
-def get_settings():
-    return {
-        'software_name': os.environ.get('SOFTWARE_NAME', 'FileShareApp'),
-        'contact_email': os.environ.get('CONTACT_EMAIL', 'newcontact@example.com'),
-        'title_upload_file': os.environ.get('TITLE_UPLOAD_FILE', 'Téléverser un Fichier'),
-        'title_download_file': os.environ.get('TITLE_DOWNLOAD_FILE', 'Télécharger un Fichier')
-    }
-
+# Démarrage de l'application
 if __name__ == '__main__':
     init_db()
     app.run(host='0.0.0.0', port=5000, debug=True)
