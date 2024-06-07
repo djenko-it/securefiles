@@ -143,7 +143,15 @@ def download_file(file_id):
 
 @app.route('/download_direct/<file_id>', methods=['GET'])
 def download_direct(file_id):
-    return send_from_directory(app.config['UPLOAD_FOLDER'], file_id, as_attachment=True)
+    with g.db:
+        cur = g.db.execute('SELECT original_filename FROM files WHERE id = ?', (file_id,))
+        row = cur.fetchone()
+        if row:
+            original_filename = row[0]
+            return send_from_directory(app.config['UPLOAD_FOLDER'], file_id, as_attachment=True, attachment_filename=original_filename)
+        else:
+            flash("Le fichier n'a pas été trouvé.")
+            return redirect(url_for('file_not_found'))
 
 @app.route('/file_not_found')
 def file_not_found():

@@ -36,7 +36,10 @@
       {% if messages %}
         <div class="mt-4">
           {% for category, message in messages %}
-            <div class="alert alert-info">{{ message }}</div>
+            <div class="alert alert-info">
+              <span>{{ message }}</span>
+              <button class="btn btn-secondary btn-sm" onclick="copyToClipboard('{{ message }}')">Copier le lien</button>
+            </div>
           {% endfor %}
         </div>
       {% endif %}
@@ -86,5 +89,15 @@
   <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
   <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+  <script>
+    function copyToClipboard(text) {
+      var tempInput = document.createElement('input');
+      tempInput.value = text;
+      document.body.appendChild(tempInput);
+      tempInput.select();
+      document.execCommand('copy');
+      document.body.removeChild(tempInput);
+    }
+  </script>
 </body>
 </html>
