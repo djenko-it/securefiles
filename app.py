@@ -118,9 +118,10 @@ def upload_file():
                              (unique_filename, filename, file.filename, expiry_time, max_downloads))
             
             link = url_for('download_file', file_id=unique_filename, _external=True)
-            flash(f'File uploaded successfully. Download link: {link}')
+            flash(link)  # Flasher uniquement l'URL
             return redirect(url_for('index'))
     return render_template('upload.html', form=form, settings=get_settings())
+
 
 @app.route('/download/<file_id>', methods=['GET'])
 def download_file(file_id):
