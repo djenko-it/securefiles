@@ -2,7 +2,7 @@ import os
 import uuid
 import sqlite3
 from datetime import datetime, timedelta
-from flask import Flask, request, redirect, url_for, flash, render_template, send_from_directory, make_response
+from flask import Flask, request, redirect, render_template, url_for, flash, g
 from werkzeug.utils import secure_filename
 from flask_wtf.csrf import CSRFProtect
 from flask_limiter import Limiter
@@ -34,10 +34,9 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def get_db():
-    db = getattr(g, '_database', None)
-    if db is None:
-        db = g._database = sqlite3.connect(DATABASE, timeout=10, check_same_thread=False)
-    return db
+    if 'db' not in g:
+        g.db = sqlite3.connect(DATABASE, timeout=10, check_same_thread=False)
+    return g.db
 
 def init_db():
     with sqlite3.connect(DATABASE) as conn:
@@ -52,9 +51,13 @@ def init_db():
             )
         ''')
 
+@app.before_request
+def before_request():
+    g.db = get_db()
+
 @app.teardown_appcontext
 def close_connection(exception):
-    db = getattr(g, '_database', None)
+    db = getattr(g, 'db', None)
     if db is not None:
         db.close()
 
@@ -80,8 +83,8 @@ def upload_file():
             expiry_option = request.form.get('expiry')
             expiry_time = get_expiry_time(expiry_option)
             
-            with sqlite3.connect(DATABASE) as conn:
-                conn.execute('INSERT INTO files (id, filename, original_filename, expiry) VALUES (?, ?, ?, ?)', 
+            with g.db:
+                g.db.execute('INSERT INTO files (id, filename, original_filename, expiry) VALUES (?, ?, ?, ?)', 
                              (unique_filename, filename, file.filename, expiry_time))
             
             link = url_for('download_file', file_id=unique_filename, _external=True)
@@ -91,9 +94,8 @@ def upload_file():
 
 @app.route('/download/<file_id>', methods=['GET'])
 def download_file(file_id):
-    with sqlite3.connect(DATABASE) as conn:
-        cur = conn.cursor()
-        cur.execute('SELECT filename, original_filename, expiry, views FROM files WHERE id = ?', (file_id,))
+    with g.db:
+        cur = g.db.execute('SELECT filename, original_filename, expiry, views FROM files WHERE id = ?', (file_id,))
         row = cur.fetchone()
 
         if row:
@@ -101,11 +103,11 @@ def download_file(file_id):
             expiry_time = datetime.strptime(expiry, '%Y-%m-%d %H:%M:%S.%f')
             
             if datetime.now() > expiry_time:
-                conn.execute('DELETE FROM files WHERE id = ?', (file_id,))
+                g.db.execute('DELETE FROM files WHERE id = ?', (file_id,))
                 flash("Le fichier a expiré.")
                 return redirect(url_for('file_expired'))
             
-            conn.execute('UPDATE files SET views = views + 1 WHERE id = ?', (file_id,))
+            g.db.execute('UPDATE files SET views = views + 1 WHERE id = ?', (file_id,))
             return send_from_directory(app.config['UPLOAD_FOLDER'], file_id, as_attachment=True, attachment_filename=original_filename)
         else:
             flash("Le fichier n'a pas été trouvé.")
