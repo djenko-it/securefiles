@@ -88,9 +88,10 @@ def get_expiry_time(expiry_option):
 def get_settings():
     return {
         'software_name': os.environ.get('SOFTWARE_NAME', 'FileShareApp'),
-        'contact_email': os.environ.get('CONTACT_EMAIL', 'newcontact@example.com'),
+        'contact_email': os.environ.get('CONTACT_EMAIL', 'djenko-it@protonmail.com'),
         'title_upload_file': os.environ.get('TITLE_UPLOAD_FILE', 'Téléverser un Fichier'),
-        'title_download_file': os.environ.get('TITLE_DOWNLOAD_FILE', 'Télécharger un Fichier')
+        'title_download_file': os.environ.get('TITLE_DOWNLOAD_FILE', 'Télécharger un Fichier'),
+        'max_file_size': os.environ.get('MAX_FILE_SIZE', '10')  # Taille maximale en Mo
     }
 
 # Routes

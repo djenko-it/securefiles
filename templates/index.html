@@ -44,6 +44,7 @@
       </div>
       <div class="dropzone" id="dropzone">
         <p>Glissez-déposez vos fichiers ici ou cliquez pour sélectionner un fichier</p>
+        <p>(Taille maximale : {{ settings.max_file_size }} Mo)</p>
       </div>
       <div class="form-group">
         <label for="expiry">Durée de validité :</label>
@@ -151,7 +152,7 @@
       fileInput.files = files;
 
       // Mettre à jour le nom du fichier choisi dans la zone de dépôt
-      dropzone.innerHTML = `<p>${files[0].name}</p>`;
+      dropzone.innerHTML = `<p>${files[0].name}</p><p>(Taille maximale : {{ settings.max_file_size }} Mo)</p>`;
     });
 
     dropzone.addEventListener('click', function() {
@@ -160,7 +161,7 @@
 
     fileInput.addEventListener('change', function() {
       // Mettre à jour le nom du fichier choisi dans la zone de dépôt
-      dropzone.innerHTML = `<p>${fileInput.files[0].name}</p>`;
+      dropzone.innerHTML = `<p>${fileInput.files[0].name}</p><p>(Taille maximale : {{ settings.max_file_size }} Mo)</p>`;
     });
   </script>
 </body>
