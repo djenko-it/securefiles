@@ -21,6 +21,7 @@
   <div class="container mt-4">
     <h1 class="text-center">{{ settings.title_upload_file }}</h1>
     <form method="post" action="/upload" enctype="multipart/form-data">
+      {{ form.hidden_tag() }} <!-- Assurez-vous que cette ligne est présente -->
       <div class="form-group">
         <label for="file">Choisissez un fichier :</label>
         <input type="file" class="form-control" id="file" name="file" required>
