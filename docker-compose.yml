@@ -3,16 +3,12 @@ version: '3.8'
 services:
   web:
     build: .
-    environment:
-      FLASK_ENV: "production"
-      SECRET_KEY: "supersecretkey"
-      SOFTWARE_NAME: "FileShareApp"
-      CONTACT_EMAIL: "newcontact@example.com"
-      TITLE_UPLOAD_FILE: "Téléverser un Fichier"
-      TITLE_DOWNLOAD_FILE: "Télécharger un Fichier"
+    ports:
+      - "5000:5000"
+    env_file:
+      - .env
     volumes:
       - .:/app
-      - ./data:/app/data  # Volume pour persister les fichiers
     depends_on:
       - redis
 
