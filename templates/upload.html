@@ -21,21 +21,16 @@
   <div class="container mt-4">
     <h1 class="text-center">{{ settings.title_upload_file }}</h1>
     <form method="post" action="/upload" enctype="multipart/form-data">
-      {{ form.hidden_tag() }} <!-- Assurez-vous que cette ligne est présente -->
+      {{ form.hidden_tag() }}
       <div class="form-group">
         <label for="file">Choisissez un fichier :</label>
-        <input type="file" class="form-control" id="file" name="file" required>
+        {{ form.file(class="form-control") }}
       </div>
       <div class="form-group">
         <label for="expiry">Durée de validité :</label>
-        <select class="form-control" id="expiry" name="expiry">
-          <option value="3h">3 heures</option>
-          <option value="1d">1 jour</option>
-          <option value="1w">1 semaine</option>
-          <option value="1m">1 mois</option>
-        </select>
+        {{ form.expiry(class="form-control") }}
       </div>
-      <button type="submit" class="btn btn-primary">Téléverser</button>
+      {{ form.submit(class="btn btn-primary") }}
     </form>
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
