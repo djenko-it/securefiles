@@ -50,7 +50,6 @@ def get_db():
         g.db = sqlite3.connect(DATABASE, timeout=10, check_same_thread=False)
     return g.db
 
-# Ajoutez une colonne max_downloads à la table files dans init_db
 def init_db():
     with sqlite3.connect(DATABASE) as conn:
         conn.execute('DROP TABLE IF EXISTS files')
@@ -100,7 +99,6 @@ def index():
     form = FileUploadForm()
     return render_template('index.html', form=form, settings=get_settings())
 
-# Ajoutez max_downloads à la route /upload
 @app.route('/upload', methods=['GET', 'POST'])
 def upload_file():
     form = FileUploadForm()
@@ -124,7 +122,6 @@ def upload_file():
             return redirect(url_for('index'))
     return render_template('upload.html', form=form, settings=get_settings())
 
-# Ajoutez la logique pour supprimer le fichier après le nombre maximal de téléchargements dans /download/<file_id>
 @app.route('/download/<file_id>', methods=['GET'])
 def download_file(file_id):
     with g.db:
