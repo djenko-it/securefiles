@@ -30,6 +30,10 @@
         <label for="expiry">Durée de validité :</label>
         {{ form.expiry(class="form-control") }}
       </div>
+      <div class="form-group">
+        <label for="max_downloads">Nombre maximal de téléchargements :</label>
+        {{ form.max_downloads(class="form-control") }}
+      </div>
       {{ form.submit(class="btn btn-primary") }}
     </form>
     {% with messages = get_flashed_messages(with_categories=true) %}
@@ -38,7 +42,7 @@
           {% for category, message in messages %}
             <div class="alert alert-info">
               <span>{{ message }}</span>
-              <button class="btn btn-secondary btn-sm" onclick="copyToClipboard('{{ message }}')">Copier le lien</button>
+              <button id="copyButton" class="btn btn-secondary btn-sm" onclick="copyToClipboard('{{ message }}')">Copier le lien</button>
             </div>
           {% endfor %}
         </div>
@@ -97,6 +101,11 @@
       tempInput.select();
       document.execCommand('copy');
       document.body.removeChild(tempInput);
+      
+      var copyButton = document.getElementById('copyButton');
+      copyButton.innerText = 'Lien copié';
+      copyButton.classList.remove('btn-secondary');
+      copyButton.classList.add('btn-success');
     }
   </script>
 </body>
