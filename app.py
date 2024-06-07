@@ -97,7 +97,6 @@ def index():
     form = FileUploadForm()
     return render_template('index.html', form=form, settings=get_settings())
 
-
 @app.route('/upload', methods=['GET', 'POST'])
 def upload_file():
     form = FileUploadForm()
@@ -120,28 +119,26 @@ def upload_file():
             return redirect(url_for('index'))
     return render_template('upload.html', form=form, settings=get_settings())
 
-@app.route('/upload', methods=['GET', 'POST'])
-def upload_file():
-    form = FileUploadForm()
-    if form.validate_on_submit():
-        file = form.file.data
-        if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            unique_filename = str(uuid.uuid4())
-            file.save(os.path.join(app.config['UPLOAD_FOLDER'], unique_filename))
-            
-            expiry_option = form.expiry.data
-            expiry_time = get_expiry_time(expiry_option)
-            
-            with g.db:
-                g.db.execute('INSERT INTO files (id, filename, original_filename, expiry) VALUES (?, ?, ?, ?)', 
-                             (unique_filename, filename, file.filename, expiry_time))
-            
-            link = url_for('download_file', file_id=unique_filename, _external=True)
-            flash(f'File uploaded successfully. Download link: {link}')
-            return redirect(url_for('index'))
-    return render_template('upload.html', form=form, settings=get_settings())
+@app.route('/download/<file_id>', methods=['GET'])
+def download_file(file_id):
+    with g.db:
+        cur = g.db.execute('SELECT filename, original_filename, expiry, views FROM files WHERE id = ?', (file_id,))
+        row = cur.fetchone()
 
+        if row:
+            filename, original_filename, expiry, views = row
+            expiry_time = datetime.strptime(expiry, '%Y-%m-%d %H:%M:%S.%f')
+            
+            if datetime.now() > expiry_time:
+                g.db.execute('DELETE FROM files WHERE id = ?', (file_id,))
+                flash("Le fichier a expiré.")
+                return redirect(url_for('file_expired'))
+            
+            g.db.execute('UPDATE files SET views = views + 1 WHERE id = ?', (file_id,))
+            return send_from_directory(app.config['UPLOAD_FOLDER'], file_id, as_attachment=True, attachment_filename=original_filename)
+        else:
+            flash("Le fichier n'a pas été trouvé.")
+            return redirect(url_for('file_not_found'))
 
 @app.route('/file_not_found')
 def file_not_found():
