@@ -1,12 +1,12 @@
 {
     "name": "file-sharing-app",
     "version": "1.0.0",
+    "description": "",
+    "main": "index.js",
     "scripts": {
-      "build:css": "tailwindcss build src/styles.css -o static/css/tailwind.css"
+      "build:css": "npx tailwindcss -i ./src/tailwind.css -o ./static/css/tailwind.css"
     },
     "dependencies": {
-      "tailwindcss": "^2.2.19"
-    },
-    "devDependencies": {}
-  }
-  
+      "tailwindcss": "^3.0.0"
+    }
+}
