@@ -38,6 +38,7 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 class FileUploadForm(FlaskForm):
     file = FileField('Choisissez un fichier', validators=[DataRequired()])
     expiry = SelectField('Durée de validité', choices=[('3h', '3 heures'), ('1d', '1 jour'), ('1w', '1 semaine'), ('1m', '1 mois')])
+    max_downloads = SelectField('Nombre maximal de téléchargements', choices=[('1', '1'), ('5', '5'), ('10', '10'), ('unlimited', 'Illimité')], validators=[DataRequired()])
     submit = SubmitField('Téléverser')
 
 # Fonctions de base de données
@@ -49,6 +50,7 @@ def get_db():
         g.db = sqlite3.connect(DATABASE, timeout=10, check_same_thread=False)
     return g.db
 
+# Ajoutez une colonne max_downloads à la table files dans init_db
 def init_db():
     with sqlite3.connect(DATABASE) as conn:
         conn.execute('DROP TABLE IF EXISTS files')
@@ -58,7 +60,8 @@ def init_db():
                 filename TEXT,
                 original_filename TEXT,
                 expiry TIMESTAMP,
-                views INTEGER DEFAULT 0
+                views INTEGER DEFAULT 0,
+                max_downloads INTEGER
             )
         ''')
 
@@ -97,6 +100,7 @@ def index():
     form = FileUploadForm()
     return render_template('index.html', form=form, settings=get_settings())
 
+# Ajoutez max_downloads à la route /upload
 @app.route('/upload', methods=['GET', 'POST'])
 def upload_file():
     form = FileUploadForm()
@@ -109,24 +113,26 @@ def upload_file():
             
             expiry_option = form.expiry.data
             expiry_time = get_expiry_time(expiry_option)
+            max_downloads = None if form.max_downloads.data == 'unlimited' else int(form.max_downloads.data)
             
             with g.db:
-                g.db.execute('INSERT INTO files (id, filename, original_filename, expiry) VALUES (?, ?, ?, ?)', 
-                             (unique_filename, filename, file.filename, expiry_time))
+                g.db.execute('INSERT INTO files (id, filename, original_filename, expiry, max_downloads) VALUES (?, ?, ?, ?, ?)', 
+                             (unique_filename, filename, file.filename, expiry_time, max_downloads))
             
             link = url_for('download_file', file_id=unique_filename, _external=True)
             flash(f'File uploaded successfully. Download link: {link}')
             return redirect(url_for('index'))
     return render_template('upload.html', form=form, settings=get_settings())
 
+# Ajoutez la logique pour supprimer le fichier après le nombre maximal de téléchargements dans /download/<file_id>
 @app.route('/download/<file_id>', methods=['GET'])
 def download_file(file_id):
     with g.db:
-        cur = g.db.execute('SELECT filename, original_filename, expiry, views FROM files WHERE id = ?', (file_id,))
+        cur = g.db.execute('SELECT filename, original_filename, expiry, views, max_downloads FROM files WHERE id = ?', (file_id,))
         row = cur.fetchone()
 
         if row:
-            filename, original_filename, expiry, views = row
+            filename, original_filename, expiry, views, max_downloads = row
             expiry_time = datetime.strptime(expiry, '%Y-%m-%d %H:%M:%S.%f')
             
             if datetime.now() > expiry_time:
@@ -134,9 +140,14 @@ def download_file(file_id):
                 flash("Le fichier a expiré.")
                 return redirect(url_for('file_expired'))
             
+            if max_downloads is not None and views >= max_downloads:
+                g.db.execute('DELETE FROM files WHERE id = ?', (file_id,))
+                flash("Le fichier a atteint le nombre maximal de téléchargements.")
+                return redirect(url_for('file_not_found'))
+
             g.db.execute('UPDATE files SET views = views + 1 WHERE id = ?', (file_id,))
-            
-            return render_template('download.html', filename=original_filename, file_id=file_id, settings=get_settings())
+            return send_from_directory(app.config['UPLOAD_FOLDER'], file_id, as_attachment=True, attachment_filename=original_filename)
+        
         else:
             flash("Le fichier n'a pas été trouvé.")
             return redirect(url_for('file_not_found'))
