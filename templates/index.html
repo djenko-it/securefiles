@@ -6,6 +6,22 @@
   <title>{{ settings.software_name }}</title>
   <link href="/static/css/tailwind.css" rel="stylesheet">
   <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    .dropzone {
+      border: 2px dashed #007bff;
+      border-radius: 5px;
+      background: #f9f9f9;
+      padding: 50px;
+      text-align: center;
+      font-size: 18px;
+      color: #007bff;
+      cursor: pointer;
+      margin-top: 20px;
+    }
+    .dropzone.dragover {
+      background: #e9e9e9;
+    }
+  </style>
 </head>
 <body class="bg-gray-100 text-gray-900">
   <nav class="bg-gray-800 p-4">
@@ -20,11 +36,14 @@
   </nav>
   <div class="container mt-4">
     <h1 class="text-center">{{ settings.title_upload_file }}</h1>
-    <form method="post" action="/upload" enctype="multipart/form-data">
+    <form id="uploadForm" method="post" action="/upload" enctype="multipart/form-data">
       {{ form.hidden_tag() }}
       <div class="form-group">
         <label for="file">Choisissez un fichier :</label>
-        {{ form.file(class="form-control") }}
+        {{ form.file(class="form-control d-none") }}
+      </div>
+      <div class="dropzone" id="dropzone">
+        <p>Glissez-déposez vos fichiers ici ou cliquez pour sélectionner un fichier</p>
       </div>
       <div class="form-group">
         <label for="expiry">Durée de validité :</label>
@@ -107,6 +126,42 @@
       copyButton.classList.remove('btn-secondary');
       copyButton.classList.add('btn-success');
     }
+
+    // Gestion des événements de glisser-déposer
+    var dropzone = document.getElementById('dropzone');
+    var fileInput = document.querySelector('input[type="file"]');
+    
+    dropzone.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      dropzone.classList.add('dragover');
+    });
+
+    dropzone.addEventListener('dragleave', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      dropzone.classList.remove('dragover');
+    });
+
+    dropzone.addEventListener('drop', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      dropzone.classList.remove('dragover');
+      var files = e.dataTransfer.files;
+      fileInput.files = files;
+
+      // Mettre à jour le nom du fichier choisi dans la zone de dépôt
+      dropzone.innerHTML = `<p>${files[0].name}</p>`;
+    });
+
+    dropzone.addEventListener('click', function() {
+      fileInput.click();
+    });
+
+    fileInput.addEventListener('change', function() {
+      // Mettre à jour le nom du fichier choisi dans la zone de dépôt
+      dropzone.innerHTML = `<p>${fileInput.files[0].name}</p>`;
+    });
   </script>
 </body>
 </html>

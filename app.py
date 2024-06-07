@@ -150,6 +150,7 @@ def download_file(file_id):
             return redirect(url_for('file_not_found'))
 
 
+
 @app.route('/download_direct/<file_id>', methods=['GET'])
 def download_direct(file_id):
     with g.db:
