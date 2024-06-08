@@ -4,6 +4,7 @@ import sqlite3
 from datetime import datetime, timedelta
 from flask import Flask, request, redirect, render_template, url_for, flash, send_from_directory, g
 from werkzeug.utils import secure_filename
+from werkzeug.security import generate_password_hash, check_password_hash
 from flask_wtf import FlaskForm
 from wtforms import FileField, SelectField, SubmitField
 from wtforms.validators import DataRequired
@@ -60,7 +61,8 @@ def init_db():
                 original_filename TEXT,
                 expiry TIMESTAMP,
                 views INTEGER DEFAULT 0,
-                max_downloads INTEGER
+                max_downloads INTEGER,
+                password TEXT
             )
         ''')
 
@@ -100,45 +102,49 @@ def index():
     form = FileUploadForm()
     return render_template('index.html', form=form, settings=get_settings())
 
-@app.route('/upload', methods=['GET', 'POST'])
+@app.route('/upload', methods=['POST'])
 def upload_file():
-    form = FileUploadForm()
-    if form.validate_on_submit():
-        file = form.file.data
-        if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            unique_filename = str(uuid.uuid4())
-            file.save(os.path.join(app.config['UPLOAD_FOLDER'], unique_filename))
-            
-            expiry_option = form.expiry.data
-            expiry_time = get_expiry_time(expiry_option)
-            max_downloads = None if form.max_downloads.data == 'unlimited' else int(form.max_downloads.data)
-            
-            with g.db:
-                g.db.execute('INSERT INTO files (id, filename, original_filename, expiry, max_downloads) VALUES (?, ?, ?, ?, ?)', 
-                             (unique_filename, filename, file.filename, expiry_time, max_downloads))
-            
-            link = url_for('download_file', file_id=unique_filename, _external=True)
-            flash(link)  # Flasher uniquement l'URL
-            return redirect(url_for('index'))
-    return render_template('upload.html', form=form, settings=get_settings())
+    file = request.files['file']
+    if file:
+        file_id = str(uuid.uuid4())
+        original_filename = file.filename
+        expiry_option = request.form['expiry']
+        max_downloads = request.form['max_downloads']
+        password = request.form['password']
+
+        expiry_time = get_expiry_time(expiry_option)
+        hashed_password = generate_password_hash(password) if password else None
+
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], file_id))
+
+        with g.db:
+            g.db.execute('INSERT INTO files (id, filename, original_filename, expiry, max_downloads, password) VALUES (?, ?, ?, ?, ?, ?)',
+                         (file_id, file.filename, original_filename, expiry_time, max_downloads, hashed_password))
+            g.db.commit()
+
+        link = url_for('download_file', file_id=file_id, _external=True)
+        flash(f'File uploaded successfully. Download link: {link}')
+        return redirect(url_for('index'))
+    else:
+        flash('No file selected')
+        return redirect(url_for('index'))
 
 
-@app.route('/download/<file_id>', methods=['GET'])
+@app.route('/download/<file_id>', methods=['GET', 'POST'])
 def download_file(file_id):
     with g.db:
-        cur = g.db.execute('SELECT filename, original_filename, expiry, views, max_downloads FROM files WHERE id = ?', (file_id,))
+        cur = g.db.execute('SELECT filename, original_filename, expiry, views, max_downloads, password FROM files WHERE id = ?', (file_id,))
         row = cur.fetchone()
 
         if row:
-            filename, original_filename, expiry, views, max_downloads = row
+            filename, original_filename, expiry, views, max_downloads, hashed_password = row
             expiry_time = datetime.strptime(expiry, '%Y-%m-%d %H:%M:%S.%f')
-            
+
             if datetime.now() > expiry_time:
                 g.db.execute('DELETE FROM files WHERE id = ?', (file_id,))
                 flash("Le fichier a expiré.")
                 return redirect(url_for('file_expired'))
-            
+
             remaining_downloads = 'Illimité'
             if max_downloads is not None:
                 remaining_downloads = max_downloads - views
@@ -147,15 +153,25 @@ def download_file(file_id):
                     flash("Le fichier a atteint le nombre maximal de téléchargements.")
                     return redirect(url_for('file_not_found'))
 
+            if request.method == 'POST':
+                password = request.form['password']
+                if hashed_password and not check_password_hash(hashed_password, password):
+                    flash("Mot de passe incorrect.")
+                    return render_template('password_required.html', file_id=file_id, settings=get_settings())
+
+            if hashed_password and request.method == 'GET':
+                return render_template('password_required.html', file_id=file_id, settings=get_settings())
+
             return render_template('download.html', 
                                    file_id=file_id, 
                                    original_filename=original_filename, 
                                    expiry_time=expiry_time.strftime('%Y-%m-%d %H:%M:%S'), 
                                    remaining_downloads=remaining_downloads, 
                                    settings=get_settings())
-        
         else:
             flash("Le fichier n'a pas été trouvé.")
+            return redirect(url_for('file_not_found'))
+
             return redirect(url_for('file_not_found'))
 
 
