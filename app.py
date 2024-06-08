@@ -139,16 +139,25 @@ def download_file(file_id):
                 flash("Le fichier a expiré.")
                 return redirect(url_for('file_expired'))
             
-            if max_downloads is not None and views >= max_downloads:
-                g.db.execute('DELETE FROM files WHERE id = ?', (file_id,))
-                flash("Le fichier a atteint le nombre maximal de téléchargements.")
-                return redirect(url_for('file_not_found'))
+            remaining_downloads = 'Illimité'
+            if max_downloads is not None:
+                remaining_downloads = max_downloads - views
+                if remaining_downloads <= 0:
+                    g.db.execute('DELETE FROM files WHERE id = ?', (file_id,))
+                    flash("Le fichier a atteint le nombre maximal de téléchargements.")
+                    return redirect(url_for('file_not_found'))
 
-            return render_template('download.html', file_id=file_id, original_filename=original_filename, settings=get_settings())
+            return render_template('download.html', 
+                                   file_id=file_id, 
+                                   original_filename=original_filename, 
+                                   expiry_time=expiry_time.strftime('%Y-%m-%d %H:%M:%S'), 
+                                   remaining_downloads=remaining_downloads, 
+                                   settings=get_settings())
         
         else:
             flash("Le fichier n'a pas été trouvé.")
             return redirect(url_for('file_not_found'))
+
 
 
 

@@ -22,8 +22,21 @@
     <h1 class="text-center">{{ settings.title_download_file }}</h1>
     <div class="text-center">
       <p>Fichier à télécharger : <strong>{{ original_filename }}</strong></p>
+      <p>Durée de validité du lien : <strong>{{ expiry_time }}</strong></p>
+      <p>Nombre de téléchargements restants : <strong>{{ remaining_downloads }}</strong></p>
       <a href="{{ url_for('download_direct', file_id=file_id) }}" class="btn btn-primary">Télécharger</a>
     </div>
+    {% if remaining_downloads == 1 %}
+    <div class="alert alert-warning mt-3">
+      Ce lien est à usage unique. Si vous fermez ou actualisez cette page, le lien ne sera plus accessible.
+    </div>
+    <script>
+      window.addEventListener('beforeunload', function (e) {
+        e.preventDefault();
+        e.returnValue = 'Ce lien est à usage unique. Si vous fermez ou actualisez cette page, le lien ne sera plus accessible.';
+      });
+    </script>
+    {% endif %}
   </div>
 
   <!-- Modal À propos -->
