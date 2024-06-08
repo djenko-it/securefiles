@@ -6,7 +6,7 @@ from flask import Flask, request, redirect, render_template, url_for, flash, sen
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_wtf import FlaskForm
-from wtforms import FileField, SelectField, SubmitField
+from wtforms import FileField, SelectField, PasswordField, SubmitField
 from wtforms.validators import DataRequired
 from flask_wtf.csrf import CSRFProtect
 from flask_limiter import Limiter
@@ -34,6 +34,10 @@ UPLOAD_FOLDER = '/app/data'
 ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'zip', 'rar'}
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+class PasswordForm(FlaskForm):
+    password = PasswordField('Mot de passe', validators=[DataRequired()])
+    submit = SubmitField('Soumettre')
 
 # Définition du formulaire WTForms
 class FileUploadForm(FlaskForm):
@@ -132,6 +136,7 @@ def upload_file():
 
 @app.route('/download/<file_id>', methods=['GET', 'POST'])
 def download_file(file_id):
+    form = PasswordForm()
     with g.db:
         cur = g.db.execute('SELECT filename, original_filename, expiry, views, max_downloads, password FROM files WHERE id = ?', (file_id,))
         row = cur.fetchone()
@@ -153,14 +158,14 @@ def download_file(file_id):
                     flash("Le fichier a atteint le nombre maximal de téléchargements.")
                     return redirect(url_for('file_not_found'))
 
-            if request.method == 'POST':
-                password = request.form['password']
+            if form.validate_on_submit():
+                password = form.password.data
                 if hashed_password and not check_password_hash(hashed_password, password):
                     flash("Mot de passe incorrect.")
-                    return render_template('password_required.html', file_id=file_id, settings=get_settings())
+                    return render_template('password_required.html', file_id=file_id, form=form, settings=get_settings())
 
             if hashed_password and request.method == 'GET':
-                return render_template('password_required.html', file_id=file_id, settings=get_settings())
+                return render_template('password_required.html', file_id=file_id, form=form, settings=get_settings())
 
             return render_template('download.html', 
                                    file_id=file_id, 
@@ -171,9 +176,6 @@ def download_file(file_id):
         else:
             flash("Le fichier n'a pas été trouvé.")
             return redirect(url_for('file_not_found'))
-
-            return redirect(url_for('file_not_found'))
-
 
 
 
