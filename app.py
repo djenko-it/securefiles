@@ -2,7 +2,7 @@ import os
 import uuid
 import sqlite3
 from datetime import datetime, timedelta
-from flask import Flask, request, redirect, render_template, url_for, flash, send_from_directory, g
+from flask import Flask, request, redirect, render_template, url_for, flash, send_from_directory, g, jsonify
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_wtf import FlaskForm
@@ -130,10 +130,8 @@ def upload_file():
                 g.db.commit()
 
             link = url_for('download_file', file_id=file_id, _external=True)
-            flash(f'File uploaded successfully. Download link: {link}')
-            return redirect(url_for('index'))
-    flash('Invalid file upload')
-    return redirect(url_for('index'))
+            return jsonify(success=True, link=link)
+    return jsonify(success=False)
 
 @app.route('/download/<file_id>', methods=['GET', 'POST'])
 def download_file(file_id):

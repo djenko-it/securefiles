@@ -34,7 +34,7 @@
 
   <div class="container mt-4">
     <h1 class="text-center">{{ settings.title_upload_file }}</h1>
-    <form method="post" enctype="multipart/form-data" action="/upload">
+    <form id="upload-form" method="post" enctype="multipart/form-data" action="/upload">
       {{ form.hidden_tag() }}
       <div class="form-group">
         {{ form.file.label(class="form-label") }}
@@ -60,6 +60,11 @@
     <div class="mt-4 dropzone" id="dropzone">
       Glissez et déposez les fichiers ici ou cliquez pour télécharger. <br>
       <small>Taille maximale : {{ settings.max_file_size }} Mo</small>
+    </div>
+
+    <div id="upload-success" class="mt-4 alert alert-success" style="display: none;">
+      Fichier téléversé avec succès. Lien de téléchargement : <a id="download-link" href="#" target="_blank"></a>
+      <button id="copy-link-btn" class="btn btn-secondary ml-2">Copier le lien</button>
     </div>
   </div>
 
@@ -109,6 +114,10 @@
   <script>
     document.addEventListener('DOMContentLoaded', function () {
       var dropzone = document.getElementById('dropzone');
+      var uploadForm = document.getElementById('upload-form');
+      var uploadSuccess = document.getElementById('upload-success');
+      var downloadLink = document.getElementById('download-link');
+      var copyLinkBtn = document.getElementById('copy-link-btn');
 
       dropzone.addEventListener('dragover', function (e) {
         e.preventDefault();
@@ -124,13 +133,19 @@
         dropzone.classList.remove('dragover');
         var files = e.dataTransfer.files;
         if (files.length > 0) {
-          var formData = new FormData();
+          var formData = new FormData(uploadForm);
           formData.append('file', files[0]);
           fetch('/upload', {
             method: 'POST',
             body: formData
           }).then(response => response.json()).then(data => {
-            alert('File uploaded successfully');
+            if (data.success) {
+              uploadSuccess.style.display = 'block';
+              downloadLink.href = data.link;
+              downloadLink.textContent = data.link;
+            } else {
+              alert('Erreur lors du téléversement du fichier.');
+            }
           }).catch(error => {
             console.error('Error:', error);
           });
@@ -142,10 +157,17 @@
       });
 
       document.querySelector('input[type="file"]').addEventListener('change', function () {
-        var file = this.files[0];
-        if (file) {
-          document.querySelector('form').submit();
-        }
+        uploadForm.submit();
+      });
+
+      copyLinkBtn.addEventListener('click', function () {
+        var link = downloadLink.href;
+        navigator.clipboard.writeText(link).then(function () {
+          copyLinkBtn.textContent = 'Lien copié';
+          copyLinkBtn.classList.add('btn-success');
+        }, function (err) {
+          console.error('Erreur lors de la copie du lien : ', err);
+        });
       });
     });
   </script>
