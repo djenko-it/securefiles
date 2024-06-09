@@ -23,6 +23,7 @@
     <div class="text-center">
       <p>Fichier à télécharger : <strong>{{ original_filename }}</strong></p>
       <p>Durée de validité du lien : <strong>{{ expiry_time }}</strong></p>
+      <p>Temps restant : <strong>{{ time_remaining_str }}</strong></p>
       <p>Nombre de téléchargements restants : <strong>{{ remaining_downloads }}</strong></p>
       {% if original_filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.pdf')) %}
         <iframe src="{{ url_for('preview_file', file_id=file_id) }}" width="100%" height="500px"></iframe>
