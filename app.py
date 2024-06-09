@@ -129,26 +129,30 @@ def index():
 @app.route('/preview/<file_id>')
 def preview_file(file_id):
     with g.db:
-        cur = g.db.execute('SELECT filename FROM files WHERE id = ?', (file_id,))
+        cur = g.db.execute('SELECT filename, original_filename FROM files WHERE id = ?', (file_id,))
         row = cur.fetchone()
-
         if row:
             filename = row[0]
             file_path = safe_join(current_app.config['UPLOAD_FOLDER'], filename)
-            
-            # Log the file path
-            current_app.logger.info(f"Previewing file at path: {file_path}")
-            
-            if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
-                return send_file(file_path, mimetype='image/jpeg')
-            elif filename.lower().endswith('.pdf'):
-                return send_file(file_path, mimetype='application/pdf')
+            if os.path.exists(file_path):
+                decrypt_file(file_path)  # Déchiffrer le fichier avant de le prévisualiser
+                if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
+                    response = send_file(file_path, mimetype='image/jpeg')
+                elif filename.lower().endswith('.pdf'):
+                    response = send_file(file_path, mimetype='application/pdf')
+                else:
+                    flash("Aperçu non disponible pour ce type de fichier.")
+                    encrypt_file(file_path)  # Réchiffrer le fichier après l'aperçu
+                    return redirect(url_for('download_file', file_id=file_id))
+                encrypt_file(file_path)  # Réchiffrer le fichier après l'aperçu
+                return response
             else:
-                flash("Aperçu non disponible pour ce type de fichier.")
-                return redirect(url_for('download_file', file_id=file_id))
+                flash("Fichier non trouvé.")
+                return redirect(url_for('file_not_found'))
         else:
             flash("Fichier non trouvé.")
             return redirect(url_for('file_not_found'))
+
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
@@ -228,16 +232,25 @@ def download_file(file_id):
 @app.route('/download_direct/<file_id>', methods=['GET'])
 def download_direct(file_id):
     with g.db:
-        cur = g.db.execute('SELECT original_filename FROM files WHERE id = ?', (file_id,))
+        cur = g.db.execute('SELECT filename, original_filename FROM files WHERE id = ?', (file_id,))
         row = cur.fetchone()
         if row:
-            original_filename = row[0]
-            g.db.execute('UPDATE files SET views = views + 1 WHERE id = ?', (file_id,))
-            g.db.commit()
-            return send_from_directory(app.config['UPLOAD_FOLDER'], file_id, as_attachment=True, attachment_filename=original_filename)
+            filename, original_filename = row
+            file_path = safe_join(app.config['UPLOAD_FOLDER'], filename)
+            if os.path.exists(file_path):
+                decrypt_file(file_path)  # Déchiffrer le fichier avant de l'envoyer
+                response = send_file(file_path, as_attachment=True, attachment_filename=original_filename)
+                encrypt_file(file_path)  # Réchiffrer le fichier après l'envoi
+                g.db.execute('UPDATE files SET views = views + 1 WHERE id = ?', (file_id,))
+                g.db.commit()
+                return response
+            else:
+                flash("Le fichier n'a pas été trouvé.")
+                return redirect(url_for('file_not_found'))
         else:
             flash("Le fichier n'a pas été trouvé.")
             return redirect(url_for('file_not_found'))
+
 
 @app.route('/file_not_found')
 def file_not_found():
