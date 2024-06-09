@@ -10,8 +10,10 @@ from wtforms import FileField, SelectField, PasswordField, SubmitField
 from wtforms.validators import DataRequired
 from flask_wtf.csrf import CSRFProtect
 from flask_limiter import Limiter
+from flask import send_file
 from flask_limiter.util import get_remote_address
 from redis import Redis
+from cryptography.fernet import Fernet
 
 # Configuration de l'application
 app = Flask(__name__)
@@ -105,6 +107,27 @@ def get_settings():
 def index():
     form = FileUploadForm()
     return render_template('index.html', form=form, settings=get_settings())
+
+@app.route('/preview/<file_id>')
+def preview_file(file_id):
+    with g.db:
+        cur = g.db.execute('SELECT filename FROM files WHERE id = ?', (file_id,))
+        row = cur.fetchone()
+
+        if row:
+            filename = row[0]
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+
+            if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
+                return send_file(file_path, mimetype='image/jpeg')
+            elif filename.lower().endswith('.pdf'):
+                return send_file(file_path, mimetype='application/pdf')
+            else:
+                flash("Aperçu non disponible pour ce type de fichier.")
+                return redirect(url_for('download_file', file_id=file_id))
+        else:
+            flash("Fichier non trouvé.")
+            return redirect(url_for('file_not_found'))
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
