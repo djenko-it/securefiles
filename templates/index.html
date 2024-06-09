@@ -13,13 +13,10 @@
       background: #f9f9f9;
       padding: 50px;
       text-align: center;
-      font-size: 18px;
-      color: #007bff;
       cursor: pointer;
-      margin-top: 20px;
     }
     .dropzone.dragover {
-      background: #e9e9e9;
+      background: #e0f7ff;
     }
   </style>
 </head>
@@ -34,45 +31,36 @@
       </div>
     </div>
   </nav>
+
   <div class="container mt-4">
     <h1 class="text-center">{{ settings.title_upload_file }}</h1>
-    <form id="uploadForm" method="post" action="/upload" enctype="multipart/form-data">
+    <form method="post" enctype="multipart/form-data" action="/upload">
       {{ form.hidden_tag() }}
       <div class="form-group">
-        <label for="file">Choisissez un fichier :</label>
-        {{ form.file(class="form-control d-none") }}
+        {{ form.file.label(class="form-label") }}
+        {{ form.file(class="form-control") }}
       </div>
-      <div class="dropzone" id="dropzone">
-        <p>Glissez-déposez vos fichiers ici ou cliquez pour sélectionner un fichier</p>
-        <p>(Taille maximale : {{ settings.max_file_size }} Mo)</p>
-      </div>
-      <div id="error-message" class="text-danger mt-2"></div>
       <div class="form-group">
-        <label for="password">Mot de passe (optionnel) :</label>
+        {{ form.password.label(class="form-label") }}
         {{ form.password(class="form-control") }}
       </div>
       <div class="form-group">
-        <label for="expiry">Durée de validité :</label>
+        {{ form.expiry.label(class="form-label") }}
         {{ form.expiry(class="form-control") }}
       </div>
       <div class="form-group">
-        <label for="max_downloads">Nombre maximal de téléchargements :</label>
+        {{ form.max_downloads.label(class="form-label") }}
         {{ form.max_downloads(class="form-control") }}
       </div>
-      {{ form.submit(class="btn btn-primary") }}
+      <div class="text-center">
+        {{ form.submit(class="btn btn-primary") }}
+      </div>
     </form>
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        <div class="mt-4">
-          {% for category, message in messages %}
-            <div class="alert alert-info">
-              <span id="link-message">{{ message.split(': ').pop() }}</span>
-              <button id="copyButton" class="btn btn-secondary btn-sm" onclick="copyToClipboard()">Copier le lien</button>
-            </div>
-          {% endfor %}
-        </div>
-      {% endif %}
-    {% endwith %}
+
+    <div class="mt-4 dropzone" id="dropzone">
+      Glissez et déposez les fichiers ici ou cliquez pour télécharger. <br>
+      <small>Taille maximale : {{ settings.max_file_size }} Mo</small>
+    </div>
   </div>
 
   <!-- Modal À propos -->
@@ -86,7 +74,7 @@
           </button>
         </div>
         <div class="modal-body">
-          Le but de ce site est de permettre le partage sécurisé de fichiers sensibles. Chaque fichier est protégé par un lien unique et peut être configuré pour expirer après une certaine durée.
+          Le but de ce site est de permettre le partage sécurisé de fichiers sensibles. Chaque fichier est protégé par un lien unique, et peut être configuré pour expirer après une certaine durée ou un certain nombre de téléchargements.
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-dismiss="modal">Fermer</button>
@@ -119,70 +107,46 @@
   <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
   <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
   <script>
-    function copyToClipboard() {
-      var message = document.getElementById('link-message').innerText;
-      var tempInput = document.createElement('input');
-      tempInput.value = message;
-      document.body.appendChild(tempInput);
-      tempInput.select();
-      document.execCommand('copy');
-      document.body.removeChild(tempInput);
-      
-      var copyButton = document.getElementById('copyButton');
-      copyButton.innerText = 'Lien copié';
-      copyButton.classList.remove('btn-secondary');
-      copyButton.classList.add('btn-success');
-    }
+    document.addEventListener('DOMContentLoaded', function () {
+      var dropzone = document.getElementById('dropzone');
 
-    // Gestion des événements de glisser-déposer
-    var dropzone = document.getElementById('dropzone');
-    var fileInput = document.querySelector('input[type="file"]');
-    var maxFileSize = {{ settings.max_file_size }} * 1024 * 1024;  // Taille maximale en octets
-    var errorMessage = document.getElementById('error-message');
+      dropzone.addEventListener('dragover', function (e) {
+        e.preventDefault();
+        dropzone.classList.add('dragover');
+      });
 
-    dropzone.addEventListener('dragover', function(e) {
-      e.preventDefault();
-      e.stopPropagation();
-      dropzone.classList.add('dragover');
-    });
+      dropzone.addEventListener('dragleave', function (e) {
+        dropzone.classList.remove('dragover');
+      });
 
-    dropzone.addEventListener('dragleave', function(e) {
-      e.preventDefault();
-      e.stopPropagation();
-      dropzone.classList.remove('dragover');
-    });
+      dropzone.addEventListener('drop', function (e) {
+        e.preventDefault();
+        dropzone.classList.remove('dragover');
+        var files = e.dataTransfer.files;
+        if (files.length > 0) {
+          var formData = new FormData();
+          formData.append('file', files[0]);
+          fetch('/upload', {
+            method: 'POST',
+            body: formData
+          }).then(response => response.json()).then(data => {
+            alert('File uploaded successfully');
+          }).catch(error => {
+            console.error('Error:', error);
+          });
+        }
+      });
 
-    dropzone.addEventListener('drop', function(e) {
-      e.preventDefault();
-      e.stopPropagation();
-      dropzone.classList.remove('dragover');
-      var files = e.dataTransfer.files;
-      
-      if (files[0].size > maxFileSize) {
-        errorMessage.textContent = 'Le fichier est trop volumineux. La taille maximale autorisée est de ' + {{ settings.max_file_size }} + ' Mo.';
-        fileInput.value = '';  // Réinitialiser le champ de fichier
-        dropzone.innerHTML = `<p>Glissez-déposez vos fichiers ici ou cliquez pour sélectionner un fichier</p><p>(Taille maximale : {{ settings.max_file_size }} Mo)</p>`;
-      } else {
-        errorMessage.textContent = '';
-        fileInput.files = files;
-        dropzone.innerHTML = `<p>${files[0].name}</p><p>(Taille maximale : {{ settings.max_file_size }} Mo)</p>`;
-      }
-    });
+      dropzone.addEventListener('click', function () {
+        document.querySelector('input[type="file"]').click();
+      });
 
-    dropzone.addEventListener('click', function() {
-      fileInput.click();
-    });
-
-    fileInput.addEventListener('change', function() {
-      var file = fileInput.files[0];
-      if (file.size > maxFileSize) {
-        errorMessage.textContent = 'Le fichier est trop volumineux. La taille maximale autorisée est de ' + {{ settings.max_file_size }} + ' Mo.';
-        fileInput.value = '';  // Réinitialiser le champ de fichier
-        dropzone.innerHTML = `<p>Glissez-déposez vos fichiers ici ou cliquez pour sélectionner un fichier</p><p>(Taille maximale : {{ settings.max_file_size }} Mo)</p>`;
-      } else {
-        errorMessage.textContent = '';
-        dropzone.innerHTML = `<p>${file.name}</p><p>(Taille maximale : {{ settings.max_file_size }} Mo)</p>`;
-      }
+      document.querySelector('input[type="file"]').addEventListener('change', function () {
+        var file = this.files[0];
+        if (file) {
+          document.querySelector('form').submit();
+        }
+      });
     });
   </script>
 </body>

@@ -2,7 +2,7 @@ import os
 import uuid
 import sqlite3
 from datetime import datetime, timedelta
-from flask import Flask, request, redirect, render_template, url_for, flash, send_from_directory, g, send_file, safe_join, current_app
+from flask import Flask, request, redirect, render_template, url_for, flash, send_from_directory, g
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_wtf import FlaskForm
@@ -106,41 +106,6 @@ def get_settings():
 def index():
     form = FileUploadForm()
     return render_template('index.html', form=form, settings=get_settings())
-
-@app.route('/preview/<file_id>', methods=['GET', 'POST'])
-def preview_file(file_id):
-    form = PasswordForm()
-    with g.db:
-        cur = g.db.execute('SELECT filename, original_filename, password FROM files WHERE id = ?', (file_id,))
-        row = cur.fetchone()
-        if row:
-            filename, original_filename, hashed_password = row
-            file_path = safe_join(current_app.config['UPLOAD_FOLDER'], filename)
-
-            if hashed_password:
-                if request.method == 'POST':
-                    if form.validate_on_submit():
-                        password = form.password.data
-                        if not check_password_hash(hashed_password, password):
-                            flash("Mot de passe incorrect.")
-                            return render_template('password_required.html', file_id=file_id, form=form, settings=get_settings())
-                    else:
-                        return render_template('password_required.html', file_id=file_id, form=form, settings=get_settings())
-
-            if os.path.exists(file_path):
-                if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
-                    return send_file(file_path, mimetype='image/jpeg')
-                elif filename.lower().endswith('.pdf'):
-                    return send_file(file_path, mimetype='application/pdf')
-                else:
-                    flash("Aperçu non disponible pour ce type de fichier.")
-                    return redirect(url_for('download_file', file_id=file_id))
-            else:
-                flash("Fichier non trouvé.")
-                return redirect(url_for('file_not_found'))
-        else:
-            flash("Fichier non trouvé.")
-            return redirect(url_for('file_not_found'))
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
