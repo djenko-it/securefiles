@@ -74,6 +74,24 @@
     </div>
   </div>
 
+  <!-- Modal pour le lien de téléchargement -->
+  <div class="modal fade" id="linkModal" tabindex="-1" role="dialog" aria-labelledby="linkModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="linkModalLabel">Lien de Téléchargement</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          Fichier téléversé avec succès. Lien de téléchargement : <a id="download-link" href="#" target="_blank"></a>
+          <button id="copy-link-btn" class="btn btn-secondary ml-2">Copier le lien</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal À propos -->
   <div class="modal fade" id="aboutModal" tabindex="-1" role="dialog" aria-labelledby="aboutModalLabel" aria-hidden="true">
     <div class="modal-dialog" role="document">
@@ -114,16 +132,16 @@
     </div>
   </div>
 
-  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+  <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
   <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function () {
       var dropzone = document.getElementById('dropzone');
       var uploadModal = $('#uploadModal');
+      var linkModal = $('#linkModal');
       var fileInput = document.getElementById('file-input');
       var uploadForm = document.getElementById('upload-form');
-      var uploadSuccess = document.getElementById('upload-success');
       var downloadLink = document.getElementById('download-link');
       var copyLinkBtn = document.getElementById('copy-link-btn');
 
@@ -154,6 +172,26 @@
         if (fileInput.files.length > 0) {
           uploadModal.modal('show');
         }
+      });
+
+      uploadForm.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var formData = new FormData(uploadForm);
+        fetch('/upload', {
+          method: 'POST',
+          body: formData
+        }).then(response => response.json()).then(data => {
+          if (data.success) {
+            uploadModal.modal('hide');
+            downloadLink.href = data.link;
+            downloadLink.textContent = data.link;
+            linkModal.modal('show');
+          } else {
+            alert('Erreur lors du téléversement du fichier.');
+          }
+        }).catch(error => {
+          console.error('Erreur:', error);
+        });
       });
 
       copyLinkBtn.addEventListener('click', function () {
