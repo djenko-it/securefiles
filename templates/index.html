@@ -34,36 +34,36 @@
       </div>
     </div>
   </nav>
-  <div class="container mt-4 fadeIn">
-    <h1 class="text-center slideIn">{{ settings.title_upload_file }}</h1>
+  <div class="container mt-4 animate-fadeIn">
+    <h1 class="text-center animate-slideIn">{{ settings.title_upload_file }}</h1>
     <form id="uploadForm" method="post" action="/upload" enctype="multipart/form-data">
       {{ form.hidden_tag() }}
-      <div class="form-group slideIn">
+      <div class="form-group animate-slideIn">
         <label for="file">Choisissez un fichier :</label>
         {{ form.file(class="form-control d-none") }}
       </div>
-      <div class="dropzone slideIn" id="dropzone">
+      <div class="dropzone animate-slideIn" id="dropzone">
         <p>Glissez-déposez vos fichiers ici ou cliquez pour sélectionner un fichier</p>
         <p>(Taille maximale : {{ settings.max_file_size }} Mo)</p>
       </div>
-      <div id="error-message" class="text-danger mt-2 slideIn"></div>
-      <div class="form-group slideIn">
+      <div id="error-message" class="text-danger mt-2 animate-slideIn"></div>
+      <div class="form-group animate-slideIn">
         <label for="password">Mot de passe (optionnel) :</label>
         <input type="password" id="password" name="password" class="form-control" placeholder="Entrez un mot de passe pour protéger le fichier">
       </div>
-      <div class="form-group slideIn">
+      <div class="form-group animate-slideIn">
         <label for="expiry">Durée de validité :</label>
         {{ form.expiry(class="form-control") }}
       </div>
-      <div class="form-group slideIn">
+      <div class="form-group animate-slideIn">
         <label for="max_downloads">Nombre maximal de téléchargements :</label>
         {{ form.max_downloads(class="form-control") }}
       </div>
-      {{ form.submit(class="btn btn-primary slideIn") }}
+      {{ form.submit(class="btn btn-primary animate-slideIn") }}
     </form>
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
-        <div class="mt-4 slideIn">
+        <div class="mt-4 animate-slideIn">
           {% for category, message in messages %}
             <div class="alert alert-info">
               <span id="link-message">{{ message.split(': ').pop() }}</span>
