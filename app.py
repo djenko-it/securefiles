@@ -13,29 +13,11 @@ from flask_limiter import Limiter
 from flask import send_file, safe_join, current_app
 from flask_limiter.util import get_remote_address
 from redis import Redis
-from cryptography.fernet import Fernet
 
 # Configuration de l'application
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'supersecretkey')
 csrf = CSRFProtect(app)
-
-# Générer une clé de chiffrement
-ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY', Fernet.generate_key())
-cipher = Fernet(ENCRYPTION_KEY)
-
-def encrypt_file(file_path):
-    with open(file_path, 'rb') as file:
-        encrypted_data = cipher.encrypt(file.read())
-    with open(file_path, 'wb') as file:
-        file.write(encrypted_data)
-
-def decrypt_file(file_path):
-    with open(file_path, 'rb') as file:
-        encrypted_data = file.read()
-    decrypted_data = cipher.decrypt(encrypted_data)
-    with open(file_path, 'wb') as file:
-        file.write(decrypted_data)
 
 # Configuration de Redis
 redis_client = Redis(host='redis', port=6379)
@@ -129,30 +111,25 @@ def index():
 @app.route('/preview/<file_id>')
 def preview_file(file_id):
     with g.db:
-        cur = g.db.execute('SELECT filename, original_filename FROM files WHERE id = ?', (file_id,))
+        cur = g.db.execute('SELECT filename FROM files WHERE id = ?', (file_id,))
         row = cur.fetchone()
         if row:
             filename = row[0]
             file_path = safe_join(current_app.config['UPLOAD_FOLDER'], filename)
             if os.path.exists(file_path):
-                decrypt_file(file_path)  # Déchiffrer le fichier avant de le prévisualiser
                 if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
-                    response = send_file(file_path, mimetype='image/jpeg')
+                    return send_file(file_path, mimetype='image/jpeg')
                 elif filename.lower().endswith('.pdf'):
-                    response = send_file(file_path, mimetype='application/pdf')
+                    return send_file(file_path, mimetype='application/pdf')
                 else:
                     flash("Aperçu non disponible pour ce type de fichier.")
-                    encrypt_file(file_path)  # Réchiffrer le fichier après l'aperçu
                     return redirect(url_for('download_file', file_id=file_id))
-                encrypt_file(file_path)  # Réchiffrer le fichier après l'aperçu
-                return response
             else:
                 flash("Fichier non trouvé.")
                 return redirect(url_for('file_not_found'))
         else:
             flash("Fichier non trouvé.")
             return redirect(url_for('file_not_found'))
-
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
@@ -169,11 +146,7 @@ def upload_file():
             expiry_time = get_expiry_time(expiry_option)
             hashed_password = generate_password_hash(password) if password else None
 
-            upload_folder = current_app.config['UPLOAD_FOLDER']
-            os.makedirs(upload_folder, exist_ok=True)
-            file_path = safe_join(upload_folder, file_id)
-            file.save(file_path)
-            encrypt_file(file_path)
+            file.save(os.path.join(app.config['UPLOAD_FOLDER'], file_id))
 
             with g.db:
                 g.db.execute('INSERT INTO files (id, filename, original_filename, expiry, max_downloads, password) VALUES (?, ?, ?, ?, ?, ?)',
@@ -203,8 +176,8 @@ def download_file(file_id):
                 return redirect(url_for('file_expired'))
 
             remaining_downloads = 'Illimité'
-            if max_downloads is not None:
-                remaining_downloads = max_downloads - views
+            if max_downloads != 'unlimited':
+                remaining_downloads = int(max_downloads) - views
                 if remaining_downloads <= 0:
                     g.db.execute('DELETE FROM files WHERE id = ?', (file_id,))
                     flash("Le fichier a atteint le nombre maximal de téléchargements.")
@@ -238,19 +211,15 @@ def download_direct(file_id):
             filename, original_filename = row
             file_path = safe_join(app.config['UPLOAD_FOLDER'], filename)
             if os.path.exists(file_path):
-                decrypt_file(file_path)  # Déchiffrer le fichier avant de l'envoyer
-                response = send_file(file_path, as_attachment=True, attachment_filename=original_filename)
-                encrypt_file(file_path)  # Réchiffrer le fichier après l'envoi
                 g.db.execute('UPDATE files SET views = views + 1 WHERE id = ?', (file_id,))
                 g.db.commit()
-                return response
+                return send_file(file_path, as_attachment=True, attachment_filename=original_filename)
             else:
                 flash("Le fichier n'a pas été trouvé.")
                 return redirect(url_for('file_not_found'))
         else:
             flash("Le fichier n'a pas été trouvé.")
             return redirect(url_for('file_not_found'))
-
 
 @app.route('/file_not_found')
 def file_not_found():
