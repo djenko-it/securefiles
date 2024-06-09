@@ -2,14 +2,15 @@ import os
 import uuid
 import sqlite3
 from datetime import datetime, timedelta
-from flask import Flask, request, redirect, render_template, url_for, flash, send_from_directory, g, jsonify
+from flask import Flask, request, redirect, render_template, url_for, flash, send_from_directory, g
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_wtf import FlaskForm
 from wtforms import FileField, SelectField, PasswordField, SubmitField
-from wtforms.validators import DataRequired, Optional
+from wtforms.validators import DataRequired
 from flask_wtf.csrf import CSRFProtect
 from flask_limiter import Limiter
+from flask import send_file, safe_join, current_app
 from flask_limiter.util import get_remote_address
 from redis import Redis
 
@@ -42,7 +43,6 @@ class PasswordForm(FlaskForm):
 # Définition du formulaire WTForms
 class FileUploadForm(FlaskForm):
     file = FileField('Choisissez un fichier', validators=[DataRequired()])
-    password = PasswordField('Mot de passe (optionnel)', validators=[Optional()])
     expiry = SelectField('Durée de validité', choices=[('3h', '3 heures'), ('1d', '1 jour'), ('1w', '1 semaine'), ('1m', '1 mois')])
     max_downloads = SelectField('Nombre maximal de téléchargements', choices=[('1', '1'), ('5', '5'), ('10', '10'), ('unlimited', 'Illimité')], validators=[DataRequired()])
     submit = SubmitField('Téléverser')
@@ -107,31 +107,54 @@ def index():
     form = FileUploadForm()
     return render_template('index.html', form=form, settings=get_settings())
 
+@app.route('/preview/<file_id>')
+def preview_file(file_id):
+    with g.db:
+        cur = g.db.execute('SELECT filename FROM files WHERE id = ?', (file_id,))
+        row = cur.fetchone()
+
+        if row:
+            filename = row[0]
+            file_path = safe_join(current_app.config['UPLOAD_FOLDER'], filename)
+            
+            # Log the file path
+            current_app.logger.info(f"Previewing file at path: {file_path}")
+            
+            if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
+                return send_file(file_path, mimetype='image/jpeg')
+            elif filename.lower().endswith('.pdf'):
+                return send_file(file_path, mimetype='application/pdf')
+            else:
+                flash("Aperçu non disponible pour ce type de fichier.")
+                return redirect(url_for('download_file', file_id=file_id))
+        else:
+            flash("Fichier non trouvé.")
+            return redirect(url_for('file_not_found'))
+
 @app.route('/upload', methods=['POST'])
 def upload_file():
-    form = FileUploadForm()
-    if form.validate_on_submit():
-        file = form.file.data
-        if file and allowed_file(file.filename):
-            file_id = str(uuid.uuid4())
-            original_filename = secure_filename(file.filename)
-            expiry_option = form.expiry.data
-            max_downloads = form.max_downloads.data
-            password = form.password.data
+    file = request.files['file']
+    if file:
+        file_id = str(uuid.uuid4())
+        original_filename = file.filename
+        expiry_option = request.form['expiry']
+        max_downloads = request.form['max_downloads']
+        password = request.form['password']
 
-            expiry_time = get_expiry_time(expiry_option)
-            hashed_password = generate_password_hash(password) if password else None
+        expiry_time = get_expiry_time(expiry_option)
+        hashed_password = generate_password_hash(password) if password else None
 
-            file.save(os.path.join(app.config['UPLOAD_FOLDER'], file_id))
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], file_id))
 
-            with g.db:
-                g.db.execute('INSERT INTO files (id, filename, original_filename, expiry, max_downloads, password) VALUES (?, ?, ?, ?, ?, ?)',
-                             (file_id, file_id, original_filename, expiry_time, max_downloads, hashed_password))
-                g.db.commit()
+        with g.db:
+            g.db.execute('INSERT INTO files (id, filename, original_filename, expiry, max_downloads, password) VALUES (?, ?, ?, ?, ?, ?)',
+                         (file_id, file.filename, original_filename, expiry_time, max_downloads, hashed_password))
+            g.db.commit()
 
-            link = url_for('download_file', file_id=file_id, _external=True)
-            return jsonify(success=True, link=link)
-    return jsonify(success=False)
+        link = url_for('download_file', file_id=file_id, _external=True)
+        return {"success": True, "link": link}
+    else:
+        return {"success": False, "error": "No file selected"}
 
 @app.route('/download/<file_id>', methods=['GET', 'POST'])
 def download_file(file_id):
@@ -150,8 +173,8 @@ def download_file(file_id):
                 return redirect(url_for('file_expired'))
 
             remaining_downloads = 'Illimité'
-            if max_downloads != 'unlimited':
-                remaining_downloads = int(max_downloads) - views
+            if max_downloads is not None:
+                remaining_downloads = max_downloads - views
                 if remaining_downloads <= 0:
                     g.db.execute('DELETE FROM files WHERE id = ?', (file_id,))
                     flash("Le fichier a atteint le nombre maximal de téléchargements.")
@@ -179,13 +202,12 @@ def download_file(file_id):
 @app.route('/download_direct/<file_id>', methods=['GET'])
 def download_direct(file_id):
     with g.db:
-        cur = g.db.execute('SELECT filename, original_filename FROM files WHERE id = ?', (file_id,))
+        cur = g.db.execute('SELECT original_filename FROM files WHERE id = ?', (file_id,))
         row = cur.fetchone()
         if row:
-            filename, original_filename = row
+            original_filename = row[0]
             g.db.execute('UPDATE files SET views = views + 1 WHERE id = ?', (file_id,))
-            g.db.commit()
-            return send_from_directory(app.config['UPLOAD_FOLDER'], filename, as_attachment=True, attachment_filename=original_filename)
+            return send_from_directory(app.config['UPLOAD_FOLDER'], file_id, as_attachment=True, attachment_filename=original_filename)
         else:
             flash("Le fichier n'a pas été trouvé.")
             return redirect(url_for('file_not_found'))
