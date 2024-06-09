@@ -7,6 +7,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_wtf.csrf import CSRFProtect
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from flask import Flask, request, redirect, render_template, url_for, flash, g, send_file, safe_join, current_app
+from forms import UploadForm  # Assurez-vous d'importer le formulaire
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'supersecretkey')  # Nécessaire pour les messages flash et CSRF
@@ -122,8 +124,9 @@ def get_expiry_time(expiry_option):
 
 @app.route('/')
 def index():
+    form = UploadForm()  # Créez une instance du formulaire
     settings = get_settings()
-    return render_template('index.html', settings=settings)
+    return render_template('index.html', form=form, settings=settings)  #
 
 @app.route('/about')
 def about():
