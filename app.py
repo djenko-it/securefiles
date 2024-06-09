@@ -20,23 +20,6 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'supersecretkey')
 csrf = CSRFProtect(app)
 
-# Générer une clé de chiffrement
-ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY', Fernet.generate_key())
-cipher = Fernet(ENCRYPTION_KEY)
-
-def encrypt_file(file_path):
-    with open(file_path, 'rb') as file:
-        encrypted_data = cipher.encrypt(file.read())
-    with open(file_path, 'wb') as file:
-        file.write(encrypted_data)
-
-def decrypt_file(file_path):
-    with open(file_path, 'rb') as file:
-        encrypted_data = file.read()
-    decrypted_data = cipher.decrypt(encrypted_data)
-    with open(file_path, 'wb') as file:
-        file.write(decrypted_data)
-
 # Configuration de Redis
 redis_client = Redis(host='redis', port=6379)
 
@@ -162,15 +145,11 @@ def upload_file():
         expiry_time = get_expiry_time(expiry_option)
         hashed_password = generate_password_hash(password) if password else None
 
-        upload_folder = current_app.config['UPLOAD_FOLDER']
-        os.makedirs(upload_folder, exist_ok=True)
-        file_path = safe_join(upload_folder, file_id)
-        file.save(file_path)
-        encrypt_file(file_path)
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], file_id))
 
         with g.db:
             g.db.execute('INSERT INTO files (id, filename, original_filename, expiry, max_downloads, password) VALUES (?, ?, ?, ?, ?, ?)',
-                         (file_id, file_id, original_filename, expiry_time, max_downloads, hashed_password))
+                         (file_id, file.filename, original_filename, expiry_time, max_downloads, hashed_password))
             g.db.commit()
 
         link = url_for('download_file', file_id=file_id, _external=True)
@@ -179,7 +158,6 @@ def upload_file():
     else:
         flash('No file selected')
         return redirect(url_for('index'))
-
 
 
 @app.route('/download/<file_id>', methods=['GET', 'POST'])
