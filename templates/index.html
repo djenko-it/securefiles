@@ -240,7 +240,7 @@
         .then(response => response.json())
         .then(data => {
           if (data.success) {
-            downloadLink.value = data.download_link;
+            downloadLink.value = data.link;
             linkModal.modal('show');
             uploadModal.modal('hide');
           } else {
