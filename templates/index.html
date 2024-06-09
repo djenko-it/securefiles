@@ -52,7 +52,6 @@
         <div class="modal-body">
           <form id="upload-form" method="post" enctype="multipart/form-data" action="/upload">
             {{ form.hidden_tag() }}
-            <input type="hidden" name="file" id="file-input">
             <div class="form-group">
               {{ form.password.label(class="form-label") }}
               {{ form.password(class="form-control") }}
@@ -65,6 +64,7 @@
               {{ form.max_downloads.label(class="form-label") }}
               {{ form.max_downloads(class="form-control") }}
             </div>
+            <input type="file" id="file-input" name="file" style="display:none;" />
             <div class="text-center">
               {{ form.submit(class="btn btn-primary") }}
             </div>
@@ -141,29 +141,19 @@
         dropzone.classList.remove('dragover');
         var files = e.dataTransfer.files;
         if (files.length > 0) {
-          var file = files[0];
-          var reader = new FileReader();
-          reader.onload = function (event) {
-            fileInput.value = event.target.result;
-            uploadModal.modal('show');
-          };
-          reader.readAsDataURL(file);
+          fileInput.files = files;
+          uploadModal.modal('show');
         }
       });
 
       dropzone.addEventListener('click', function () {
-        var input = document.createElement('input');
-        input.type = 'file';
-        input.onchange = function (event) {
-          var file = event.target.files[0];
-          var reader = new FileReader();
-          reader.onload = function (event) {
-            fileInput.value = event.target.result;
-            uploadModal.modal('show');
-          };
-          reader.readAsDataURL(file);
-        };
-        input.click();
+        fileInput.click();
+      });
+
+      fileInput.addEventListener('change', function () {
+        if (fileInput.files.length > 0) {
+          uploadModal.modal('show');
+        }
       });
 
       copyLinkBtn.addEventListener('click', function () {
