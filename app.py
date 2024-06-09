@@ -2,7 +2,7 @@ import os
 import uuid
 import sqlite3
 from datetime import datetime, timedelta
-from flask import Flask, request, redirect, render_template, url_for, flash, send_from_directory, g
+from flask import Flask, request, redirect, render_template, url_for, flash, send_from_directory, g, send_file, safe_join, current_app
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_wtf import FlaskForm
@@ -10,7 +10,6 @@ from wtforms import FileField, SelectField, PasswordField, SubmitField
 from wtforms.validators import DataRequired, Optional
 from flask_wtf.csrf import CSRFProtect
 from flask_limiter import Limiter
-from flask import send_file, safe_join, current_app
 from flask_limiter.util import get_remote_address
 from redis import Redis
 
@@ -108,14 +107,26 @@ def index():
     form = FileUploadForm()
     return render_template('index.html', form=form, settings=get_settings())
 
-@app.route('/preview/<file_id>')
+@app.route('/preview/<file_id>', methods=['GET', 'POST'])
 def preview_file(file_id):
+    form = PasswordForm()
     with g.db:
-        cur = g.db.execute('SELECT filename FROM files WHERE id = ?', (file_id,))
+        cur = g.db.execute('SELECT filename, original_filename, password FROM files WHERE id = ?', (file_id,))
         row = cur.fetchone()
         if row:
-            filename = row[0]
+            filename, original_filename, hashed_password = row
             file_path = safe_join(current_app.config['UPLOAD_FOLDER'], filename)
+
+            if hashed_password:
+                if request.method == 'POST':
+                    if form.validate_on_submit():
+                        password = form.password.data
+                        if not check_password_hash(hashed_password, password):
+                            flash("Mot de passe incorrect.")
+                            return render_template('password_required.html', file_id=file_id, form=form, settings=get_settings())
+                    else:
+                        return render_template('password_required.html', file_id=file_id, form=form, settings=get_settings())
+
             if os.path.exists(file_path):
                 if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
                     return send_file(file_path, mimetype='image/jpeg')
@@ -209,14 +220,9 @@ def download_direct(file_id):
         row = cur.fetchone()
         if row:
             filename, original_filename = row
-            file_path = safe_join(app.config['UPLOAD_FOLDER'], filename)
-            if os.path.exists(file_path):
-                g.db.execute('UPDATE files SET views = views + 1 WHERE id = ?', (file_id,))
-                g.db.commit()
-                return send_file(file_path, as_attachment=True, attachment_filename=original_filename)
-            else:
-                flash("Le fichier n'a pas été trouvé.")
-                return redirect(url_for('file_not_found'))
+            g.db.execute('UPDATE files SET views = views + 1 WHERE id = ?', (file_id,))
+            g.db.commit()
+            return send_from_directory(app.config['UPLOAD_FOLDER'], filename, as_attachment=True, attachment_filename=original_filename)
         else:
             flash("Le fichier n'a pas été trouvé.")
             return redirect(url_for('file_not_found'))
