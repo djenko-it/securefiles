@@ -256,7 +256,9 @@
       copyLinkBtn.addEventListener('click', function () {
         downloadLink.select();
         document.execCommand('copy');
-        alert('Lien copié dans le presse-papier.');
+        copyLinkBtn.textContent = 'Lien copié';
+        copyLinkBtn.classList.remove('btn-secondary');
+        copyLinkBtn.classList.add('btn-success');
       });
     });
   </script>
