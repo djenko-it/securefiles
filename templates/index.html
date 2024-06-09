@@ -53,6 +53,10 @@
           <form id="upload-form" method="post" enctype="multipart/form-data" action="/upload">
             {{ form.hidden_tag() }}
             <div class="form-group">
+              {{ form.password_protect.label(class="form-label") }}
+              {{ form.password_protect(class="form-control") }}
+            </div>
+            <div class="form-group">
               {{ form.password.label(class="form-label") }}
               {{ form.password(class="form-control") }}
             </div>
@@ -157,11 +161,8 @@
       dropzone.addEventListener('drop', function (e) {
         e.preventDefault();
         dropzone.classList.remove('dragover');
-        var files = e.dataTransfer.files;
-        if (files.length > 0) {
-          fileInput.files = files;
-          uploadModal.modal('show');
-        }
+        fileInput.files = e.dataTransfer.files;
+        uploadModal.modal('show');
       });
 
       dropzone.addEventListener('click', function () {
@@ -169,39 +170,44 @@
       });
 
       fileInput.addEventListener('change', function () {
-        if (fileInput.files.length > 0) {
-          uploadModal.modal('show');
-        }
+        uploadModal.modal('show');
       });
 
       uploadForm.addEventListener('submit', function (e) {
         e.preventDefault();
         var formData = new FormData(uploadForm);
-        fetch('/upload', {
-          method: 'POST',
-          body: formData
-        }).then(response => response.json()).then(data => {
-          if (data.success) {
-            uploadModal.modal('hide');
-            downloadLink.href = data.link;
-            downloadLink.textContent = data.link;
-            linkModal.modal('show');
-          } else {
-            alert('Erreur lors du téléversement du fichier.');
+        $.ajax({
+          url: uploadForm.action,
+          type: uploadForm.method,
+          data: formData,
+          processData: false,
+          contentType: false,
+          success: function (response) {
+            if (response.success) {
+              uploadModal.modal('hide');
+              downloadLink.href = response.link;
+              downloadLink.textContent = response.link;
+              linkModal.modal('show');
+            } else {
+              alert('Erreur lors du téléversement : ' + response.error);
+            }
+          },
+          error: function () {
+            alert('Erreur lors du téléversement.');
           }
-        }).catch(error => {
-          console.error('Erreur:', error);
         });
       });
 
       copyLinkBtn.addEventListener('click', function () {
-        var link = downloadLink.href;
-        navigator.clipboard.writeText(link).then(function () {
-          copyLinkBtn.textContent = 'Lien copié';
-          copyLinkBtn.classList.add('btn-success');
-        }, function (err) {
-          console.error('Erreur lors de la copie du lien : ', err);
-        });
+        var tempInput = document.createElement('input');
+        document.body.appendChild(tempInput);
+        tempInput.value = downloadLink.href;
+        tempInput.select();
+        document.execCommand('copy');
+        document.body.removeChild(tempInput);
+        copyLinkBtn.textContent = 'Lien copié !';
+        copyLinkBtn.classList.remove('btn-secondary');
+        copyLinkBtn.classList.add('btn-success');
       });
     });
   </script>

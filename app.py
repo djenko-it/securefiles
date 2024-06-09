@@ -6,7 +6,7 @@ from flask import Flask, request, redirect, render_template, url_for, flash, sen
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_wtf import FlaskForm
-from wtforms import FileField, SelectField, PasswordField, SubmitField
+from wtforms import FileField, SelectField, PasswordField, SubmitField, BooleanField
 from wtforms.validators import DataRequired
 from flask_wtf.csrf import CSRFProtect
 from flask_limiter import Limiter
@@ -45,6 +45,8 @@ class FileUploadForm(FlaskForm):
     file = FileField('Choisissez un fichier', validators=[DataRequired()])
     expiry = SelectField('Durée de validité', choices=[('3h', '3 heures'), ('1d', '1 jour'), ('1w', '1 semaine'), ('1m', '1 mois')])
     max_downloads = SelectField('Nombre maximal de téléchargements', choices=[('1', '1'), ('5', '5'), ('10', '10'), ('unlimited', 'Illimité')], validators=[DataRequired()])
+    password_protect = BooleanField('Protéger par mot de passe')
+    password = PasswordField('Mot de passe')
     submit = SubmitField('Téléverser')
 
 # Fonctions de base de données
