@@ -33,38 +33,44 @@
   </nav>
 
   <div class="container mt-4">
-    <h1 class="text-center">{{ settings.title_upload_file }}</h1>
-    <form id="upload-form" method="post" enctype="multipart/form-data" action="/upload">
-      {{ form.hidden_tag() }}
-      <div class="form-group">
-        {{ form.file.label(class="form-label") }}
-        {{ form.file(class="form-control") }}
-      </div>
-      <div class="form-group">
-        {{ form.password.label(class="form-label") }}
-        {{ form.password(class="form-control") }}
-      </div>
-      <div class="form-group">
-        {{ form.expiry.label(class="form-label") }}
-        {{ form.expiry(class="form-control") }}
-      </div>
-      <div class="form-group">
-        {{ form.max_downloads.label(class="form-label") }}
-        {{ form.max_downloads(class="form-control") }}
-      </div>
-      <div class="text-center">
-        {{ form.submit(class="btn btn-primary") }}
-      </div>
-    </form>
-
-    <div class="mt-4 dropzone" id="dropzone">
+    <div class="dropzone" id="dropzone">
       Glissez et déposez les fichiers ici ou cliquez pour télécharger. <br>
       <small>Taille maximale : {{ settings.max_file_size }} Mo</small>
     </div>
+  </div>
 
-    <div id="upload-success" class="mt-4 alert alert-success" style="display: none;">
-      Fichier téléversé avec succès. Lien de téléchargement : <a id="download-link" href="#" target="_blank"></a>
-      <button id="copy-link-btn" class="btn btn-secondary ml-2">Copier le lien</button>
+  <!-- Modal pour les options de téléchargement -->
+  <div class="modal fade" id="uploadModal" tabindex="-1" role="dialog" aria-labelledby="uploadModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="uploadModalLabel">Options de Téléchargement</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <form id="upload-form" method="post" enctype="multipart/form-data" action="/upload">
+            {{ form.hidden_tag() }}
+            <input type="hidden" name="file" id="file-input">
+            <div class="form-group">
+              {{ form.password.label(class="form-label") }}
+              {{ form.password(class="form-control") }}
+            </div>
+            <div class="form-group">
+              {{ form.expiry.label(class="form-label") }}
+              {{ form.expiry(class="form-control") }}
+            </div>
+            <div class="form-group">
+              {{ form.max_downloads.label(class="form-label") }}
+              {{ form.max_downloads(class="form-control") }}
+            </div>
+            <div class="text-center">
+              {{ form.submit(class="btn btn-primary") }}
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -114,6 +120,8 @@
   <script>
     document.addEventListener('DOMContentLoaded', function () {
       var dropzone = document.getElementById('dropzone');
+      var uploadModal = $('#uploadModal');
+      var fileInput = document.getElementById('file-input');
       var uploadForm = document.getElementById('upload-form');
       var uploadSuccess = document.getElementById('upload-success');
       var downloadLink = document.getElementById('download-link');
@@ -133,31 +141,29 @@
         dropzone.classList.remove('dragover');
         var files = e.dataTransfer.files;
         if (files.length > 0) {
-          var formData = new FormData(uploadForm);
-          formData.append('file', files[0]);
-          fetch('/upload', {
-            method: 'POST',
-            body: formData
-          }).then(response => response.json()).then(data => {
-            if (data.success) {
-              uploadSuccess.style.display = 'block';
-              downloadLink.href = data.link;
-              downloadLink.textContent = data.link;
-            } else {
-              alert('Erreur lors du téléversement du fichier.');
-            }
-          }).catch(error => {
-            console.error('Error:', error);
-          });
+          var file = files[0];
+          var reader = new FileReader();
+          reader.onload = function (event) {
+            fileInput.value = event.target.result;
+            uploadModal.modal('show');
+          };
+          reader.readAsDataURL(file);
         }
       });
 
       dropzone.addEventListener('click', function () {
-        document.querySelector('input[type="file"]').click();
-      });
-
-      document.querySelector('input[type="file"]').addEventListener('change', function () {
-        uploadForm.submit();
+        var input = document.createElement('input');
+        input.type = 'file';
+        input.onchange = function (event) {
+          var file = event.target.files[0];
+          var reader = new FileReader();
+          reader.onload = function (event) {
+            fileInput.value = event.target.result;
+            uploadModal.modal('show');
+          };
+          reader.readAsDataURL(file);
+        };
+        input.click();
       });
 
       copyLinkBtn.addEventListener('click', function () {
