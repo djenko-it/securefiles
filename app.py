@@ -10,7 +10,7 @@ from wtforms import FileField, SelectField, PasswordField, SubmitField
 from wtforms.validators import DataRequired
 from flask_wtf.csrf import CSRFProtect
 from flask_limiter import Limiter
-from flask import send_file
+from flask import send_file, safe_join, current_app
 from flask_limiter.util import get_remote_address
 from redis import Redis
 from cryptography.fernet import Fernet
@@ -116,8 +116,11 @@ def preview_file(file_id):
 
         if row:
             filename = row[0]
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-
+            file_path = safe_join(current_app.config['UPLOAD_FOLDER'], filename)
+            
+            # Log the file path
+            current_app.logger.info(f"Previewing file at path: {file_path}")
+            
             if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
                 return send_file(file_path, mimetype='image/jpeg')
             elif filename.lower().endswith('.pdf'):
@@ -142,11 +145,15 @@ def upload_file():
         expiry_time = get_expiry_time(expiry_option)
         hashed_password = generate_password_hash(password) if password else None
 
-        file.save(os.path.join(app.config['UPLOAD_FOLDER'], file_id))
+        upload_folder = current_app.config['UPLOAD_FOLDER']
+        os.makedirs(upload_folder, exist_ok=True)
+        file_path = safe_join(upload_folder, file_id)
+        file.save(file_path)
+        encrypt_file(file_path)
 
         with g.db:
             g.db.execute('INSERT INTO files (id, filename, original_filename, expiry, max_downloads, password) VALUES (?, ?, ?, ?, ?, ?)',
-                         (file_id, file.filename, original_filename, expiry_time, max_downloads, hashed_password))
+                         (file_id, file_id, original_filename, expiry_time, max_downloads, hashed_password))
             g.db.commit()
 
         link = url_for('download_file', file_id=file_id, _external=True)
@@ -155,6 +162,7 @@ def upload_file():
     else:
         flash('No file selected')
         return redirect(url_for('index'))
+
 
 
 @app.route('/download/<file_id>', methods=['GET', 'POST'])
