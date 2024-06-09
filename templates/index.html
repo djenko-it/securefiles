@@ -28,6 +28,7 @@
     .dropzone small {
       display: block;
       margin-top: 10px;
+      font-weight: bold;
     }
   </style>
 </head>
@@ -46,7 +47,7 @@
   <div class="container mt-4">
     <div class="dropzone" id="dropzone">
       <i class="fas fa-cloud-upload-alt"></i>
-      Glissez et déposez les fichiers ici ou cliquez pour télécharger. <br>
+      <div>Glissez et déposez les fichiers ici ou cliquez pour télécharger.</div>
       <small>Taille maximale : {{ settings.max_file_size }} Mo</small>
     </div>
   </div>
