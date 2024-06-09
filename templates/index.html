@@ -66,8 +66,8 @@
         <div class="mt-4">
           {% for category, message in messages %}
             <div class="alert alert-info">
-              <span>{{ message }}</span>
-              <button id="copyButton" class="btn btn-secondary btn-sm" onclick="copyToClipboard('{{ message }}')">Copier le lien</button>
+              <span id="link-message">{{ message }}</span>
+              <button id="copyButton" class="btn btn-secondary btn-sm" onclick="copyToClipboard()">Copier le lien</button>
             </div>
           {% endfor %}
         </div>
@@ -119,9 +119,11 @@
   <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
   <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
   <script>
-    function copyToClipboard(text) {
+    function copyToClipboard() {
+      var message = document.getElementById('link-message').innerText;
+      var link = message.split(' ').pop();  // Extraire le dernier mot du message, qui est l'URL
       var tempInput = document.createElement('input');
-      tempInput.value = text;
+      tempInput.value = link;
       document.body.appendChild(tempInput);
       tempInput.select();
       document.execCommand('copy');
