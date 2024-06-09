@@ -99,40 +99,40 @@
   <!-- Modal À propos -->
   <div class="modal fade" id="aboutModal" tabindex="-1" role="dialog" aria-labelledby="aboutModalLabel" aria-hidden="true">
     <div class="modal-dialog" role="document">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="aboutModalLabel">À propos</h5>
-          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-            <span aria-hidden="true">&times;</span>
-          </button>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="aboutModalLabel">À propos</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                Le but de ce site est de permettre le partage sécurisé de fichiers sensibles. Chaque fichier est protégé par un lien unique, et peut être configuré pour expirer après une certaine durée ou un certain nombre de téléchargements.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Fermer</button>
+            </div>
         </div>
-        <div class="modal-body">
-          Le but de ce site est de permettre le partage sécurisé de fichiers sensibles. Chaque fichier est protégé par un lien unique, et peut être configuré pour expirer après une certaine durée ou un certain nombre de téléchargements.
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-dismiss="modal">Fermer</button>
-        </div>
-      </div>
     </div>
   </div>
 
   <!-- Modal Contact -->
   <div class="modal fade" id="contactModal" tabindex="-1" role="dialog" aria-labelledby="contactModalLabel" aria-hidden="true">
     <div class="modal-dialog" role="document">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="contactModalLabel">Contact</h5>
-          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-            <span aria-hidden="true">&times;</span>
-          </button>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="contactModalLabel">Contact</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                Pour toute question ou assistance, veuillez nous contacter à : <a href="mailto:{{ settings.contact_email }}">{{ settings.contact_email }}</a>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Fermer</button>
+            </div>
         </div>
-        <div class="modal-body">
-          Pour toute question ou assistance, veuillez nous contacter à : <a href="mailto:{{ settings.contact_email }}">{{ settings.contact_email }}</a>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-dismiss="modal">Fermer</button>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -176,6 +176,14 @@
       uploadForm.addEventListener('submit', function (e) {
         e.preventDefault();
         var formData = new FormData(uploadForm);
+        var file = fileInput.files[0];
+        var maxSize = {{ settings.max_file_size }} * 1024 * 1024; // Taille maximale en octets
+
+        if (file.size > maxSize) {
+          alert('Le fichier dépasse la taille maximale autorisée de ' + {{ settings.max_file_size }} + ' Mo.');
+          return;
+        }
+
         $.ajax({
           url: uploadForm.action,
           type: uploadForm.method,
@@ -199,15 +207,13 @@
       });
 
       copyLinkBtn.addEventListener('click', function () {
-        var tempInput = document.createElement('input');
-        document.body.appendChild(tempInput);
-        tempInput.value = downloadLink.href;
-        tempInput.select();
-        document.execCommand('copy');
-        document.body.removeChild(tempInput);
-        copyLinkBtn.textContent = 'Lien copié !';
-        copyLinkBtn.classList.remove('btn-secondary');
-        copyLinkBtn.classList.add('btn-success');
+        navigator.clipboard.writeText(downloadLink.href).then(function() {
+          copyLinkBtn.textContent = 'Lien copié !';
+          copyLinkBtn.classList.remove('btn-secondary');
+          copyLinkBtn.classList.add('btn-success');
+        }).catch(function() {
+          alert('Erreur lors de la copie du lien.');
+        });
       });
     });
   </script>
