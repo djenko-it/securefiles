@@ -66,7 +66,7 @@
         <div class="mt-4">
           {% for category, message in messages %}
             <div class="alert alert-info">
-              <span id="link-message">{{ message }}</span>
+              <span id="link-message">{{ message.split(': ').pop() }}</span>
               <button id="copyButton" class="btn btn-secondary btn-sm" onclick="copyToClipboard()">Copier le lien</button>
             </div>
           {% endfor %}
@@ -121,9 +121,8 @@
   <script>
     function copyToClipboard() {
       var message = document.getElementById('link-message').innerText;
-      var link = message.split(' ').pop();  // Extraire le dernier mot du message, qui est l'URL
       var tempInput = document.createElement('input');
-      tempInput.value = link;
+      tempInput.value = message;
       document.body.appendChild(tempInput);
       tempInput.select();
       document.execCommand('copy');
