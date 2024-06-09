@@ -7,7 +7,7 @@ from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_wtf import FlaskForm
 from wtforms import FileField, SelectField, PasswordField, SubmitField
-from wtforms.validators import DataRequired
+from wtforms.validators import DataRequired, Optional
 from flask_wtf.csrf import CSRFProtect
 from flask_limiter import Limiter
 from flask import send_file, safe_join, current_app
@@ -19,6 +19,23 @@ from cryptography.fernet import Fernet
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'supersecretkey')
 csrf = CSRFProtect(app)
+
+# Générer une clé de chiffrement
+ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY', Fernet.generate_key())
+cipher = Fernet(ENCRYPTION_KEY)
+
+def encrypt_file(file_path):
+    with open(file_path, 'rb') as file:
+        encrypted_data = cipher.encrypt(file.read())
+    with open(file_path, 'wb') as file:
+        file.write(encrypted_data)
+
+def decrypt_file(file_path):
+    with open(file_path, 'rb') as file:
+        encrypted_data = file.read()
+    decrypted_data = cipher.decrypt(encrypted_data)
+    with open(file_path, 'wb') as file:
+        file.write(decrypted_data)
 
 # Configuration de Redis
 redis_client = Redis(host='redis', port=6379)
@@ -44,6 +61,7 @@ class PasswordForm(FlaskForm):
 # Définition du formulaire WTForms
 class FileUploadForm(FlaskForm):
     file = FileField('Choisissez un fichier', validators=[DataRequired()])
+    password = PasswordField('Mot de passe (optionnel)', validators=[Optional()])
     expiry = SelectField('Durée de validité', choices=[('3h', '3 heures'), ('1d', '1 jour'), ('1w', '1 semaine'), ('1m', '1 mois')])
     max_downloads = SelectField('Nombre maximal de téléchargements', choices=[('1', '1'), ('5', '5'), ('10', '10'), ('unlimited', 'Illimité')], validators=[DataRequired()])
     submit = SubmitField('Téléverser')
@@ -134,31 +152,35 @@ def preview_file(file_id):
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
-    file = request.files['file']
-    if file:
-        file_id = str(uuid.uuid4())
-        original_filename = file.filename
-        expiry_option = request.form['expiry']
-        max_downloads = request.form['max_downloads']
-        password = request.form['password']
+    form = FileUploadForm()
+    if form.validate_on_submit():
+        file = form.file.data
+        if file and allowed_file(file.filename):
+            file_id = str(uuid.uuid4())
+            original_filename = secure_filename(file.filename)
+            expiry_option = form.expiry.data
+            max_downloads = form.max_downloads.data
+            password = form.password.data
 
-        expiry_time = get_expiry_time(expiry_option)
-        hashed_password = generate_password_hash(password) if password else None
+            expiry_time = get_expiry_time(expiry_option)
+            hashed_password = generate_password_hash(password) if password else None
 
-        file.save(os.path.join(app.config['UPLOAD_FOLDER'], file_id))
+            upload_folder = current_app.config['UPLOAD_FOLDER']
+            os.makedirs(upload_folder, exist_ok=True)
+            file_path = safe_join(upload_folder, file_id)
+            file.save(file_path)
+            encrypt_file(file_path)
 
-        with g.db:
-            g.db.execute('INSERT INTO files (id, filename, original_filename, expiry, max_downloads, password) VALUES (?, ?, ?, ?, ?, ?)',
-                         (file_id, file.filename, original_filename, expiry_time, max_downloads, hashed_password))
-            g.db.commit()
+            with g.db:
+                g.db.execute('INSERT INTO files (id, filename, original_filename, expiry, max_downloads, password) VALUES (?, ?, ?, ?, ?, ?)',
+                             (file_id, file_id, original_filename, expiry_time, max_downloads, hashed_password))
+                g.db.commit()
 
-        link = url_for('download_file', file_id=file_id, _external=True)
-        flash(f'File uploaded successfully. Download link: {link}')
-        return redirect(url_for('index'))
-    else:
-        flash('No file selected')
-        return redirect(url_for('index'))
-
+            link = url_for('download_file', file_id=file_id, _external=True)
+            flash(f'File uploaded successfully. Download link: {link}')
+            return redirect(url_for('index'))
+    flash('Invalid file upload')
+    return redirect(url_for('index'))
 
 @app.route('/download/<file_id>', methods=['GET', 'POST'])
 def download_file(file_id):
@@ -203,9 +225,6 @@ def download_file(file_id):
             flash("Le fichier n'a pas été trouvé.")
             return redirect(url_for('file_not_found'))
 
-
-
-
 @app.route('/download_direct/<file_id>', methods=['GET'])
 def download_direct(file_id):
     with g.db:
@@ -214,11 +233,11 @@ def download_direct(file_id):
         if row:
             original_filename = row[0]
             g.db.execute('UPDATE files SET views = views + 1 WHERE id = ?', (file_id,))
+            g.db.commit()
             return send_from_directory(app.config['UPLOAD_FOLDER'], file_id, as_attachment=True, attachment_filename=original_filename)
         else:
             flash("Le fichier n'a pas été trouvé.")
             return redirect(url_for('file_not_found'))
-
 
 @app.route('/file_not_found')
 def file_not_found():
