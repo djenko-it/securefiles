@@ -20,6 +20,23 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'supersecretkey')
 csrf = CSRFProtect(app)
 
+# Générer une clé de chiffrement
+ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY', Fernet.generate_key())
+cipher = Fernet(ENCRYPTION_KEY)
+
+def encrypt_file(file_path):
+    with open(file_path, 'rb') as file:
+        encrypted_data = cipher.encrypt(file.read())
+    with open(file_path, 'wb') as file:
+        file.write(encrypted_data)
+
+def decrypt_file(file_path):
+    with open(file_path, 'rb') as file:
+        encrypted_data = file.read()
+    decrypted_data = cipher.decrypt(encrypted_data)
+    with open(file_path, 'wb') as file:
+        file.write(decrypted_data)
+
 # Configuration de Redis
 redis_client = Redis(host='redis', port=6379)
 
