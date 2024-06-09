@@ -53,8 +53,8 @@
           <form id="upload-form" method="post" enctype="multipart/form-data" action="/upload">
             {{ form.hidden_tag() }}
             <div class="form-group">
-              {{ form.password.label(class="form-label") }} <span class="text-muted">(optionnel)</span>
-              {{ form.password(class="form-control") }}
+              {{ form.password.label(class="form-label") }}
+              {{ form.password(class="form-control", placeholder="Mot de passe (optionnel)") }}
             </div>
             <div class="form-group">
               {{ form.expiry.label(class="form-label") }}
@@ -87,9 +87,9 @@
         <div class="modal-body">
           <div class="form-group">
             <label for="download-link">Lien de téléchargement :</label>
-            <input type="text" class="form-control" id="download-link" readonly>
+            <input type="text" id="download-link" class="form-control" readonly>
           </div>
-          <button id="copy-link-btn" class="btn btn-secondary ml-2">Copier le lien</button>
+          <button id="copy-link-btn" class="btn btn-secondary">Copier le lien</button>
         </div>
       </div>
     </div>
@@ -98,40 +98,40 @@
   <!-- Modal À propos -->
   <div class="modal fade" id="aboutModal" tabindex="-1" role="dialog" aria-labelledby="aboutModalLabel" aria-hidden="true">
     <div class="modal-dialog" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="aboutModalLabel">À propos</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-            <div class="modal-body">
-                Le but de ce site est de permettre le partage sécurisé de fichiers sensibles. Chaque fichier est protégé par un lien unique, et peut être configuré pour expirer après une certaine durée ou un certain nombre de téléchargements.
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Fermer</button>
-            </div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="aboutModalLabel">À propos</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
         </div>
+        <div class="modal-body">
+          Le but de ce site est de permettre le partage sécurisé de fichiers sensibles. Chaque fichier est protégé par un lien unique, et peut être configuré pour expirer après une certaine durée ou un certain nombre de téléchargements.
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Fermer</button>
+        </div>
+      </div>
     </div>
   </div>
 
   <!-- Modal Contact -->
   <div class="modal fade" id="contactModal" tabindex="-1" role="dialog" aria-labelledby="contactModalLabel" aria-hidden="true">
     <div class="modal-dialog" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="contactModalLabel">Contact</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-            <div class="modal-body">
-                Pour toute question ou assistance, veuillez nous contacter à : <a href="mailto:{{ settings.contact_email }}">{{ settings.contact_email }}</a>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Fermer</button>
-            </div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="contactModalLabel">Contact</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
         </div>
+        <div class="modal-body">
+          Pour toute question ou assistance, veuillez nous contacter à : <a href="mailto:{{ settings.contact_email }}">{{ settings.contact_email }}</a>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Fermer</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -160,8 +160,7 @@
       dropzone.addEventListener('drop', function (e) {
         e.preventDefault();
         dropzone.classList.remove('dragover');
-        var files = e.dataTransfer.files;
-        var file = files[0];
+        var file = e.dataTransfer.files[0];
         var maxSize = {{ settings.max_file_size }} * 1024 * 1024; // Taille maximale en octets
 
         if (file.size > maxSize) {
@@ -169,7 +168,7 @@
           return;
         }
 
-        fileInput.files = files;
+        fileInput.files = e.dataTransfer.files;
         uploadModal.modal('show');
       });
 
@@ -192,6 +191,7 @@
       uploadForm.addEventListener('submit', function (e) {
         e.preventDefault();
         var formData = new FormData(uploadForm);
+
         $.ajax({
           url: uploadForm.action,
           type: uploadForm.method,
