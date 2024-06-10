@@ -45,6 +45,7 @@ class FileUploadForm(FlaskForm):
     file = FileField('Choisissez un fichier', validators=[DataRequired()])
     expiry = SelectField('Durée de validité', choices=[('3h', '3 heures'), ('1d', '1 jour'), ('1w', '1 semaine'), ('1m', '1 mois')])
     max_downloads = SelectField('Nombre maximal de téléchargements', choices=[('1', '1'), ('5', '5'), ('10', '10'), ('unlimited', 'Illimité')], validators=[DataRequired()])
+    password = PasswordField('Mot de passe (optionnel)')
     submit = SubmitField('Téléverser')
 
 # Fonctions de base de données
