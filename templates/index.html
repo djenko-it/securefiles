@@ -8,36 +8,10 @@
   <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
   <style>
-    body.light-theme {
-      --bg-color: #f9f9f9;
-      --text-color: #333;
-      --primary-color: #007bff;
-      --primary-color-hover: #0056b3;
-    }
-    body.dark-theme {
-      --bg-color: #333;
-      --text-color: #f9f9f9;
-      --primary-color: #1e90ff;
-      --primary-color-hover: #1c7cd6;
-    }
-    body {
-      background-color: var(--bg-color);
-      color: var(--text-color);
-      transition: background-color 0.3s, color 0.3s;
-    }
-    .btn-primary {
-      background-color: var(--primary-color);
-      border-color: var(--primary-color);
-      transition: background-color 0.3s ease, border-color 0.3s ease;
-    }
-    .btn-primary:hover {
-      background-color: var(--primary-color-hover);
-      border-color: var(--primary-color-hover);
-    }
     .dropzone {
-      border: 2px dashed var(--primary-color);
+      border: 2px dashed #007bff;
       border-radius: 10px;
-      background: var(--bg-color);
+      background: #f9f9f9;
       padding: 60px;
       text-align: center;
       cursor: pointer;
@@ -45,15 +19,16 @@
       transition: background 0.3s ease;
     }
     .dropzone.dragover {
-      background: var(--primary-color-hover);
+      background: #e0f7ff;
     }
     .dropzone i {
       font-size: 60px;
-      color: var(--primary-color);
+      color: #007bff;
       margin-bottom: 20px;
     }
     .dropzone div {
       font-size: 18px;
+      color: #333;
       margin-bottom: 10px;
     }
     .dropzone small {
@@ -61,30 +36,30 @@
       font-size: 14px;
       font-weight: bold;
     }
+    .btn-primary {
+      background-color: #007bff;
+      border-color: #007bff;
+      transition: background-color 0.3s ease, border-color 0.3s ease;
+    }
+    .btn-primary:hover {
+      background-color: #0056b3;
+      border-color: #004085;
+    }
     .modal-content {
       border-radius: 10px;
     }
-    .modal-header, .modal-footer {
-      border-color: var(--primary-color);
+    .modal-header {
+      border-bottom: 1px solid #e9ecef;
+    }
+    .modal-footer {
+      border-top: 1px solid #e9ecef;
     }
     .form-control {
       border-radius: 5px;
     }
-    #theme-toggle {
-      background: var(--bg-color);
-      color: var(--primary-color);
-      border: 1px solid var(--primary-color);
-      border-radius: 5px;
-      padding: 5px 10px;
-      cursor: pointer;
-    }
-    #theme-toggle:hover {
-      background: var(--primary-color-hover);
-      color: var(--bg-color);
-    }
   </style>
 </head>
-<body class="light-theme">
+<body class="bg-gray-100 text-gray-900">
   <nav class="bg-gray-800 p-4">
     <div class="container mx-auto flex justify-between items-center">
       <a class="text-white text-lg font-bold" href="/">{{ settings.software_name }}</a>
@@ -92,7 +67,6 @@
         <a class="text-gray-300 hover:text-white" href="/">Accueil</a>
         <a class="text-gray-300 hover:text-white" href="#" data-toggle="modal" data-target="#aboutModal">À propos</a>
         <a class="text-gray-300 hover:text-white" href="#" data-toggle="modal" data-target="#contactModal">Contact</a>
-        <div id="theme-toggle">Toggle Theme</div>
       </div>
     </div>
   </nav>
@@ -101,7 +75,7 @@
     <div class="dropzone" id="dropzone">
       <i class="fas fa-cloud-upload-alt"></i>
       <div>Glissez et déposez les fichiers ici ou cliquez pour télécharger.</div>
-      <small>Taille maximale : <strong>{{ settings.max_file_size }} Mo</strong></small>
+      <small>Taille maximale : {{ settings.max_file_size }} Mo</small>
     </div>
   </div>
 
@@ -286,20 +260,6 @@
         copyLinkBtn.classList.remove('btn-secondary');
         copyLinkBtn.classList.add('btn-success');
       });
-
-      document.getElementById('theme-toggle').addEventListener('click', function () {
-        document.body.classList.toggle('dark-theme');
-        document.body.classList.toggle('light-theme');
-        const currentTheme = document.body.classList.contains('dark-theme') ? 'dark' : 'light';
-        document.cookie = `theme=${currentTheme};path=/`;
-      });
-
-      // Set the initial theme based on the cookie
-      const theme = document.cookie.split('; ').find(row => row.startsWith('theme=')).split('=')[1];
-      if (theme) {
-        document.body.classList.remove('light-theme', 'dark-theme');
-        document.body.classList.add(`${theme}-theme`);
-      }
     });
   </script>
 </body>
