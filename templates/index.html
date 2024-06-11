@@ -71,16 +71,15 @@
       border-radius: 5px;
     }
     #theme-toggle {
-      background: var(--bg-color);
-      color: var(--primary-color);
-      border: 1px solid var(--primary-color);
-      border-radius: 5px;
-      padding: 5px 10px;
+      background: none;
+      border: none;
       cursor: pointer;
+      font-size: 24px;
+      color: var(--primary-color);
+      transition: color 0.3s ease;
     }
     #theme-toggle:hover {
-      background: var(--primary-color-hover);
-      color: var(--bg-color);
+      color: var(--primary-color-hover);
     }
   </style>
 </head>
@@ -92,7 +91,7 @@
         <a class="text-gray-300 hover:text-white" href="/">Accueil</a>
         <a class="text-gray-300 hover:text-white" href="#" data-toggle="modal" data-target="#aboutModal">À propos</a>
         <a class="text-gray-300 hover:text-white" href="#" data-toggle="modal" data-target="#contactModal">Contact</a>
-        <div id="theme-toggle">Toggle Theme</div>
+        <button id="theme-toggle"><i class="fas fa-sun"></i></button>
       </div>
     </div>
   </nav>
@@ -292,6 +291,7 @@
         document.body.classList.toggle('light-theme');
         const currentTheme = document.body.classList.contains('dark-theme') ? 'dark' : 'light';
         document.cookie = `theme=${currentTheme};path=/`;
+        this.innerHTML = currentTheme === 'dark' ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
       });
 
       // Set the initial theme based on the cookie
@@ -299,6 +299,7 @@
       if (theme) {
         document.body.classList.remove('light-theme', 'dark-theme');
         document.body.classList.add(`${theme}-theme`);
+        document.getElementById('theme-toggle').innerHTML = theme === 'dark' ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
       }
     });
   </script>
