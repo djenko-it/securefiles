@@ -13,12 +13,16 @@
       --text-color: #333;
       --primary-color: #007bff;
       --primary-color-hover: #0056b3;
+      --modal-bg-color: #fff;
+      --modal-text-color: #333;
     }
     body.dark-theme {
       --bg-color: #333;
       --text-color: #f9f9f9;
       --primary-color: #1e90ff;
       --primary-color-hover: #1c7cd6;
+      --modal-bg-color: #444;
+      --modal-text-color: #f9f9f9;
     }
     body {
       background-color: var(--bg-color);
@@ -62,7 +66,10 @@
       font-weight: bold;
     }
     .modal-content {
+      background-color: var(--modal-bg-color);
+      color: var(--modal-text-color);
       border-radius: 10px;
+      transition: background-color 0.3s, color 0.3s;
     }
     .modal-header, .modal-footer {
       border-color: var(--primary-color);
@@ -299,7 +306,7 @@
       if (theme) {
         document.body.classList.remove('light-theme', 'dark-theme');
         document.body.classList.add(`${theme}-theme`);
-        document.getElementById('theme-toggle').innerHTML = theme === 'dark' ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
+        document.getElementById('theme-toggle').innerHTML = theme === 'dark' ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun'></i>';
       }
     });
   </script>
