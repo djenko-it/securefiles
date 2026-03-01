@@ -10,7 +10,6 @@ from wtforms import FileField, SelectField, PasswordField, SubmitField
 from wtforms.validators import DataRequired
 from flask_wtf.csrf import CSRFProtect
 from flask_limiter import Limiter
-from flask import send_file, safe_join, current_app
 from flask_limiter.util import get_remote_address
 from redis import Redis
 
@@ -189,7 +188,7 @@ def download_direct(file_id):
         if row:
             original_filename = row[0]
             g.db.execute('UPDATE files SET views = views + 1 WHERE id = ?', (file_id,))
-            return send_from_directory(app.config['UPLOAD_FOLDER'], file_id, as_attachment=True, attachment_filename=original_filename)
+            return send_from_directory(app.config['UPLOAD_FOLDER'], file_id, as_attachment=True, download_name=original_filename)
         else:
             flash("Le fichier n'a pas été trouvé.")
             return redirect(url_for('file_not_found'))
