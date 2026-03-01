@@ -58,9 +58,8 @@ def get_db():
 
 def init_db():
     with sqlite3.connect(DATABASE) as conn:
-        conn.execute('DROP TABLE IF EXISTS files')
         conn.execute('''
-            CREATE TABLE files (
+            CREATE TABLE IF NOT EXISTS files (
                 id TEXT PRIMARY KEY,
                 filename TEXT,
                 original_filename TEXT,

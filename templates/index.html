@@ -4,109 +4,66 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{ settings.software_name }}</title>
-  <link href="/static/css/tailwind.css" rel="stylesheet">
-  <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-  <style>
-    .dropzone {
-      border: 2px dashed #007bff;
-      border-radius: 10px;
-      background: #f9f9f9;
-      padding: 60px;
-      text-align: center;
-      cursor: pointer;
-      position: relative;
-      transition: background 0.3s ease;
-    }
-    .dropzone.dragover {
-      background: #e0f7ff;
-    }
-    .dropzone i {
-      font-size: 60px;
-      color: #007bff;
-      margin-bottom: 20px;
-    }
-    .dropzone div {
-      font-size: 18px;
-      color: #333;
-      margin-bottom: 10px;
-    }
-    .dropzone small {
-      display: block;
-      font-size: 14px;
-      font-weight: bold;
-    }
-    .btn-primary {
-      background-color: #007bff;
-      border-color: #007bff;
-      transition: background-color 0.3s ease, border-color 0.3s ease;
-    }
-    .btn-primary:hover {
-      background-color: #0056b3;
-      border-color: #004085;
-    }
-    .modal-content {
-      border-radius: 10px;
-    }
-    .modal-header {
-      border-bottom: 1px solid #e9ecef;
-    }
-    .modal-footer {
-      border-top: 1px solid #e9ecef;
-    }
-    .form-control {
-      border-radius: 5px;
-    }
-  </style>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link href="/static/css/custom.css" rel="stylesheet">
 </head>
-<body class="bg-gray-100 text-gray-900">
-  <nav class="bg-gray-800 p-4">
-    <div class="container mx-auto flex justify-between items-center">
-      <a class="text-white text-lg font-bold" href="/">{{ settings.software_name }}</a>
-      <div class="flex space-x-4">
-        <a class="text-gray-300 hover:text-white" href="/">Accueil</a>
-        <a class="text-gray-300 hover:text-white" href="#" data-toggle="modal" data-target="#aboutModal">À propos</a>
-        <a class="text-gray-300 hover:text-white" href="#" data-toggle="modal" data-target="#contactModal">Contact</a>
-      </div>
+<body>
+  <nav class="navbar navbar-dark mb-4">
+    <div class="container">
+      <a class="navbar-brand" href="/">
+        <i class="fas fa-shield-halved me-2"></i>{{ settings.software_name }}
+      </a>
+      <span class="text-secondary small d-none d-sm-block">Partage sécurisé de fichiers</span>
     </div>
   </nav>
 
-  <div class="container mt-4">
-    <div class="dropzone" id="dropzone">
-      <i class="fas fa-cloud-upload-alt"></i>
-      <div>Glissez et déposez les fichiers ici ou cliquez pour télécharger.</div>
-      <small>Taille maximale : {{ settings.max_file_size }} Mo</small>
+  <main class="container pb-5" style="max-width: 680px;">
+    <div class="card mb-3">
+      <div class="card-body p-4">
+        <div class="dropzone" id="dropzone">
+          <div class="dz-icon"><i class="fas fa-cloud-arrow-up"></i></div>
+          <div class="fw-semibold mb-1">Glissez un fichier ici ou cliquez pour parcourir</div>
+          <small class="text-muted">Taille maximale : {{ settings.max_file_size }} Mo</small>
+        </div>
+      </div>
     </div>
-  </div>
+    <p class="text-center text-muted small">
+      <i class="fas fa-lock me-1"></i>Chaque lien est unique. Le fichier est supprimé après expiration.
+    </p>
+  </main>
 
-  <!-- Modal pour les options de téléchargement -->
-  <div class="modal fade" id="uploadModal" tabindex="-1" role="dialog" aria-labelledby="uploadModalLabel" aria-hidden="true">
-    <div class="modal-dialog" role="document">
+  <!-- Modal : options du partage -->
+  <div class="modal fade" id="uploadModal" tabindex="-1" aria-labelledby="uploadModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title" id="uploadModalLabel">Options de Téléchargement</h5>
-          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-            <span aria-hidden="true">&times;</span>
-          </button>
+          <h5 class="modal-title fw-semibold" id="uploadModalLabel">
+            <i class="fas fa-sliders me-2 text-primary"></i>Options du partage
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
         </div>
         <div class="modal-body">
           <form id="upload-form" method="post" enctype="multipart/form-data" action="/upload">
             {{ form.hidden_tag() }}
-            <div class="form-group">
-              {{ form.password.label(class="form-label") }}
-              {{ form.password(class="form-control", placeholder="Mot de passe (optionnel)") }}
+            <input type="file" id="file-input" name="file" style="display:none;">
+
+            <div class="mb-3">
+              <label class="form-label-sm">Mot de passe (optionnel)</label>
+              {{ form.password(class="form-control", placeholder="Laisser vide pour aucun mot de passe") }}
             </div>
-            <div class="form-group">
-              {{ form.expiry.label(class="form-label") }}
-              {{ form.expiry(class="form-control") }}
+            <div class="mb-3">
+              <label class="form-label-sm">Durée de validité</label>
+              {{ form.expiry(class="form-select") }}
             </div>
-            <div class="form-group">
-              {{ form.max_downloads.label(class="form-label") }}
-              {{ form.max_downloads(class="form-control") }}
+            <div class="mb-4">
+              <label class="form-label-sm">Téléchargements max</label>
+              {{ form.max_downloads(class="form-select") }}
             </div>
-            <input type="file" id="file-input" name="file" style="display:none;" />
-            <div class="text-center">
-              {{ form.submit(class="btn btn-primary") }}
+            <div class="d-grid">
+              <button type="submit" class="btn btn-primary btn-lg">
+                <i class="fas fa-upload me-2"></i>Envoyer
+              </button>
             </div>
           </form>
         </div>
@@ -114,153 +71,104 @@
     </div>
   </div>
 
-  <!-- Modal pour le lien de téléchargement -->
-  <div class="modal fade" id="linkModal" tabindex="-1" role="dialog" aria-labelledby="linkModalLabel" aria-hidden="true">
-    <div class="modal-dialog" role="document">
+  <!-- Modal : lien généré -->
+  <div class="modal fade" id="linkModal" tabindex="-1" aria-labelledby="linkModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="linkModalLabel">Lien de Téléchargement</h5>
-          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-            <span aria-hidden="true">&times;</span>
-          </button>
+        <div class="modal-header border-0 pb-0">
+          <h5 class="modal-title fw-semibold" id="linkModalLabel">
+            <i class="fas fa-circle-check text-success me-2"></i>Fichier prêt !
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
         </div>
-        <div class="modal-body">
-          <div class="form-group">
-            <label for="download-link">Lien de téléchargement :</label>
-            <input type="text" id="download-link" class="form-control" readonly>
+        <div class="modal-body pt-2">
+          <p class="text-muted small mb-2">Copiez et partagez ce lien :</p>
+          <div class="input-group">
+            <input type="text" id="download-link" class="form-control font-monospace small" readonly>
+            <button id="copy-link-btn" class="btn btn-outline-primary" type="button" title="Copier">
+              <i class="fas fa-copy"></i>
+            </button>
           </div>
-          <button id="copy-link-btn" class="btn btn-secondary">Copier le lien</button>
+          <div id="copy-success" class="text-success small mt-2" style="display:none;">
+            <i class="fas fa-check me-1"></i>Lien copié dans le presse-papier
+          </div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Modal À propos -->
-  <div class="modal fade" id="aboutModal" tabindex="-1" role="dialog" aria-labelledby="aboutModalLabel" aria-hidden="true">
-    <div class="modal-dialog" role="document">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="aboutModalLabel">À propos</h5>
-          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-            <span aria-hidden="true">&times;</span>
-          </button>
-        </div>
-        <div class="modal-body">
-          Le but de ce site est de permettre le partage sécurisé de fichiers sensibles. Chaque fichier est protégé par un lien unique, et peut être configuré pour expirer après une certaine durée ou un certain nombre de téléchargements.
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-dismiss="modal">Fermer</button>
-        </div>
-      </div>
-    </div>
-  </div>
+  <footer>
+    {{ settings.software_name }} &mdash;
+    <a href="mailto:{{ settings.contact_email }}">{{ settings.contact_email }}</a>
+  </footer>
 
-  <!-- Modal Contact -->
-  <div class="modal fade" id="contactModal" tabindex="-1" role="dialog" aria-labelledby="contactModalLabel" aria-hidden="true">
-    <div class="modal-dialog" role="document">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="contactModalLabel">Contact</h5>
-          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-            <span aria-hidden="true">&times;</span>
-          </button>
-        </div>
-        <div class="modal-body">
-          Pour toute question ou assistance, veuillez nous contacter à : <a href="mailto:{{ settings.contact_email }}">{{ settings.contact_email }}</a>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-dismiss="modal">Fermer</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
-  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function () {
-      var dropzone = document.getElementById('dropzone');
-      var uploadModal = $('#uploadModal');
-      var linkModal = $('#linkModal');
-      var fileInput = document.getElementById('file-input');
-      var uploadForm = document.getElementById('upload-form');
-      var downloadLink = document.getElementById('download-link');
-      var copyLinkBtn = document.getElementById('copy-link-btn');
+      const dropzone    = document.getElementById('dropzone')
+      const fileInput   = document.getElementById('file-input')
+      const uploadForm  = document.getElementById('upload-form')
+      const dlLink      = document.getElementById('download-link')
+      const copyBtn     = document.getElementById('copy-link-btn')
+      const copySuccess = document.getElementById('copy-success')
+      const uploadModal = new bootstrap.Modal(document.getElementById('uploadModal'))
+      const linkModal   = new bootstrap.Modal(document.getElementById('linkModal'))
+      const maxBytes    = {{ settings.max_file_size }} * 1024 * 1024
 
-      dropzone.addEventListener('dragover', function (e) {
-        e.preventDefault();
-        dropzone.classList.add('dragover');
-      });
+      function sizeOk(file) {
+        if (file.size > maxBytes) {
+          alert('Ce fichier dépasse la taille maximale de {{ settings.max_file_size }} Mo.')
+          return false
+        }
+        return true
+      }
 
-      dropzone.addEventListener('dragleave', function (e) {
-        dropzone.classList.remove('dragover');
-      });
-
+      dropzone.addEventListener('dragover',  e => { e.preventDefault(); dropzone.classList.add('dragover') })
+      dropzone.addEventListener('dragleave', ()  => dropzone.classList.remove('dragover'))
       dropzone.addEventListener('drop', function (e) {
-        e.preventDefault();
-        dropzone.classList.remove('dragover');
-        var file = e.dataTransfer.files[0];
-        var maxSize = {{ settings.max_file_size }} * 1024 * 1024; // Taille maximale en octets
+        e.preventDefault()
+        dropzone.classList.remove('dragover')
+        const f = e.dataTransfer.files[0]
+        if (!f || !sizeOk(f)) return
+        fileInput.files = e.dataTransfer.files
+        uploadModal.show()
+      })
 
-        if (file.size > maxSize) {
-          alert('Le fichier dépasse la taille maximale autorisée de ' + {{ settings.max_file_size }} + ' Mo.');
-          return;
-        }
-
-        fileInput.files = e.dataTransfer.files;
-        uploadModal.modal('show');
-      });
-
-      dropzone.addEventListener('click', function () {
-        fileInput.click();
-      });
-
+      dropzone.addEventListener('click', () => fileInput.click())
       fileInput.addEventListener('change', function () {
-        var file = fileInput.files[0];
-        var maxSize = {{ settings.max_file_size }} * 1024 * 1024; // Taille maximale en octets
-
-        if (file.size > maxSize) {
-          alert('Le fichier dépasse la taille maximale autorisée de ' + {{ settings.max_file_size }} + ' Mo.');
-          return;
-        }
-
-        uploadModal.modal('show');
-      });
+        if (!fileInput.files[0] || !sizeOk(fileInput.files[0])) return
+        uploadModal.show()
+      })
 
       uploadForm.addEventListener('submit', function (e) {
-        e.preventDefault();
-        var formData = new FormData(uploadForm);
-        formData.append('file', fileInput.files[0]);
+        e.preventDefault()
+        const fd = new FormData(uploadForm)
+        fd.set('file', fileInput.files[0])
+        fetch('/upload', { method: 'POST', body: fd })
+          .then(r => r.json())
+          .then(data => {
+            if (data.success) {
+              dlLink.value = data.link
+              uploadModal.hide()
+              linkModal.show()
+            } else {
+              alert('Erreur : ' + (data.message || 'type de fichier non autorisé.'))
+            }
+          })
+          .catch(() => alert("Erreur lors de l'envoi du fichier."))
+      })
 
-        fetch('/upload', {
-          method: 'POST',
-          body: formData
+      copyBtn.addEventListener('click', function () {
+        navigator.clipboard.writeText(dlLink.value).then(() => {
+          copySuccess.style.display = 'block'
+          copyBtn.innerHTML = '<i class="fas fa-check"></i>'
+          setTimeout(() => {
+            copySuccess.style.display = 'none'
+            copyBtn.innerHTML = '<i class="fas fa-copy"></i>'
+          }, 2500)
         })
-        .then(response => response.json())
-        .then(data => {
-          if (data.success) {
-            downloadLink.value = data.link;
-            linkModal.modal('show');
-            uploadModal.modal('hide');
-          } else {
-            alert('Erreur lors du téléchargement du fichier.');
-          }
-        })
-        .catch(error => {
-          console.error('Error:', error);
-          alert('Erreur lors du téléchargement du fichier.');
-        });
-      });
-
-      copyLinkBtn.addEventListener('click', function () {
-        downloadLink.select();
-        document.execCommand('copy');
-        copyLinkBtn.textContent = 'Lien copié';
-        copyLinkBtn.classList.remove('btn-secondary');
-        copyLinkBtn.classList.add('btn-success');
-      });
-    });
+      })
+    })
   </script>
 </body>
 </html>
