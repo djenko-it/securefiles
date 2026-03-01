@@ -2,7 +2,7 @@ import os
 import uuid
 import sqlite3
 from datetime import datetime, timedelta
-from flask import Flask, request, redirect, render_template, url_for, flash, send_from_directory, g
+from flask import Flask, request, redirect, render_template, url_for, flash, send_from_directory, g, session
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_wtf import FlaskForm
@@ -10,7 +10,6 @@ from wtforms import FileField, SelectField, PasswordField, SubmitField
 from wtforms.validators import DataRequired
 from flask_wtf.csrf import CSRFProtect
 from flask_limiter import Limiter
-from flask import send_file, safe_join, current_app
 from flask_limiter.util import get_remote_address
 from redis import Redis
 
@@ -146,7 +145,10 @@ def download_file(file_id):
 
         if row:
             filename, original_filename, expiry, views, max_downloads, hashed_password = row
-            expiry_time = datetime.strptime(expiry, '%Y-%m-%d %H:%M:%S.%f')
+            try:
+                expiry_time = datetime.strptime(expiry, '%Y-%m-%d %H:%M:%S.%f')
+            except ValueError:
+                expiry_time = datetime.strptime(expiry, '%Y-%m-%d %H:%M:%S')
 
             if datetime.now() > expiry_time:
                 g.db.execute('DELETE FROM files WHERE id = ?', (file_id,))
@@ -167,6 +169,8 @@ def download_file(file_id):
                 if hashed_password and not check_password_hash(hashed_password, password):
                     flash("Mot de passe incorrect.")
                     return render_template('password_required.html', file_id=file_id, form=form, settings=get_settings())
+                if hashed_password:
+                    session[f'auth_{file_id}'] = True
 
             if hashed_password and request.method == 'GET':
                 return render_template('password_required.html', file_id=file_id, form=form, settings=get_settings())
@@ -184,15 +188,43 @@ def download_file(file_id):
 @app.route('/download_direct/<file_id>', methods=['GET'])
 def download_direct(file_id):
     with g.db:
-        cur = g.db.execute('SELECT original_filename FROM files WHERE id = ?', (file_id,))
+        cur = g.db.execute(
+            'SELECT original_filename, expiry, views, max_downloads, password FROM files WHERE id = ?',
+            (file_id,)
+        )
         row = cur.fetchone()
-        if row:
-            original_filename = row[0]
-            g.db.execute('UPDATE files SET views = views + 1 WHERE id = ?', (file_id,))
-            return send_from_directory(app.config['UPLOAD_FOLDER'], file_id, as_attachment=True, attachment_filename=original_filename)
-        else:
+        if not row:
             flash("Le fichier n'a pas été trouvé.")
             return redirect(url_for('file_not_found'))
+
+        original_filename, expiry, views, max_downloads, hashed_password = row
+
+        # Vérification de l'expiration
+        try:
+            expiry_time = datetime.strptime(expiry, '%Y-%m-%d %H:%M:%S.%f')
+        except ValueError:
+            expiry_time = datetime.strptime(expiry, '%Y-%m-%d %H:%M:%S')
+        if datetime.now() > expiry_time:
+            g.db.execute('DELETE FROM files WHERE id = ?', (file_id,))
+            return redirect(url_for('file_expired'))
+
+        # Vérification du nombre de téléchargements
+        if max_downloads != 'unlimited' and int(max_downloads) - views <= 0:
+            g.db.execute('DELETE FROM files WHERE id = ?', (file_id,))
+            return redirect(url_for('file_not_found'))
+
+        # Vérification de l'authentification par mot de passe
+        if hashed_password and not session.get(f'auth_{file_id}'):
+            return redirect(url_for('download_file', file_id=file_id))
+
+        g.db.execute('UPDATE files SET views = views + 1 WHERE id = ?', (file_id,))
+        g.db.commit()
+        return send_from_directory(
+            app.config['UPLOAD_FOLDER'],
+            file_id,
+            as_attachment=True,
+            download_name=original_filename
+        )
 
 @app.route('/file_not_found')
 def file_not_found():
