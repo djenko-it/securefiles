@@ -11,10 +11,18 @@
 <body>
   <nav class="navbar navbar-dark mb-4">
     <div class="container">
-      <a class="navbar-brand" href="/">
-        <i class="fas fa-shield-halved me-2"></i>{{ settings.software_name }}
-      </a>
-      <span class="text-secondary small d-none d-sm-block">Partage sécurisé de fichiers</span>
+      <a class="navbar-brand" href="/"><i class="fas fa-shield-halved me-2"></i>{{ settings.software_name }}</a>
+      <div class="d-flex align-items-center gap-2">
+        {% if current_user.is_authenticated %}
+          <a href="{{ url_for('dashboard') }}" class="btn btn-sm btn-outline-light">
+            <i class="fas fa-table-list me-1"></i>Mes partages
+          </a>
+          <a href="{{ url_for('logout') }}" class="text-secondary small ms-1">Déconnexion</a>
+        {% else %}
+          <a href="{{ url_for('login') }}" class="btn btn-sm btn-outline-light">Connexion</a>
+          <a href="{{ url_for('register') }}" class="btn btn-sm btn-primary">Inscription</a>
+        {% endif %}
+      </div>
     </div>
   </nav>
 

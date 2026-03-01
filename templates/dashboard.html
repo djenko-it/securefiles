@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ settings.software_name }} — Tableau de bord</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link href="/static/css/custom.css" rel="stylesheet">
+</head>
+<body>
+  <nav class="navbar navbar-dark mb-4">
+    <div class="container">
+      <a class="navbar-brand" href="/"><i class="fas fa-shield-halved me-2"></i>{{ settings.software_name }}</a>
+      <div class="d-flex align-items-center gap-3">
+        <span class="text-secondary small d-none d-sm-inline">
+          <i class="fas fa-user me-1"></i>{{ current_user.username }}
+        </span>
+        <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-light">Déconnexion</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container pb-5" style="max-width: 900px;">
+
+    <!-- Lien de dépôt -->
+    <div class="card mb-4">
+      <div class="card-body p-4">
+        <p class="fw-semibold mb-1" style="font-size:.8rem; letter-spacing:.05em; text-transform:uppercase; color:#6c757d;">
+          <i class="fas fa-inbox me-2"></i>Mon lien de dépôt
+        </p>
+        <p class="text-muted small mb-2">Partagez ce lien pour recevoir des fichiers sans que l'expéditeur ait besoin d'un compte :</p>
+        <div class="input-group" style="max-width:600px;">
+          <input id="drop-url" type="text" class="form-control font-monospace small" value="{{ drop_url }}" readonly>
+          <button id="copy-drop-btn" class="btn btn-outline-primary" type="button"><i class="fas fa-copy"></i></button>
+        </div>
+        <div id="copy-drop-ok" class="text-success small mt-1" style="display:none;">
+          <i class="fas fa-check me-1"></i>Lien copié !
+        </div>
+      </div>
+    </div>
+
+    <!-- Fichiers reçus -->
+    {% set received = files | selectattr('deposited_by') | list %}
+    {% if received %}
+    <div class="card mb-4">
+      <div class="card-body p-4">
+        <p class="fw-semibold mb-3" style="font-size:.8rem; letter-spacing:.05em; text-transform:uppercase; color:#6c757d;">
+          <i class="fas fa-arrow-down me-2 text-success"></i>Fichiers reçus
+        </p>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead style="font-size:.8rem; color:#6c757d;">
+              <tr><th>Fichier</th><th>Expéditeur</th><th>Expire le</th><th></th></tr>
+            </thead>
+            <tbody>
+              {% for f in received %}
+              <tr>
+                <td>
+                  <i class="fas fa-file me-2 text-muted"></i>
+                  {% if not f.expired %}
+                    <a href="{{ url_for('download_file', file_id=f.id) }}" class="text-decoration-none fw-medium">{{ f.name }}</a>
+                  {% else %}
+                    <span class="text-muted">{{ f.name }}</span>
+                    <span class="badge bg-secondary ms-1" style="font-size:.65rem;">Expiré</span>
+                  {% endif %}
+                </td>
+                <td><small class="text-muted">{{ f.deposited_by }}</small></td>
+                <td><small class="text-muted">{{ f.expiry }}</small></td>
+                <td class="text-end">
+                  <form method="post" action="{{ url_for('delete_file', file_id=f.id) }}"
+                        onsubmit="return confirm('Supprimer ce fichier ?')">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="btn btn-sm btn-link text-danger p-0" type="submit">
+                      <i class="fas fa-trash-can"></i>
+                    </button>
+                  </form>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Mes partages -->
+    {% set shared = files | rejectattr('deposited_by') | list %}
+    <div class="card">
+      <div class="card-body p-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <p class="fw-semibold mb-0" style="font-size:.8rem; letter-spacing:.05em; text-transform:uppercase; color:#6c757d;">
+            <i class="fas fa-share-nodes me-2"></i>Mes partages
+          </p>
+          <a href="{{ url_for('index') }}" class="btn btn-sm btn-primary">
+            <i class="fas fa-plus me-1"></i>Nouveau
+          </a>
+        </div>
+
+        {% if shared %}
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead style="font-size:.8rem; color:#6c757d;">
+              <tr><th>Fichier</th><th>Expire le</th><th>Restants</th><th>Lien</th><th></th></tr>
+            </thead>
+            <tbody>
+              {% for f in shared %}
+              <tr class="{{ 'text-muted' if f.expired or f.exhausted }}">
+                <td>
+                  <i class="fas fa-file me-2 text-muted"></i>
+                  <span class="fw-medium">{{ f.name }}</span>
+                  {% if f.expired %}<span class="badge bg-secondary ms-1" style="font-size:.65rem;">Expiré</span>{% endif %}
+                  {% if f.exhausted and not f.expired %}<span class="badge bg-warning text-dark ms-1" style="font-size:.65rem;">Épuisé</span>{% endif %}
+                </td>
+                <td><small class="text-muted">{{ f.expiry }}</small></td>
+                <td><small>{{ f.remaining }}</small></td>
+                <td>
+                  {% if not f.expired and not f.exhausted %}
+                  <button class="btn btn-link btn-sm p-0 text-muted copy-link-btn"
+                          data-url="{{ url_for('download_file', file_id=f.id, _external=True) }}"
+                          title="Copier le lien">
+                    <i class="fas fa-copy"></i>
+                  </button>
+                  {% endif %}
+                </td>
+                <td class="text-end">
+                  <form method="post" action="{{ url_for('delete_file', file_id=f.id) }}"
+                        onsubmit="return confirm('Supprimer ce partage ?')">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="btn btn-sm btn-link text-danger p-0" type="submit">
+                      <i class="fas fa-trash-can"></i>
+                    </button>
+                  </form>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="text-center py-4 text-muted">
+          <i class="fas fa-folder-open fa-2x mb-2 d-block opacity-25"></i>
+          Aucun partage pour le moment.
+          <a href="{{ url_for('index') }}">Envoyer un fichier</a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <a href="mailto:{{ settings.contact_email }}">{{ settings.contact_email }}</a>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    document.getElementById('copy-drop-btn').addEventListener('click', function () {
+      navigator.clipboard.writeText(document.getElementById('drop-url').value).then(() => {
+        const ok = document.getElementById('copy-drop-ok')
+        ok.style.display = 'block'
+        this.innerHTML = '<i class="fas fa-check"></i>'
+        setTimeout(() => { ok.style.display = 'none'; this.innerHTML = '<i class="fas fa-copy"></i>' }, 2500)
+      })
+    })
+
+    document.querySelectorAll('.copy-link-btn').forEach(btn => {
+      btn.addEventListener('click', function () {
+        navigator.clipboard.writeText(this.dataset.url).then(() => {
+          const icon = this.querySelector('i')
+          icon.className = 'fas fa-check text-success'
+          setTimeout(() => icon.className = 'fas fa-copy', 2000)
+        })
+      })
+    })
+  </script>
+</body>
+</html>

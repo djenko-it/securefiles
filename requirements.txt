@@ -1,6 +1,7 @@
 Flask==2.0.1
 Werkzeug==2.0.1
 Flask-WTF
+Flask-Login
 Flask-Limiter
 redis
 cryptography
