@@ -8,248 +8,350 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <link href="/static/css/custom.css" rel="stylesheet">
   <style>
-    .table th { font-size: .8rem; font-weight: 600; color: #6c757d; text-transform: uppercase; letter-spacing: .05em; }
-    .table td { vertical-align: middle; }
+    .table th { font-size: .78rem; font-weight: 600; color: #6c757d; text-transform: uppercase; letter-spacing: .05em; }
+    .table td { vertical-align: middle; font-size: .9rem; }
     .crown-gold { color: #f0a500; }
+    .log-table td { font-size: .82rem; }
+    .badge-action { font-size: .72rem; letter-spacing: .03em; }
+    #log-filter { max-width: 220px; }
   </style>
 </head>
 <body>
 
-  <nav class="navbar navbar-dark mb-4">
-    <div class="container">
-      <a class="navbar-brand" href="/"><i class="fas fa-shield-halved me-2"></i>{{ settings.app_name }}</a>
-      <div class="d-flex align-items-center gap-2">
-        <a href="{{ url_for('admin_panel') }}" class="btn btn-sm btn-warning">
-          <i class="fas fa-screwdriver-wrench me-1"></i>Admin
-        </a>
-        <a href="{{ url_for('dashboard') }}" class="btn btn-sm btn-outline-light">
-          <i class="fas fa-table-list me-1"></i>Mes partages
-        </a>
-        <a href="{{ url_for('logout') }}" class="text-secondary small ms-1">Déconnexion</a>
+<nav class="navbar navbar-dark mb-4">
+  <div class="container">
+    <a class="navbar-brand" href="/"><i class="fas fa-shield-halved me-2"></i>{{ settings.app_name }}</a>
+    <div class="d-flex align-items-center gap-2">
+      <a href="{{ url_for('admin_panel') }}" class="btn btn-sm btn-warning">
+        <i class="fas fa-screwdriver-wrench me-1"></i>Admin
+      </a>
+      <a href="{{ url_for('dashboard') }}" class="btn btn-sm btn-outline-light">
+        <i class="fas fa-table-list me-1"></i>Mes partages
+      </a>
+      <a href="{{ url_for('logout') }}" class="text-secondary small ms-1">Déconnexion</a>
+    </div>
+  </div>
+</nav>
+
+<main class="container pb-5">
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in messages %}
+      <div class="alert alert-{{ cat }} alert-dismissible fade show py-2" role="alert">
+        {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endwith %}
+
+  <h1 class="h4 fw-semibold mb-4">
+    <i class="fas fa-screwdriver-wrench me-2 text-warning"></i>Administration
+  </h1>
+
+  <ul class="nav nav-tabs mb-4" id="adminTabs" role="tablist">
+    <li class="nav-item">
+      <button class="nav-link active" id="tab-users-btn" data-bs-toggle="tab"
+              data-bs-target="#tab-users" type="button" role="tab">
+        <i class="fas fa-users me-1"></i>Utilisateurs
+        <span class="badge bg-secondary ms-1">{{ users | length }}</span>
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link" id="tab-settings-btn" data-bs-toggle="tab"
+              data-bs-target="#tab-settings" type="button" role="tab">
+        <i class="fas fa-sliders me-1"></i>Paramètres
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link" id="tab-logs-btn" data-bs-toggle="tab"
+              data-bs-target="#tab-logs" type="button" role="tab">
+        <i class="fas fa-scroll me-1"></i>Journal d'audit
+        <span class="badge bg-secondary ms-1">{{ logs | length }}</span>
+      </button>
+    </li>
+  </ul>
+
+  <div class="tab-content" id="adminTabsContent">
+
+    <!-- ── Onglet Utilisateurs ──────────────────────────────────────────── -->
+    <div class="tab-pane fade show active" id="tab-users" role="tabpanel">
+      <div class="card shadow-sm">
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th class="ps-4">Utilisateur</th>
+                  <th>Inscription</th>
+                  <th class="text-center">Fichiers</th>
+                  <th class="text-center">Stockage</th>
+                  <th class="text-end pe-4">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for u in users %}
+                <tr>
+                  <td class="ps-4 fw-semibold">
+                    {% if u.is_admin %}
+                      <i class="fas fa-crown crown-gold me-1" title="Administrateur"></i>
+                    {% endif %}
+                    {{ u.username }}
+                    {% if u.id == current_user.id %}
+                      <span class="badge bg-primary ms-1" style="font-size:.7rem">vous</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-muted small">{{ u.created_at[:10] if u.created_at else '—' }}</td>
+                  <td class="text-center">
+                    <span class="badge bg-light text-dark border">{{ u.file_count }}</span>
+                  </td>
+                  <td class="text-center">
+                    <span class="badge bg-light text-dark border">{{ u.storage_mb }} Mo</span>
+                  </td>
+                  <td class="text-end pe-4">
+                    {% if u.id != current_user.id %}
+                      <form method="post"
+                            action="{{ url_for('admin_toggle_admin', user_id=u.id) }}"
+                            class="d-inline"
+                            onsubmit="return confirm('Modifier les droits admin de {{ u.username }} ?')">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="btn btn-sm {% if u.is_admin %}btn-warning{% else %}btn-outline-secondary{% endif %}"
+                                title="{{ 'Retirer les droits admin' if u.is_admin else 'Promouvoir administrateur' }}">
+                          <i class="fas fa-crown"></i>
+                        </button>
+                      </form>
+                      <form method="post"
+                            action="{{ url_for('admin_delete_user', user_id=u.id) }}"
+                            class="d-inline"
+                            onsubmit="return confirm('Supprimer {{ u.username }} et tous ses fichiers ? Cette action est irréversible.')">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="btn btn-sm btn-outline-danger ms-1" title="Supprimer">
+                          <i class="fas fa-trash"></i>
+                        </button>
+                      </form>
+                    {% else %}
+                      <span class="text-muted small">—</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% else %}
+                <tr>
+                  <td colspan="5" class="text-center text-muted py-4">Aucun utilisateur.</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
-  </nav>
 
-  <main class="container pb-5">
+    <!-- ── Onglet Paramètres ─────────────────────────────────────────────── -->
+    <div class="tab-pane fade" id="tab-settings" role="tabpanel">
+      <div class="card shadow-sm">
+        <div class="card-body p-4">
+          <form method="post" action="{{ url_for('admin_save_settings') }}">
+            {{ form.hidden_tag() }}
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% for cat, msg in messages %}
-        <div class="alert alert-{{ cat }} alert-dismissible fade show py-2" role="alert">
-          {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-      {% endfor %}
-    {% endwith %}
-
-    <h1 class="h4 fw-semibold mb-4">
-      <i class="fas fa-screwdriver-wrench me-2 text-warning"></i>Administration
-    </h1>
-
-    <ul class="nav nav-tabs mb-4" id="adminTabs" role="tablist">
-      <li class="nav-item">
-        <button class="nav-link active" id="tab-users-btn" data-bs-toggle="tab"
-                data-bs-target="#tab-users" type="button" role="tab">
-          <i class="fas fa-users me-1"></i>Utilisateurs
-          <span class="badge bg-secondary ms-1">{{ users | length }}</span>
-        </button>
-      </li>
-      <li class="nav-item">
-        <button class="nav-link" id="tab-settings-btn" data-bs-toggle="tab"
-                data-bs-target="#tab-settings" type="button" role="tab">
-          <i class="fas fa-sliders me-1"></i>Paramètres
-        </button>
-      </li>
-    </ul>
-
-    <div class="tab-content" id="adminTabsContent">
-
-      <!-- ── Onglet Utilisateurs ── -->
-      <div class="tab-pane fade show active" id="tab-users" role="tabpanel">
-        <div class="card shadow-sm">
-          <div class="card-body p-0">
-            <div class="table-responsive">
-              <table class="table table-hover mb-0">
-                <thead class="table-light">
-                  <tr>
-                    <th class="ps-4">Utilisateur</th>
-                    <th>Inscription</th>
-                    <th class="text-center">Fichiers</th>
-                    <th class="text-center">Stockage utilisé</th>
-                    <th class="text-end pe-4">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for u in users %}
-                  <tr>
-                    <td class="ps-4 fw-semibold">
-                      {% if u.is_admin %}
-                        <i class="fas fa-crown crown-gold me-1" title="Administrateur"></i>
-                      {% endif %}
-                      {{ u.username }}
-                      {% if u.id == current_user.id %}
-                        <span class="badge bg-primary ms-1" style="font-size:.7rem;">vous</span>
-                      {% endif %}
-                    </td>
-                    <td class="text-muted small">
-                      {{ u.created_at[:10] if u.created_at else '—' }}
-                    </td>
-                    <td class="text-center">
-                      <span class="badge bg-light text-dark border">{{ u.file_count }}</span>
-                    </td>
-                    <td class="text-center">
-                      <span class="badge bg-light text-dark border">{{ u.storage_mb }} Mo</span>
-                    </td>
-                    <td class="text-end pe-4">
-                      {% if u.id != current_user.id %}
-                        <form method="post"
-                              action="{{ url_for('admin_toggle_admin', user_id=u.id) }}"
-                              class="d-inline"
-                              onsubmit="return confirm('Modifier les droits admin de {{ u.username }} ?')">
-                          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                          <button class="btn btn-sm {% if u.is_admin %}btn-warning{% else %}btn-outline-secondary{% endif %}"
-                                  title="{{ 'Retirer les droits admin' if u.is_admin else 'Promouvoir administrateur' }}">
-                            <i class="fas fa-crown"></i>
-                          </button>
-                        </form>
-                        <form method="post"
-                              action="{{ url_for('admin_delete_user', user_id=u.id) }}"
-                              class="d-inline"
-                              onsubmit="return confirm('Supprimer {{ u.username }} et tous ses fichiers ? Cette action est irréversible.')">
-                          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                          <button class="btn btn-sm btn-outline-danger ms-1" title="Supprimer">
-                            <i class="fas fa-trash"></i>
-                          </button>
-                        </form>
-                      {% else %}
-                        <span class="text-muted small">—</span>
-                      {% endif %}
-                    </td>
-                  </tr>
-                  {% else %}
-                  <tr>
-                    <td colspan="5" class="text-center text-muted py-4">Aucun utilisateur.</td>
-                  </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
+            <p class="text-uppercase fw-semibold text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em">
+              <i class="fas fa-tag me-1"></i>Identité
+            </p>
+            <div class="row g-3 mb-4">
+              <div class="col-md-6">
+                <label class="form-label">{{ form.app_name.label.text }}</label>
+                {{ form.app_name(class="form-control") }}
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">{{ form.contact_email.label.text }}</label>
+                {{ form.contact_email(class="form-control", type="email") }}
+              </div>
             </div>
+
+            <hr class="my-3">
+            <p class="text-uppercase fw-semibold text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em">
+              <i class="fas fa-file me-1"></i>Fichiers
+            </p>
+            <div class="row g-3 mb-4">
+              <div class="col-md-4">
+                <label class="form-label">{{ form.max_file_size_mb.label.text }}</label>
+                <div class="input-group">
+                  {{ form.max_file_size_mb(class="form-control") }}
+                  <span class="input-group-text">Mo</span>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">{{ form.default_expiry.label.text }}</label>
+                {{ form.default_expiry(class="form-select") }}
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">{{ form.blocked_extensions.label.text }}</label>
+                {{ form.blocked_extensions(class="form-control", placeholder="exe, bat, sh…") }}
+                <div class="form-text">Séparées par des virgules.</div>
+              </div>
+            </div>
+
+            <hr class="my-3">
+            <p class="text-uppercase fw-semibold text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em">
+              <i class="fas fa-gauge me-1"></i>Quotas par utilisateur
+            </p>
+            <div class="row g-3 mb-4">
+              <div class="col-md-6">
+                <label class="form-label">{{ form.max_files_per_user.label.text }}</label>
+                <div class="input-group">
+                  {{ form.max_files_per_user(class="form-control") }}
+                  <span class="input-group-text">fichiers</span>
+                </div>
+                <div class="form-text">0 = pas de limite.</div>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">{{ form.max_storage_mb.label.text }}</label>
+                <div class="input-group">
+                  {{ form.max_storage_mb(class="form-control") }}
+                  <span class="input-group-text">Mo</span>
+                </div>
+                <div class="form-text">0 = pas de limite.</div>
+              </div>
+            </div>
+
+            <hr class="my-3">
+            <p class="text-uppercase fw-semibold text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em">
+              <i class="fas fa-lock me-1"></i>Accès
+            </p>
+            <div class="mb-4">
+              <div class="form-check form-switch">
+                {{ form.allow_registration(class="form-check-input", role="switch", id="allowReg") }}
+                <label class="form-check-label" for="allowReg">{{ form.allow_registration.label.text }}</label>
+              </div>
+              <div class="form-text">Si désactivé, seuls les admins peuvent créer de nouveaux comptes.</div>
+            </div>
+
+            <button type="submit" class="btn btn-primary">
+              <i class="fas fa-floppy-disk me-2"></i>{{ form.submit.label.text }}
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Onglet Journal d'audit ────────────────────────────────────────── -->
+    <div class="tab-pane fade" id="tab-logs" role="tabpanel">
+      <div class="card shadow-sm">
+        <div class="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2 py-3">
+          <span class="fw-semibold">
+            <i class="fas fa-scroll me-1 text-muted"></i>Derniers {{ logs | length }} événements
+          </span>
+          <div class="d-flex gap-2 align-items-center flex-wrap">
+            <select id="log-filter" class="form-select form-select-sm">
+              <option value="">Toutes les actions</option>
+              <option value="login">login</option>
+              <option value="login_failed">login_failed</option>
+              <option value="logout">logout</option>
+              <option value="register">register</option>
+              <option value="upload">upload</option>
+              <option value="download">download</option>
+              <option value="delete_file">delete_file</option>
+              <option value="drop_upload">drop_upload</option>
+              <option value="admin_delete_user">admin_delete_user</option>
+              <option value="admin_toggle_admin">admin_toggle_admin</option>
+              <option value="admin_settings">admin_settings</option>
+              <option value="cleanup">cleanup</option>
+            </select>
+            <input id="log-search" type="search" class="form-control form-control-sm"
+                   placeholder="Utilisateur / détail…" style="max-width:200px">
+          </div>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive" style="max-height:60vh;overflow-y:auto">
+            <table class="table table-hover table-sm log-table mb-0" id="log-table">
+              <thead class="table-light sticky-top">
+                <tr>
+                  <th class="ps-3">Horodatage</th>
+                  <th>Utilisateur</th>
+                  <th>Action</th>
+                  <th>Cible</th>
+                  <th>Détails</th>
+                  <th class="pe-3">IP</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for log in logs %}
+                <tr class="log-row" data-action="{{ log.action }}"
+                    data-search="{{ (log.username ~ ' ' ~ (log.details or '') ~ ' ' ~ (log.target or '')) | lower }}">
+                  <td class="ps-3 text-muted text-nowrap">
+                    {{ log.timestamp[:19] if log.timestamp else '—' }}
+                  </td>
+                  <td class="fw-semibold">{{ log.username or '—' }}</td>
+                  <td>
+                    {% set badge_map = {
+                      'login':              'bg-success',
+                      'login_failed':       'bg-danger',
+                      'logout':             'bg-secondary',
+                      'register':           'bg-info text-dark',
+                      'upload':             'bg-primary',
+                      'download':           'bg-success',
+                      'delete_file':        'bg-danger',
+                      'drop_upload':        'bg-info text-dark',
+                      'admin_delete_user':  'bg-danger',
+                      'admin_toggle_admin': 'bg-warning text-dark',
+                      'admin_settings':     'bg-warning text-dark',
+                      'cleanup':            'bg-secondary',
+                    } %}
+                    <span class="badge badge-action {{ badge_map.get(log.action, 'bg-light text-dark border') }}">
+                      {{ log.action }}
+                    </span>
+                  </td>
+                  <td class="text-muted font-monospace" style="font-size:.78rem;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+                      title="{{ log.target or '' }}">
+                    {{ log.target or '—' }}
+                  </td>
+                  <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+                      title="{{ log.details or '' }}">
+                    {{ log.details or '—' }}
+                  </td>
+                  <td class="pe-3 text-muted font-monospace" style="font-size:.78rem">
+                    {{ log.ip or '—' }}
+                  </td>
+                </tr>
+                {% else %}
+                <tr>
+                  <td colspan="6" class="text-center text-muted py-4">Aucun événement enregistré.</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
+    </div>
 
-      <!-- ── Onglet Paramètres ── -->
-      <div class="tab-pane fade" id="tab-settings" role="tabpanel">
-        <div class="card shadow-sm">
-          <div class="card-body p-4">
-            <form method="post" action="{{ url_for('admin_save_settings') }}">
-              {{ form.hidden_tag() }}
+  </div><!-- /tab-content -->
+</main>
 
-              <!-- Identité -->
-              <p class="text-uppercase fw-semibold text-muted mb-3"
-                 style="font-size:.75rem;letter-spacing:.08em;">
-                <i class="fas fa-tag me-1"></i>Identité de l'application
-              </p>
-              <div class="row g-3 mb-4">
-                <div class="col-md-6">
-                  <label class="form-label">{{ form.app_name.label.text }}</label>
-                  {{ form.app_name(class="form-control") }}
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">{{ form.contact_email.label.text }}</label>
-                  {{ form.contact_email(class="form-control", type="email") }}
-                </div>
-              </div>
+<footer>
+  <a href="mailto:{{ settings.contact_email }}">{{ settings.contact_email }}</a>
+</footer>
 
-              <hr class="my-3">
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  // Ouvre l'onglet correct selon le hash d'URL
+  const hashTabMap = { '#settings': 'tab-settings-btn', '#logs': 'tab-logs-btn' };
+  const targetBtn  = hashTabMap[window.location.hash];
+  if (targetBtn) bootstrap.Tab.getOrCreateInstance(document.getElementById(targetBtn)).show();
 
-              <!-- Fichiers -->
-              <p class="text-uppercase fw-semibold text-muted mb-3"
-                 style="font-size:.75rem;letter-spacing:.08em;">
-                <i class="fas fa-file me-1"></i>Fichiers
-              </p>
-              <div class="row g-3 mb-4">
-                <div class="col-md-4">
-                  <label class="form-label">{{ form.max_file_size_mb.label.text }}</label>
-                  <div class="input-group">
-                    {{ form.max_file_size_mb(class="form-control") }}
-                    <span class="input-group-text">Mo</span>
-                  </div>
-                </div>
-                <div class="col-md-4">
-                  <label class="form-label">{{ form.default_expiry.label.text }}</label>
-                  {{ form.default_expiry(class="form-select") }}
-                </div>
-                <div class="col-md-4">
-                  <label class="form-label">{{ form.blocked_extensions.label.text }}</label>
-                  {{ form.blocked_extensions(class="form-control", placeholder="exe, bat, sh, ...") }}
-                  <div class="form-text">Séparées par des virgules.</div>
-                </div>
-              </div>
+  // Filtre côté client pour le journal d'audit
+  const filterSel  = document.getElementById('log-filter');
+  const searchInput = document.getElementById('log-search');
 
-              <hr class="my-3">
+  function filterLogs() {
+    const action  = filterSel.value.toLowerCase();
+    const keyword = searchInput.value.toLowerCase().trim();
+    document.querySelectorAll('#log-table .log-row').forEach(row => {
+      const matchAction  = !action  || row.dataset.action  === action;
+      const matchKeyword = !keyword || row.dataset.search.includes(keyword);
+      row.style.display  = (matchAction && matchKeyword) ? '' : 'none';
+    });
+  }
 
-              <!-- Quotas -->
-              <p class="text-uppercase fw-semibold text-muted mb-3"
-                 style="font-size:.75rem;letter-spacing:.08em;">
-                <i class="fas fa-gauge me-1"></i>Quotas par utilisateur
-              </p>
-              <div class="row g-3 mb-4">
-                <div class="col-md-6">
-                  <label class="form-label">{{ form.max_files_per_user.label.text }}</label>
-                  <div class="input-group">
-                    {{ form.max_files_per_user(class="form-control") }}
-                    <span class="input-group-text">fichiers</span>
-                  </div>
-                  <div class="form-text">0 = pas de limite.</div>
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">{{ form.max_storage_mb.label.text }}</label>
-                  <div class="input-group">
-                    {{ form.max_storage_mb(class="form-control") }}
-                    <span class="input-group-text">Mo</span>
-                  </div>
-                  <div class="form-text">0 = pas de limite.</div>
-                </div>
-              </div>
-
-              <hr class="my-3">
-
-              <!-- Accès -->
-              <p class="text-uppercase fw-semibold text-muted mb-3"
-                 style="font-size:.75rem;letter-spacing:.08em;">
-                <i class="fas fa-lock me-1"></i>Accès
-              </p>
-              <div class="mb-4">
-                <div class="form-check form-switch">
-                  {{ form.allow_registration(class="form-check-input", role="switch", id="allowReg") }}
-                  <label class="form-check-label" for="allowReg">
-                    {{ form.allow_registration.label.text }}
-                  </label>
-                </div>
-                <div class="form-text">Si désactivé, seuls les admins peuvent créer de nouveaux comptes.</div>
-              </div>
-
-              <button type="submit" class="btn btn-primary">
-                <i class="fas fa-floppy-disk me-2"></i>{{ form.submit.label.text }}
-              </button>
-            </form>
-          </div>
-        </div>
-      </div>
-
-    </div><!-- /tab-content -->
-  </main>
-
-  <footer>
-    <a href="mailto:{{ settings.contact_email }}">{{ settings.contact_email }}</a>
-  </footer>
-
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  <script>
-    // Ouvre l'onglet Paramètres si l'URL contient #settings
-    if (window.location.hash === '#settings') {
-      const btn = document.getElementById('tab-settings-btn');
-      if (btn) bootstrap.Tab.getOrCreateInstance(btn).show();
-    }
-  </script>
+  filterSel.addEventListener('change', filterLogs);
+  searchInput.addEventListener('input',  filterLogs);
+</script>
 </body>
 </html>

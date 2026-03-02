@@ -1,23 +1,33 @@
+import io
+import logging
 import os
-import uuid
 import sqlite3
+import uuid
 from datetime import datetime, timedelta
 from functools import wraps
-from flask import Flask, request, redirect, render_template, url_for, flash, send_from_directory, g, session, abort
-from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
-from werkzeug.security import generate_password_hash, check_password_hash
-from flask_wtf import FlaskForm
-from wtforms import FileField, SelectField, PasswordField, SubmitField, StringField, BooleanField, IntegerField
-from wtforms.validators import DataRequired, Length, EqualTo, Optional, NumberRange
-from flask_wtf.csrf import CSRFProtect
+
+from apscheduler.schedulers.background import BackgroundScheduler
+from cryptography.fernet import Fernet, InvalidToken
+from flask import (Flask, abort, flash, g, redirect, render_template,
+                   request, send_file, send_from_directory, session,
+                   url_for)
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from flask_login import (LoginManager, UserMixin, current_user, login_required,
+                         login_user, logout_user)
+from flask_wtf import FlaskForm
+from flask_wtf.csrf import CSRFProtect
 from redis import Redis
+from werkzeug.security import check_password_hash, generate_password_hash
+from wtforms import (BooleanField, FileField, IntegerField, PasswordField,
+                     SelectField, StringField, SubmitField)
+from wtforms.validators import DataRequired, EqualTo, Length, NumberRange, Optional
 
-# ── Configuration ────────────────────────────────────────────────────────────
+# ── Application ───────────────────────────────────────────────────────────────
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'supersecretkey')
 csrf = CSRFProtect(app)
+logging.basicConfig(level=logging.INFO)
 
 redis_client = Redis(host='redis', port=6379)
 
@@ -25,10 +35,9 @@ limiter = Limiter(
     get_remote_address,
     app=app,
     storage_uri='redis://redis:6379',
-    default_limits=["200 per day", "50 per hour"]
+    default_limits=["200 per day", "50 per hour"],
 )
 
-# ── Flask-Login ───────────────────────────────────────────────────────────────
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 login_manager.login_message = 'Veuillez vous connecter pour accéder à cette page.'
@@ -55,7 +64,37 @@ SETTINGS_DEFAULTS = {
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
+# ── Chiffrement Fernet ────────────────────────────────────────────────────────
+_raw_key = os.environ.get('ENCRYPTION_KEY', '').strip().strip('"').strip("'")
+# retire les commentaires inline éventuels (ex. "key=xxx  # commentaire")
+_raw_key = _raw_key.split('#')[0].strip()
+if _raw_key:
+    try:
+        fernet = Fernet(_raw_key.encode())
+        app.logger.info("Chiffrement Fernet activé.")
+    except Exception as exc:
+        app.logger.warning("ENCRYPTION_KEY invalide — chiffrement désactivé : %s", exc)
+        fernet = None
+else:
+    app.logger.warning("ENCRYPTION_KEY absent — fichiers stockés sans chiffrement.")
+    fernet = None
 
+
+def _encrypt(data: bytes) -> bytes:
+    return fernet.encrypt(data) if fernet else data
+
+
+def _decrypt(data: bytes) -> bytes:
+    if not fernet:
+        return data
+    try:
+        return fernet.decrypt(data)
+    except InvalidToken:
+        # Fichier antérieur au chiffrement : on le sert tel quel
+        return data
+
+
+# ── Modèle utilisateur ────────────────────────────────────────────────────────
 class User(UserMixin):
     def __init__(self, id, username, password, drop_token, is_admin=False):
         self.id         = id
@@ -69,7 +108,7 @@ class User(UserMixin):
 def load_user(user_id):
     cur = get_db().execute(
         'SELECT id, username, password, drop_token, is_admin FROM users WHERE id = ?',
-        (user_id,)
+        (user_id,),
     )
     row = cur.fetchone()
     return User(*row) if row else None
@@ -84,7 +123,7 @@ def admin_required(f):
     return decorated
 
 
-# ── Forms ─────────────────────────────────────────────────────────────────────
+# ── Formulaires WTForms ───────────────────────────────────────────────────────
 class PasswordForm(FlaskForm):
     password = PasswordField('Mot de passe', validators=[DataRequired()])
     submit   = SubmitField('Soumettre')
@@ -93,10 +132,10 @@ class PasswordForm(FlaskForm):
 class FileUploadForm(FlaskForm):
     file          = FileField('Choisissez un fichier', validators=[DataRequired()])
     expiry        = SelectField('Durée de validité', choices=[
-        ('3h', '3 heures'), ('1d', '1 jour'), ('1w', '1 semaine'), ('1m', '1 mois')
+        ('3h', '3 heures'), ('1d', '1 jour'), ('1w', '1 semaine'), ('1m', '1 mois'),
     ])
     max_downloads = SelectField('Nombre maximal de téléchargements', choices=[
-        ('1', '1'), ('5', '5'), ('10', '10'), ('unlimited', 'Illimité')
+        ('1', '1'), ('5', '5'), ('10', '10'), ('unlimited', 'Illimité'),
     ], validators=[DataRequired()])
     password      = PasswordField('Mot de passe (optionnel)')
     submit        = SubmitField('Téléverser')
@@ -104,35 +143,35 @@ class FileUploadForm(FlaskForm):
 
 class RegisterForm(FlaskForm):
     username = StringField('Nom d\'utilisateur', validators=[DataRequired(), Length(min=3, max=32)])
-    password = PasswordField('Mot de passe', validators=[DataRequired(), Length(min=6)])
+    password = PasswordField('Mot de passe', validators=[DataRequired(), Length(min=10)])
     confirm  = PasswordField('Confirmer', validators=[
-        DataRequired(), EqualTo('password', message='Les mots de passe ne correspondent pas.')
+        DataRequired(), EqualTo('password', message='Les mots de passe ne correspondent pas.'),
     ])
     submit   = SubmitField('Créer un compte')
 
 
 class LoginForm(FlaskForm):
     username = StringField('Nom d\'utilisateur', validators=[DataRequired()])
-    password = PasswordField('Mot de passe', validators=[DataRequired()])
+    password = PasswordField('Mot de passe',     validators=[DataRequired()])
     submit   = SubmitField('Se connecter')
 
 
 class AdminSettingsForm(FlaskForm):
     app_name           = StringField('Nom de l\'application',
                                      validators=[DataRequired(), Length(max=64)])
-    contact_email      = StringField('E-mail de contact administrateur',
+    contact_email      = StringField('E-mail de contact',
                                      validators=[DataRequired(), Length(max=128)])
     max_file_size_mb   = IntegerField('Taille max des fichiers (Mo)',
                                       validators=[DataRequired(), NumberRange(min=1, max=2048)])
-    blocked_extensions = StringField('Extensions bloquées (séparées par des virgules)',
+    blocked_extensions = StringField('Extensions bloquées (virgules)',
                                      validators=[Optional(), Length(max=256)])
     allow_registration = BooleanField('Autoriser les inscriptions')
     default_expiry     = SelectField('Expiration par défaut', choices=[
-        ('3h', '3 heures'), ('1d', '1 jour'), ('1w', '1 semaine'), ('1m', '1 mois')
+        ('3h', '3 heures'), ('1d', '1 jour'), ('1w', '1 semaine'), ('1m', '1 mois'),
     ])
-    max_files_per_user = IntegerField('Quota fichiers par utilisateur (0 = illimité)',
+    max_files_per_user = IntegerField('Quota fichiers / utilisateur (0 = illimité)',
                                       validators=[NumberRange(min=0)])
-    max_storage_mb     = IntegerField('Quota stockage par utilisateur en Mo (0 = illimité)',
+    max_storage_mb     = IntegerField('Quota stockage / utilisateur en Mo (0 = illimité)',
                                       validators=[NumberRange(min=0)])
     submit             = SubmitField('Sauvegarder')
 
@@ -141,11 +180,13 @@ class AdminSettingsForm(FlaskForm):
 def get_db():
     if 'db' not in g:
         g.db = sqlite3.connect(DATABASE, timeout=10, check_same_thread=False)
+        g.db.execute('PRAGMA journal_mode=WAL')
     return g.db
 
 
 def init_db():
     with sqlite3.connect(DATABASE) as conn:
+        conn.execute('PRAGMA journal_mode=WAL')
         conn.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -173,13 +214,26 @@ def init_db():
                 value TEXT NOT NULL
             )
         ''')
-        # Migrations sans casser les données existantes
-        existing_files = {row[1] for row in conn.execute('PRAGMA table_info(files)')}
-        if 'owner_id' not in existing_files:
-            conn.execute('ALTER TABLE files ADD COLUMN owner_id INTEGER REFERENCES users(id)')
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS audit_logs (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                user_id    INTEGER,
+                username   TEXT,
+                action     TEXT NOT NULL,
+                target     TEXT,
+                details    TEXT,
+                ip_address TEXT
+            )
+        ''')
+        conn.execute('CREATE INDEX IF NOT EXISTS idx_audit_ts ON audit_logs (timestamp DESC)')
+        # ── Migrations ────────────────────────────────────────────────────────
+        existing_files = {r[1] for r in conn.execute('PRAGMA table_info(files)')}
+        if 'owner_id'    not in existing_files:
+            conn.execute('ALTER TABLE files ADD COLUMN owner_id    INTEGER REFERENCES users(id)')
         if 'deposited_by' not in existing_files:
             conn.execute('ALTER TABLE files ADD COLUMN deposited_by TEXT')
-        existing_users = {row[1] for row in conn.execute('PRAGMA table_info(users)')}
+        existing_users = {r[1] for r in conn.execute('PRAGMA table_info(users)')}
         if 'is_admin' not in existing_users:
             conn.execute('ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0')
 
@@ -196,6 +250,77 @@ def close_connection(exception):
         db.close()
 
 
+# ── Journal d'audit ───────────────────────────────────────────────────────────
+def audit_log(action: str, target: str = None, details: str = None):
+    """Enregistre une action dans le journal. Doit être appelé dans un contexte de requête."""
+    uid   = current_user.id       if current_user.is_authenticated else None
+    uname = current_user.username if current_user.is_authenticated else None
+    ip    = request.remote_addr
+    try:
+        g.db.execute(
+            'INSERT INTO audit_logs (user_id, username, action, target, details, ip_address)'
+            ' VALUES (?, ?, ?, ?, ?, ?)',
+            (uid, uname, action, target, details, ip),
+        )
+        g.db.commit()
+    except Exception as exc:
+        app.logger.error("audit_log failed: %s", exc)
+
+
+def _system_audit_log(action: str, details: str = None):
+    """Journal pour le job de nettoyage (hors contexte de requête)."""
+    try:
+        with sqlite3.connect(DATABASE) as conn:
+            conn.execute(
+                'INSERT INTO audit_logs (username, action, details) VALUES (?, ?, ?)',
+                ('system', action, details),
+            )
+    except Exception as exc:
+        app.logger.error("_system_audit_log failed: %s", exc)
+
+
+# ── Nettoyage automatique des fichiers expirés ────────────────────────────────
+def cleanup_expired_files():
+    """Supprime les fichiers et enregistrements expirés. Tournant toutes les heures."""
+    app.logger.info("[Cleanup] Vérification des fichiers expirés…")
+    now = str(datetime.now())
+    deleted = 0
+    errors  = 0
+    try:
+        with sqlite3.connect(DATABASE) as conn:
+            conn.execute('PRAGMA journal_mode=WAL')
+            expired = conn.execute(
+                'SELECT id FROM files WHERE expiry < ?', (now,)
+            ).fetchall()
+            for (fid,) in expired:
+                path = os.path.join(UPLOAD_FOLDER, fid)
+                try:
+                    if os.path.exists(path):
+                        os.remove(path)
+                        deleted += 1
+                except OSError as exc:
+                    app.logger.error("[Cleanup] Erreur suppression %s : %s", fid, exc)
+                    errors += 1
+            conn.execute('DELETE FROM files WHERE expiry < ?', (now,))
+    except Exception as exc:
+        app.logger.error("[Cleanup] Erreur générale : %s", exc)
+        return
+
+    if deleted or errors:
+        detail = f"{deleted} fichier(s) supprimé(s)"
+        if errors:
+            detail += f", {errors} erreur(s)"
+        _system_audit_log('cleanup', detail)
+        app.logger.info("[Cleanup] %s.", detail)
+
+
+_scheduler = BackgroundScheduler(daemon=True)
+_scheduler.add_job(cleanup_expired_files, 'interval', hours=1, id='cleanup',
+                   next_run_time=datetime.now() + timedelta(minutes=1))
+_scheduler.start()
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
 def get_settings():
     rows = g.db.execute('SELECT key, value FROM settings').fetchall()
     s = dict(SETTINGS_DEFAULTS)
@@ -209,36 +334,41 @@ def allowed_file(filename):
         return False
     ext = filename.rsplit('.', 1)[1].lower()
     s = get_settings()
-    if ext in s.get('blocked_ext_set', set()):
-        return False
-    return ext in ALLOWED_EXTENSIONS
+    return ext not in s.get('blocked_ext_set', set()) and ext in ALLOWED_EXTENSIONS
 
 
 def get_expiry_time(expiry_option):
-    if expiry_option == '3h':
-        return datetime.now() + timedelta(hours=3)
-    elif expiry_option == '1d':
-        return datetime.now() + timedelta(days=1)
-    elif expiry_option == '1w':
-        return datetime.now() + timedelta(weeks=1)
-    elif expiry_option == '1m':
-        return datetime.now() + timedelta(days=30)
-    return None
+    deltas = {'3h': timedelta(hours=3), '1d': timedelta(days=1),
+              '1w': timedelta(weeks=1),  '1m': timedelta(days=30)}
+    return datetime.now() + deltas.get(expiry_option, timedelta(days=1))
 
 
 def _parse_expiry(expiry_str):
+    for fmt in ('%Y-%m-%d %H:%M:%S.%f', '%Y-%m-%d %H:%M:%S'):
+        try:
+            return datetime.strptime(expiry_str, fmt)
+        except ValueError:
+            continue
+    raise ValueError(f"Format d'expiration inconnu : {expiry_str}")
+
+
+def _remove_file(file_id: str) -> bool:
+    """Supprime le fichier sur disque. Retourne True si supprimé, False sinon."""
+    path = os.path.join(app.config['UPLOAD_FOLDER'], file_id)
     try:
-        return datetime.strptime(expiry_str, '%Y-%m-%d %H:%M:%S.%f')
-    except ValueError:
-        return datetime.strptime(expiry_str, '%Y-%m-%d %H:%M:%S')
+        if os.path.exists(path):
+            os.remove(path)
+            return True
+    except OSError as exc:
+        app.logger.error("Erreur suppression fichier %s : %s", file_id, exc)
+    return False
 
 
 # ── Routes principales ────────────────────────────────────────────────────────
 @app.route('/')
 @login_required
 def index():
-    form = FileUploadForm()
-    return render_template('index.html', form=form, settings=get_settings())
+    return render_template('index.html', form=FileUploadForm(), settings=get_settings())
 
 
 @app.route('/upload', methods=['POST'])
@@ -246,44 +376,47 @@ def index():
 def upload_file():
     file = request.files.get('file')
     if not file or not allowed_file(file.filename):
-        return {"success": False, "message": "Fichier absent ou type non autorisé"}
+        return {'success': False, 'message': 'Fichier absent ou type non autorisé.'}
 
     settings = get_settings()
 
-    # Vérifier la taille du fichier
+    # ── Vérification taille ───────────────────────────────────────────────────
     file.seek(0, 2)
     size_bytes = file.tell()
     file.seek(0)
     max_bytes = int(settings['max_file_size_mb']) * 1024 * 1024
     if size_bytes > max_bytes:
-        return {"success": False,
-                "message": f"Fichier trop grand (max {settings['max_file_size_mb']} Mo)"}
+        return {'success': False,
+                'message': f"Fichier trop grand (max {settings['max_file_size_mb']} Mo)."}
 
-    # Vérifier le quota fichiers par utilisateur
+    # ── Vérification quota fichiers ───────────────────────────────────────────
     max_files = int(settings['max_files_per_user'])
     if max_files > 0:
         count = g.db.execute(
             'SELECT COUNT(*) FROM files WHERE owner_id = ?', (current_user.id,)
         ).fetchone()[0]
         if count >= max_files:
-            return {"success": False,
-                    "message": f"Quota atteint ({max_files} fichiers maximum)"}
+            return {'success': False,
+                    'message': f"Quota atteint ({max_files} fichiers maximum)."}
 
-    # Vérifier le quota stockage par utilisateur
+    # ── Vérification quota stockage ───────────────────────────────────────────
     max_storage = int(settings['max_storage_mb'])
     if max_storage > 0:
-        rows = g.db.execute(
+        file_ids = g.db.execute(
             'SELECT id FROM files WHERE owner_id = ?', (current_user.id,)
         ).fetchall()
-        used = sum(
-            os.path.getsize(os.path.join(app.config['UPLOAD_FOLDER'], r[0]))
-            for r in rows
-            if os.path.exists(os.path.join(app.config['UPLOAD_FOLDER'], r[0]))
-        )
+        used = 0
+        for (fid,) in file_ids:
+            p = os.path.join(app.config['UPLOAD_FOLDER'], fid)
+            try:
+                used += os.path.getsize(p) if os.path.exists(p) else 0
+            except OSError:
+                pass
         if used + size_bytes > max_storage * 1024 * 1024:
-            return {"success": False,
-                    "message": f"Quota de stockage dépassé ({max_storage} Mo maximum)"}
+            return {'success': False,
+                    'message': f"Quota de stockage dépassé ({max_storage} Mo maximum)."}
 
+    # ── Enregistrement ────────────────────────────────────────────────────────
     file_id         = str(uuid.uuid4())
     expiry_time     = get_expiry_time(request.form.get('expiry', settings['default_expiry']))
     max_downloads   = request.form.get('max_downloads', 'unlimited')
@@ -291,101 +424,135 @@ def upload_file():
     hashed_password = generate_password_hash(password) if password else None
 
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-    file.save(os.path.join(app.config['UPLOAD_FOLDER'], file_id))
+    dest = os.path.join(app.config['UPLOAD_FOLDER'], file_id)
+    try:
+        raw_data = file.read()
+        with open(dest, 'wb') as fh:
+            fh.write(_encrypt(raw_data))
+    except OSError as exc:
+        app.logger.error("Erreur écriture fichier %s : %s", file_id, exc)
+        return {'success': False, 'message': 'Erreur interne lors de l\'enregistrement du fichier.'}
 
-    with g.db:
-        g.db.execute(
-            'INSERT INTO files (id, filename, original_filename, expiry, max_downloads, password, owner_id)'
-            ' VALUES (?, ?, ?, ?, ?, ?, ?)',
-            (file_id, file_id, file.filename, expiry_time, max_downloads, hashed_password, current_user.id)
-        )
-        g.db.commit()
+    g.db.execute(
+        'INSERT INTO files (id, filename, original_filename, expiry, max_downloads, password, owner_id)'
+        ' VALUES (?, ?, ?, ?, ?, ?, ?)',
+        (file_id, file_id, file.filename, expiry_time, max_downloads, hashed_password, current_user.id),
+    )
+    g.db.commit()
 
-    return {"success": True, "link": url_for('download_file', file_id=file_id, _external=True)}
+    size_kb = round(size_bytes / 1024, 1)
+    audit_log('upload', target=file_id,
+              details=f"{file.filename} ({size_kb} Ko, expire: {expiry_time.strftime('%d/%m/%Y %H:%M')})")
+
+    return {'success': True, 'link': url_for('download_file', file_id=file_id, _external=True)}
 
 
 @app.route('/download/<file_id>', methods=['GET', 'POST'])
 def download_file(file_id):
     form = PasswordForm()
-    with g.db:
-        cur = g.db.execute(
-            'SELECT filename, original_filename, expiry, views, max_downloads, password FROM files WHERE id = ?',
-            (file_id,)
-        )
-        row = cur.fetchone()
+    cur  = g.db.execute(
+        'SELECT filename, original_filename, expiry, views, max_downloads, password FROM files WHERE id = ?',
+        (file_id,),
+    )
+    row = cur.fetchone()
+    if not row:
+        return redirect(url_for('file_not_found'))
 
-        if not row:
-            flash("Le fichier n'a pas été trouvé.")
-            return redirect(url_for('file_not_found'))
+    filename, original_filename, expiry, views, max_downloads, hashed_password = row
+    expiry_time = _parse_expiry(expiry)
 
-        filename, original_filename, expiry, views, max_downloads, hashed_password = row
-        expiry_time = _parse_expiry(expiry)
+    if datetime.now() > expiry_time:
+        _remove_file(file_id)
+        g.db.execute('DELETE FROM files WHERE id = ?', (file_id,))
+        g.db.commit()
+        return redirect(url_for('file_expired'))
 
-        if datetime.now() > expiry_time:
+    if max_downloads != 'unlimited':
+        remaining = int(max_downloads) - views
+        if remaining <= 0:
+            _remove_file(file_id)
             g.db.execute('DELETE FROM files WHERE id = ?', (file_id,))
-            return redirect(url_for('file_expired'))
+            g.db.commit()
+            return redirect(url_for('file_not_found'))
+    else:
+        remaining = 'Illimité'
 
-        if max_downloads != 'unlimited':
-            remaining_downloads = int(max_downloads) - views
-            if remaining_downloads <= 0:
-                g.db.execute('DELETE FROM files WHERE id = ?', (file_id,))
-                return redirect(url_for('file_not_found'))
-        else:
-            remaining_downloads = 'Illimité'
+    # Gestion mot de passe
+    if form.validate_on_submit():
+        if hashed_password and not check_password_hash(hashed_password, form.password.data):
+            flash('Mot de passe incorrect.', 'danger')
+            return render_template('password_required.html', file_id=file_id,
+                                   form=form, settings=get_settings())
+        if hashed_password:
+            session[f'auth_{file_id}'] = datetime.now().timestamp()
 
-        if form.validate_on_submit():
-            if hashed_password and not check_password_hash(hashed_password, form.password.data):
-                flash("Mot de passe incorrect.")
-                return render_template('password_required.html', file_id=file_id, form=form,
-                                       settings=get_settings())
-            if hashed_password:
-                session[f'auth_{file_id}'] = True
+    if hashed_password and request.method == 'GET':
+        auth_ts = session.get(f'auth_{file_id}')
+        if not auth_ts or (datetime.now().timestamp() - auth_ts) > 3600:
+            session.pop(f'auth_{file_id}', None)
+            return render_template('password_required.html', file_id=file_id,
+                                   form=form, settings=get_settings())
 
-        if hashed_password and request.method == 'GET':
-            return render_template('password_required.html', file_id=file_id, form=form,
-                                   settings=get_settings())
-
-        return render_template('download.html',
-                               file_id=file_id,
-                               original_filename=original_filename,
-                               expiry_time=expiry_time.strftime('%Y-%m-%d %H:%M:%S'),
-                               remaining_downloads=remaining_downloads,
-                               settings=get_settings())
+    return render_template('download.html',
+                           file_id=file_id,
+                           original_filename=original_filename,
+                           expiry_time=expiry_time.strftime('%Y-%m-%d %H:%M:%S'),
+                           remaining_downloads=remaining,
+                           settings=get_settings())
 
 
-@app.route('/download_direct/<file_id>', methods=['GET'])
+@app.route('/download_direct/<file_id>')
 def download_direct(file_id):
-    with g.db:
-        cur = g.db.execute(
-            'SELECT original_filename, expiry, views, max_downloads, password FROM files WHERE id = ?',
-            (file_id,)
-        )
-        row = cur.fetchone()
-        if not row:
-            return redirect(url_for('file_not_found'))
+    cur = g.db.execute(
+        'SELECT original_filename, expiry, views, max_downloads, password FROM files WHERE id = ?',
+        (file_id,),
+    )
+    row = cur.fetchone()
+    if not row:
+        return redirect(url_for('file_not_found'))
 
-        original_filename, expiry, views, max_downloads, hashed_password = row
-        expiry_time = _parse_expiry(expiry)
+    original_filename, expiry, views, max_downloads, hashed_password = row
+    expiry_time = _parse_expiry(expiry)
 
-        if datetime.now() > expiry_time:
-            g.db.execute('DELETE FROM files WHERE id = ?', (file_id,))
-            return redirect(url_for('file_expired'))
+    if datetime.now() > expiry_time:
+        _remove_file(file_id)
+        g.db.execute('DELETE FROM files WHERE id = ?', (file_id,))
+        g.db.commit()
+        return redirect(url_for('file_expired'))
 
-        if max_downloads != 'unlimited' and int(max_downloads) - views <= 0:
-            g.db.execute('DELETE FROM files WHERE id = ?', (file_id,))
-            return redirect(url_for('file_not_found'))
+    if max_downloads != 'unlimited' and int(max_downloads) - views <= 0:
+        _remove_file(file_id)
+        g.db.execute('DELETE FROM files WHERE id = ?', (file_id,))
+        g.db.commit()
+        return redirect(url_for('file_not_found'))
 
-        if hashed_password and not session.get(f'auth_{file_id}'):
+    # Vérifier auth mot de passe (TTL 1 heure)
+    if hashed_password:
+        auth_ts = session.get(f'auth_{file_id}')
+        if not auth_ts or (datetime.now().timestamp() - auth_ts) > 3600:
+            session.pop(f'auth_{file_id}', None)
             return redirect(url_for('download_file', file_id=file_id))
 
-        g.db.execute('UPDATE files SET views = views + 1 WHERE id = ?', (file_id,))
-        g.db.commit()
-        return send_from_directory(
-            app.config['UPLOAD_FOLDER'],
-            file_id,
-            as_attachment=True,
-            download_name=original_filename
-        )
+    g.db.execute('UPDATE files SET views = views + 1 WHERE id = ?', (file_id,))
+    g.db.commit()
+
+    audit_log('download', target=file_id, details=original_filename)
+
+    path = os.path.join(app.config['UPLOAD_FOLDER'], file_id)
+    try:
+        with open(path, 'rb') as fh:
+            raw = fh.read()
+    except OSError as exc:
+        app.logger.error("Erreur lecture fichier %s : %s", file_id, exc)
+        flash("Erreur lors de la lecture du fichier.", 'danger')
+        return redirect(url_for('file_not_found'))
+
+    data = _decrypt(raw)
+    return send_file(
+        io.BytesIO(data),
+        as_attachment=True,
+        download_name=original_filename,
+    )
 
 
 # ── Authentification ──────────────────────────────────────────────────────────
@@ -400,15 +567,15 @@ def register():
     form = RegisterForm()
     if form.validate_on_submit():
         try:
-            # Le premier compte créé devient administrateur
             user_count = g.db.execute('SELECT COUNT(*) FROM users').fetchone()[0]
             is_admin   = 1 if user_count == 0 else 0
             g.db.execute(
                 'INSERT INTO users (username, password, drop_token, is_admin) VALUES (?, ?, ?, ?)',
                 (form.username.data.strip(), generate_password_hash(form.password.data),
-                 str(uuid.uuid4()), is_admin)
+                 str(uuid.uuid4()), is_admin),
             )
             g.db.commit()
+            audit_log('register', details=form.username.data.strip())
             flash('Compte créé ! Vous pouvez vous connecter.', 'success')
             return redirect(url_for('login'))
         except sqlite3.IntegrityError:
@@ -417,19 +584,23 @@ def register():
 
 
 @app.route('/login', methods=['GET', 'POST'])
+@limiter.limit("10 per minute")
 def login():
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
     form = LoginForm()
     if form.validate_on_submit():
-        cur = g.db.execute(
+        uname = form.username.data.strip()
+        cur   = g.db.execute(
             'SELECT id, username, password, drop_token, is_admin FROM users WHERE username = ?',
-            (form.username.data.strip(),)
+            (uname,),
         )
         row = cur.fetchone()
         if row and check_password_hash(row[2], form.password.data):
             login_user(User(*row))
+            audit_log('login')
             return redirect(request.args.get('next') or url_for('dashboard'))
+        audit_log('login_failed', target=uname)
         flash('Identifiants incorrects.', 'danger')
     return render_template('login.html', form=form, settings=get_settings())
 
@@ -437,6 +608,7 @@ def login():
 @app.route('/logout')
 @login_required
 def logout():
+    audit_log('logout')
     logout_user()
     return redirect(url_for('login'))
 
@@ -445,16 +617,16 @@ def logout():
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    cur = g.db.execute(
+    cur  = g.db.execute(
         'SELECT id, original_filename, expiry, views, max_downloads, deposited_by'
         ' FROM files WHERE owner_id = ? ORDER BY expiry DESC',
-        (current_user.id,)
+        (current_user.id,),
     )
     now   = datetime.now()
     files = []
     for fid, name, expiry, views, max_dl, dep_by in cur.fetchall():
-        exp      = _parse_expiry(expiry)
-        expired  = now > exp
+        exp       = _parse_expiry(expiry)
+        expired   = now > exp
         remaining = 'Illimité' if max_dl == 'unlimited' else max(0, int(max_dl) - views)
         files.append({
             'id':           fid,
@@ -465,7 +637,6 @@ def dashboard():
             'exhausted':    remaining == 0,
             'deposited_by': dep_by,
         })
-
     drop_url = url_for('drop_zone', drop_token=current_user.drop_token, _external=True)
     return render_template('dashboard.html', files=files, drop_url=drop_url, settings=get_settings())
 
@@ -473,21 +644,23 @@ def dashboard():
 @app.route('/delete/<file_id>', methods=['POST'])
 @login_required
 def delete_file(file_id):
-    cur = g.db.execute('SELECT owner_id FROM files WHERE id = ?', (file_id,))
+    cur = g.db.execute(
+        'SELECT owner_id, original_filename FROM files WHERE id = ?', (file_id,)
+    )
     row = cur.fetchone()
     if row and row[0] == current_user.id:
-        path = os.path.join(app.config['UPLOAD_FOLDER'], file_id)
-        if os.path.exists(path):
-            os.remove(path)
+        _remove_file(file_id)
         g.db.execute('DELETE FROM files WHERE id = ?', (file_id,))
         g.db.commit()
+        audit_log('delete_file', target=file_id, details=row[1])
     return redirect(url_for('dashboard'))
 
 
 # ── Zone de dépôt ─────────────────────────────────────────────────────────────
 @app.route('/drop/<drop_token>', methods=['GET', 'POST'])
+@limiter.limit("20 per hour")
 def drop_zone(drop_token):
-    cur = g.db.execute('SELECT id, username FROM users WHERE drop_token = ?', (drop_token,))
+    cur      = g.db.execute('SELECT id, username FROM users WHERE drop_token = ?', (drop_token,))
     user_row = cur.fetchone()
     if not user_row:
         return redirect(url_for('file_not_found'))
@@ -499,24 +672,34 @@ def drop_zone(drop_token):
         sender_name = request.form.get('sender_name', '').strip() or 'Anonyme'
         if file and allowed_file(file.filename):
             file_id     = str(uuid.uuid4())
-            expiry_time = datetime.now() + timedelta(days=30)
+            settings    = get_settings()
+            expiry_time = get_expiry_time(settings['default_expiry'])
+            dest        = os.path.join(app.config['UPLOAD_FOLDER'], file_id)
             os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-            file.save(os.path.join(app.config['UPLOAD_FOLDER'], file_id))
+            try:
+                raw_data = file.read()
+                with open(dest, 'wb') as fh:
+                    fh.write(_encrypt(raw_data))
+            except OSError as exc:
+                app.logger.error("drop_zone: erreur écriture %s : %s", file_id, exc)
+                flash("Erreur interne lors de l'enregistrement.", 'danger')
+                return render_template('drop.html', recipient=recipient_name,
+                                       drop_token=drop_token, success=False,
+                                       settings=get_settings())
             g.db.execute(
                 'INSERT INTO files (id, filename, original_filename, expiry, max_downloads, owner_id, deposited_by)'
                 ' VALUES (?, ?, ?, ?, ?, ?, ?)',
-                (file_id, file_id, file.filename, expiry_time, 'unlimited', recipient_id, sender_name)
+                (file_id, file_id, file.filename, expiry_time, 'unlimited', recipient_id, sender_name),
             )
             g.db.commit()
+            audit_log('drop_upload', target=file_id,
+                      details=f"{file.filename} déposé pour {recipient_name} par {sender_name}")
             success = True
         else:
             flash('Type de fichier non autorisé.', 'danger')
 
-    return render_template('drop.html',
-                           recipient=recipient_name,
-                           drop_token=drop_token,
-                           success=success,
-                           settings=get_settings())
+    return render_template('drop.html', recipient=recipient_name,
+                           drop_token=drop_token, success=success, settings=get_settings())
 
 
 # ── Administration ────────────────────────────────────────────────────────────
@@ -524,6 +707,7 @@ def drop_zone(drop_token):
 @login_required
 @admin_required
 def admin_panel():
+    # Utilisateurs + stats
     rows = g.db.execute('''
         SELECT u.id, u.username, u.created_at, u.is_admin, COUNT(f.id) AS file_count
         FROM users u
@@ -534,20 +718,35 @@ def admin_panel():
 
     users = []
     for uid, username, created_at, is_admin, file_count in rows:
-        file_ids   = g.db.execute('SELECT id FROM files WHERE owner_id = ?', (uid,)).fetchall()
-        used_bytes = sum(
-            os.path.getsize(os.path.join(app.config['UPLOAD_FOLDER'], r[0]))
-            for r in file_ids
-            if os.path.exists(os.path.join(app.config['UPLOAD_FOLDER'], r[0]))
-        )
+        file_ids = g.db.execute('SELECT id FROM files WHERE owner_id = ?', (uid,)).fetchall()
+        used = 0
+        for (fid,) in file_ids:
+            p = os.path.join(app.config['UPLOAD_FOLDER'], fid)
+            try:
+                used += os.path.getsize(p) if os.path.exists(p) else 0
+            except OSError:
+                pass
         users.append({
             'id':         uid,
             'username':   username,
             'created_at': created_at,
             'is_admin':   bool(is_admin),
             'file_count': file_count,
-            'storage_mb': round(used_bytes / (1024 * 1024), 2),
+            'storage_mb': round(used / (1024 * 1024), 2),
         })
+
+    # Derniers 300 événements d'audit
+    log_rows = g.db.execute('''
+        SELECT id, timestamp, username, action, target, details, ip_address
+        FROM audit_logs
+        ORDER BY id DESC
+        LIMIT 300
+    ''').fetchall()
+    logs = [
+        {'id': r[0], 'timestamp': r[1], 'username': r[2] or 'system',
+         'action': r[3], 'target': r[4], 'details': r[5], 'ip': r[6]}
+        for r in log_rows
+    ]
 
     settings = get_settings()
     form = AdminSettingsForm(data={
@@ -560,7 +759,8 @@ def admin_panel():
         'max_files_per_user': int(settings['max_files_per_user']),
         'max_storage_mb':     int(settings['max_storage_mb']),
     })
-    return render_template('admin.html', users=users, form=form, settings=settings)
+    return render_template('admin.html', users=users, form=form,
+                           settings=settings, logs=logs)
 
 
 @app.route('/admin/settings', methods=['POST'])
@@ -580,10 +780,9 @@ def admin_save_settings():
             'max_storage_mb':     str(form.max_storage_mb.data),
         }
         for key, value in values.items():
-            g.db.execute(
-                'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', (key, value)
-            )
+            g.db.execute('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', (key, value))
         g.db.commit()
+        audit_log('admin_settings', details='Paramètres mis à jour')
         flash('Paramètres sauvegardés.', 'success')
     else:
         for field, errors in form.errors.items():
@@ -599,15 +798,21 @@ def admin_delete_user(user_id):
     if user_id == current_user.id:
         flash("Impossible de supprimer votre propre compte.", 'danger')
         return redirect(url_for('admin_panel'))
+    row = g.db.execute('SELECT username FROM users WHERE id = ?', (user_id,)).fetchone()
+    if not row:
+        return redirect(url_for('admin_panel'))
+    target_username = row[0]
     file_ids = g.db.execute('SELECT id FROM files WHERE owner_id = ?', (user_id,)).fetchall()
+    n_deleted = 0
     for (fid,) in file_ids:
-        path = os.path.join(app.config['UPLOAD_FOLDER'], fid)
-        if os.path.exists(path):
-            os.remove(path)
+        if _remove_file(fid):
+            n_deleted += 1
     g.db.execute('DELETE FROM files WHERE owner_id = ?', (user_id,))
     g.db.execute('DELETE FROM users WHERE id = ?', (user_id,))
     g.db.commit()
-    flash('Utilisateur supprimé.', 'success')
+    audit_log('admin_delete_user', target=target_username,
+              details=f"{n_deleted} fichier(s) supprimé(s)")
+    flash(f"Utilisateur « {target_username} » supprimé.", 'success')
     return redirect(url_for('admin_panel'))
 
 
@@ -618,11 +823,13 @@ def admin_toggle_admin(user_id):
     if user_id == current_user.id:
         flash("Impossible de modifier vos propres droits.", 'danger')
         return redirect(url_for('admin_panel'))
-    row = g.db.execute('SELECT is_admin FROM users WHERE id = ?', (user_id,)).fetchone()
+    row = g.db.execute('SELECT username, is_admin FROM users WHERE id = ?', (user_id,)).fetchone()
     if row:
-        g.db.execute('UPDATE users SET is_admin = ? WHERE id = ?',
-                     (0 if row[0] else 1, user_id))
+        new_val = 0 if row[1] else 1
+        g.db.execute('UPDATE users SET is_admin = ? WHERE id = ?', (new_val, user_id))
         g.db.commit()
+        action_str = 'Promu administrateur' if new_val else 'Droits admin retirés'
+        audit_log('admin_toggle_admin', target=row[0], details=action_str)
     return redirect(url_for('admin_panel'))
 
 

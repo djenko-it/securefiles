@@ -5,4 +5,5 @@ Flask-Login
 Flask-Limiter
 redis
 cryptography
+APScheduler
 gunicorn
