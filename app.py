@@ -175,12 +175,14 @@ def _parse_expiry(expiry_str):
 
 # ── Routes principales ────────────────────────────────────────────────────────
 @app.route('/')
+@login_required
 def index():
     form = FileUploadForm()
     return render_template('index.html', form=form, settings=get_settings())
 
 
 @app.route('/upload', methods=['POST'])
+@login_required
 def upload_file():
     file = request.files.get('file')
     if file and allowed_file(file.filename):

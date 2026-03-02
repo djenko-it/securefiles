@@ -48,6 +48,15 @@ def client():
         yield c
 
 
+@pytest.fixture
+def logged_in_client():
+    """Client avec un utilisateur déjà connecté."""
+    with flask_app.app.test_client() as c:
+        create_user_in_db('testuser', 'testpass')
+        c.post('/login', data={'username': 'testuser', 'password': 'testpass'})
+        yield c
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -106,11 +115,16 @@ def login_user_client(client, username='alice', password='motdepasse'):
 # ---------------------------------------------------------------------------
 
 class TestIndex:
-    def test_returns_200(self, client):
-        assert client.get('/').status_code == 200
+    def test_anonyme_redirige_vers_login(self, client):
+        r = client.get('/')
+        assert r.status_code == 302
+        assert 'login' in r.headers['Location']
 
-    def test_contains_dropzone(self, client):
-        assert b'dropzone' in client.get('/').data
+    def test_connecte_retourne_200(self, logged_in_client):
+        assert logged_in_client.get('/').status_code == 200
+
+    def test_contains_dropzone(self, logged_in_client):
+        assert b'dropzone' in logged_in_client.get('/').data
 
 
 class TestErrorPages:
@@ -126,43 +140,39 @@ class TestErrorPages:
 # ---------------------------------------------------------------------------
 
 class TestUpload:
-    def test_upload_fichier_valide(self, client):
-        r = do_upload(client)
+    def test_upload_fichier_valide(self, logged_in_client):
+        r = do_upload(logged_in_client)
         data = r.get_json()
         assert data['success'] is True
         assert '/download/' in data['link']
 
-    def test_upload_extension_invalide(self, client):
-        assert do_upload(client, filename='virus.exe').get_json()['success'] is False
+    def test_upload_extension_invalide(self, logged_in_client):
+        assert do_upload(logged_in_client, filename='virus.exe').get_json()['success'] is False
 
-    def test_upload_pdf(self, client):
-        assert do_upload(client, filename='doc.pdf', content=b'%PDF').get_json()['success'] is True
+    def test_upload_pdf(self, logged_in_client):
+        assert do_upload(logged_in_client, filename='doc.pdf', content=b'%PDF').get_json()['success'] is True
 
-    def test_upload_cree_entree_bdd(self, client):
-        do_upload(client)
+    def test_upload_cree_entree_bdd(self, logged_in_client):
+        do_upload(logged_in_client)
         conn = sqlite3.connect(flask_app.DATABASE)
         count = conn.execute('SELECT COUNT(*) FROM files').fetchone()[0]
         conn.close()
         assert count == 1
 
-    def test_upload_sans_fichier(self, client):
-        assert do_upload(client, filename='', content=b'').get_json()['success'] is False
+    def test_upload_sans_fichier(self, logged_in_client):
+        assert do_upload(logged_in_client, filename='', content=b'').get_json()['success'] is False
 
-    def test_upload_associe_utilisateur_connecte(self, client):
-        create_user_in_db()
-        login_user_client(client)
-        fid = file_id_from(do_upload(client))
+    def test_upload_associe_utilisateur_connecte(self, logged_in_client):
+        fid = file_id_from(do_upload(logged_in_client))
         conn = sqlite3.connect(flask_app.DATABASE)
         row = conn.execute('SELECT owner_id FROM files WHERE id = ?', (fid,)).fetchone()
         conn.close()
         assert row[0] is not None
 
-    def test_upload_sans_compte_owner_null(self, client):
-        fid = file_id_from(do_upload(client))
-        conn = sqlite3.connect(flask_app.DATABASE)
-        row = conn.execute('SELECT owner_id FROM files WHERE id = ?', (fid,)).fetchone()
-        conn.close()
-        assert row[0] is None
+    def test_upload_anonyme_redirige_login(self, client):
+        r = do_upload(client)
+        assert r.status_code == 302
+        assert 'login' in r.headers['Location']
 
 
 # ---------------------------------------------------------------------------
@@ -170,9 +180,9 @@ class TestUpload:
 # ---------------------------------------------------------------------------
 
 class TestDownload:
-    def test_fichier_valide(self, client):
-        fid = file_id_from(do_upload(client))
-        r = client.get(f'/download/{fid}')
+    def test_fichier_valide(self, logged_in_client):
+        fid = file_id_from(do_upload(logged_in_client))
+        r = logged_in_client.get(f'/download/{fid}')
         assert r.status_code == 200
         assert b'test.txt' in r.data
 
@@ -181,29 +191,29 @@ class TestDownload:
         assert r.status_code == 302
         assert 'file_not_found' in r.headers['Location']
 
-    def test_fichier_expire(self, client):
-        fid = file_id_from(do_upload(client))
+    def test_fichier_expire(self, logged_in_client):
+        fid = file_id_from(do_upload(logged_in_client))
         set_expiry_in_db(fid, timedelta(hours=-1))
-        r = client.get(f'/download/{fid}')
+        r = logged_in_client.get(f'/download/{fid}')
         assert r.status_code == 302
         assert 'file_expired' in r.headers['Location']
 
-    def test_regression_strptime_sans_microsecondes(self, client):
-        fid = file_id_from(do_upload(client))
+    def test_regression_strptime_sans_microsecondes(self, logged_in_client):
+        fid = file_id_from(do_upload(logged_in_client))
         set_expiry_in_db(fid, timedelta(hours=1))
-        assert client.get(f'/download/{fid}').status_code == 200
+        assert logged_in_client.get(f'/download/{fid}').status_code == 200
 
-    def test_limite_telechargements_atteinte(self, client):
-        fid = file_id_from(do_upload(client, max_downloads='1'))
+    def test_limite_telechargements_atteinte(self, logged_in_client):
+        fid = file_id_from(do_upload(logged_in_client, max_downloads='1'))
         set_views_in_db(fid, 1)
-        r = client.get(f'/download/{fid}')
+        r = logged_in_client.get(f'/download/{fid}')
         assert r.status_code == 302
         assert 'file_not_found' in r.headers['Location']
 
-    def test_illimite_ne_bloque_pas(self, client):
-        fid = file_id_from(do_upload(client, max_downloads='unlimited'))
+    def test_illimite_ne_bloque_pas(self, logged_in_client):
+        fid = file_id_from(do_upload(logged_in_client, max_downloads='unlimited'))
         set_views_in_db(fid, 9999)
-        assert client.get(f'/download/{fid}').status_code == 200
+        assert logged_in_client.get(f'/download/{fid}').status_code == 200
 
 
 # ---------------------------------------------------------------------------
@@ -211,28 +221,28 @@ class TestDownload:
 # ---------------------------------------------------------------------------
 
 class TestMotDePasse:
-    def test_get_affiche_formulaire(self, client):
-        fid = file_id_from(do_upload(client, password='secret'))
-        r = client.get(f'/download/{fid}')
+    def test_get_affiche_formulaire(self, logged_in_client):
+        fid = file_id_from(do_upload(logged_in_client, password='secret'))
+        r = logged_in_client.get(f'/download/{fid}')
         assert r.status_code == 200
         assert b'password' in r.data.lower()
 
-    def test_mauvais_mot_de_passe(self, client):
-        fid = file_id_from(do_upload(client, password='secret'))
-        r = client.post(f'/download/{fid}', data={'password': 'mauvais'})
+    def test_mauvais_mot_de_passe(self, logged_in_client):
+        fid = file_id_from(do_upload(logged_in_client, password='secret'))
+        r = logged_in_client.post(f'/download/{fid}', data={'password': 'mauvais'})
         assert r.status_code == 200
         assert 'incorrect' in r.data.decode().lower()
 
-    def test_bon_mot_de_passe(self, client):
-        fid = file_id_from(do_upload(client, password='secret'))
-        r = client.post(f'/download/{fid}', data={'password': 'secret'})
+    def test_bon_mot_de_passe(self, logged_in_client):
+        fid = file_id_from(do_upload(logged_in_client, password='secret'))
+        r = logged_in_client.post(f'/download/{fid}', data={'password': 'secret'})
         assert r.status_code == 200
         assert b'test.txt' in r.data
 
-    def test_bon_mot_de_passe_cree_session(self, client):
-        fid = file_id_from(do_upload(client, password='secret'))
-        client.post(f'/download/{fid}', data={'password': 'secret'})
-        with client.session_transaction() as sess:
+    def test_bon_mot_de_passe_cree_session(self, logged_in_client):
+        fid = file_id_from(do_upload(logged_in_client, password='secret'))
+        logged_in_client.post(f'/download/{fid}', data={'password': 'secret'})
+        with logged_in_client.session_transaction() as sess:
             assert sess.get(f'auth_{fid}') is True
 
 
@@ -241,13 +251,13 @@ class TestMotDePasse:
 # ---------------------------------------------------------------------------
 
 class TestDownloadDirect:
-    def test_telechargement_valide(self, client):
-        fid = file_id_from(do_upload(client))
-        assert client.get(f'/download_direct/{fid}').status_code == 200
+    def test_telechargement_valide(self, logged_in_client):
+        fid = file_id_from(do_upload(logged_in_client))
+        assert logged_in_client.get(f'/download_direct/{fid}').status_code == 200
 
-    def test_incremente_vues(self, client):
-        fid = file_id_from(do_upload(client))
-        client.get(f'/download_direct/{fid}')
+    def test_incremente_vues(self, logged_in_client):
+        fid = file_id_from(do_upload(logged_in_client))
+        logged_in_client.get(f'/download_direct/{fid}')
         conn = sqlite3.connect(flask_app.DATABASE)
         views = conn.execute('SELECT views FROM files WHERE id = ?', (fid,)).fetchone()[0]
         conn.close()
@@ -256,29 +266,31 @@ class TestDownloadDirect:
     def test_fichier_introuvable(self, client):
         assert client.get('/download_direct/uuid-inexistant').status_code == 302
 
-    def test_bypass_mdp_impossible_sans_session(self, client):
-        fid = file_id_from(do_upload(client, password='secret'))
-        r = client.get(f'/download_direct/{fid}')
+    def test_bypass_mdp_impossible_sans_session(self, logged_in_client):
+        fid = file_id_from(do_upload(logged_in_client, password='secret'))
+        # Log out to test as anonymous
+        logged_in_client.get('/logout')
+        r = logged_in_client.get(f'/download_direct/{fid}')
         assert r.status_code == 302
         assert f'/download/{fid}' in r.headers['Location']
 
-    def test_telechargement_avec_session_auth(self, client):
-        fid = file_id_from(do_upload(client, password='secret'))
-        with client.session_transaction() as sess:
+    def test_telechargement_avec_session_auth(self, logged_in_client):
+        fid = file_id_from(do_upload(logged_in_client, password='secret'))
+        with logged_in_client.session_transaction() as sess:
             sess[f'auth_{fid}'] = True
-        assert client.get(f'/download_direct/{fid}').status_code == 200
+        assert logged_in_client.get(f'/download_direct/{fid}').status_code == 200
 
-    def test_expire_redirige(self, client):
-        fid = file_id_from(do_upload(client))
+    def test_expire_redirige(self, logged_in_client):
+        fid = file_id_from(do_upload(logged_in_client))
         set_expiry_in_db(fid, timedelta(hours=-1))
-        r = client.get(f'/download_direct/{fid}')
+        r = logged_in_client.get(f'/download_direct/{fid}')
         assert r.status_code == 302
         assert 'file_expired' in r.headers['Location']
 
-    def test_limite_atteinte_redirige(self, client):
-        fid = file_id_from(do_upload(client, max_downloads='1'))
+    def test_limite_atteinte_redirige(self, logged_in_client):
+        fid = file_id_from(do_upload(logged_in_client, max_downloads='1'))
         set_views_in_db(fid, 1)
-        r = client.get(f'/download_direct/{fid}')
+        r = logged_in_client.get(f'/download_direct/{fid}')
         assert r.status_code == 302
         assert 'file_not_found' in r.headers['Location']
 
