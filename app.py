@@ -1,4 +1,6 @@
+import base64
 import io
+import json
 import logging
 import os
 import sqlite3
@@ -6,11 +8,11 @@ import uuid
 from datetime import datetime, timedelta
 from functools import wraps
 
+import pyotp
 from apscheduler.schedulers.background import BackgroundScheduler
 from cryptography.fernet import Fernet, InvalidToken
-from flask import (Flask, abort, flash, g, redirect, render_template,
-                   request, send_file, send_from_directory, session,
-                   url_for)
+from flask import (Flask, abort, flash, g, jsonify, redirect, render_template,
+                   request, send_file, session, url_for)
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_login import (LoginManager, UserMixin, current_user, login_required,
@@ -22,6 +24,24 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from wtforms import (BooleanField, FileField, IntegerField, PasswordField,
                      SelectField, StringField, SubmitField)
 from wtforms.validators import DataRequired, EqualTo, Length, NumberRange, Optional
+
+try:
+    from webauthn import (
+        generate_authentication_options,
+        generate_registration_options,
+        options_to_json,
+        verify_authentication_response,
+        verify_registration_response,
+    )
+    from webauthn.helpers.structs import (
+        AuthenticatorSelectionCriteria,
+        PublicKeyCredentialDescriptor,
+        ResidentKeyRequirement,
+        UserVerificationRequirement,
+    )
+    WEBAUTHN_AVAILABLE = True
+except ImportError:
+    WEBAUTHN_AVAILABLE = False
 
 # ── Application ───────────────────────────────────────────────────────────────
 app = Flask(__name__)
@@ -62,21 +82,28 @@ SETTINGS_DEFAULTS = {
     'max_storage_mb':     '0',
 }
 
+AVATAR_COLORS = [
+    '#4361ee', '#e63946', '#2a9d8f', '#e9c46a', '#f4a261',
+    '#264653', '#6c5ce7', '#00b894', '#fd79a8', '#636e72',
+    '#0984e3', '#d63031', '#6ab04c', '#f9ca24', '#eb4d4b',
+]
+
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+# ── WebAuthn config ───────────────────────────────────────────────────────────
+RP_ID     = os.environ.get('WEBAUTHN_RP_ID', 'localhost')
+RP_ORIGIN = os.environ.get('WEBAUTHN_RP_ORIGIN', 'http://localhost:5000')
+RP_NAME   = 'FileShareApp'
 
 # ── Chiffrement Fernet ────────────────────────────────────────────────────────
 _raw_key = os.environ.get('ENCRYPTION_KEY', '').strip().strip('"').strip("'")
-# retire les commentaires inline éventuels (ex. "key=xxx  # commentaire")
 _raw_key = _raw_key.split('#')[0].strip()
 if _raw_key:
     try:
         fernet = Fernet(_raw_key.encode())
-        app.logger.info("Chiffrement Fernet activé.")
-    except Exception as exc:
-        app.logger.warning("ENCRYPTION_KEY invalide — chiffrement désactivé : %s", exc)
+    except Exception:
         fernet = None
 else:
-    app.logger.warning("ENCRYPTION_KEY absent — fichiers stockés sans chiffrement.")
     fernet = None
 
 
@@ -90,28 +117,73 @@ def _decrypt(data: bytes) -> bytes:
     try:
         return fernet.decrypt(data)
     except InvalidToken:
-        # Fichier antérieur au chiffrement : on le sert tel quel
         return data
+
+
+def _encrypt_secret(secret: str) -> str:
+    if fernet and secret:
+        return fernet.encrypt(secret.encode()).decode()
+    return secret
+
+
+def _decrypt_secret(encrypted: str) -> str:
+    if not fernet or not encrypted:
+        return encrypted or ''
+    try:
+        return fernet.decrypt(encrypted.encode()).decode()
+    except (InvalidToken, Exception):
+        return encrypted
 
 
 # ── Modèle utilisateur ────────────────────────────────────────────────────────
 class User(UserMixin):
-    def __init__(self, id, username, password, drop_token, is_admin=False):
-        self.id         = id
-        self.username   = username
-        self.password   = password
-        self.drop_token = drop_token
-        self.is_admin   = bool(is_admin)
+    def __init__(self, id, username, password, drop_token, is_admin=False,
+                 totp_secret=None, webauthn_credential_id=None,
+                 webauthn_public_key=None, webauthn_sign_count=0,
+                 theme='light', avatar_color='#4361ee'):
+        self.id                     = id
+        self.username               = username
+        self.password               = password
+        self.drop_token             = drop_token
+        self.is_admin               = bool(is_admin)
+        self.totp_secret            = totp_secret
+        self.webauthn_credential_id = webauthn_credential_id
+        self.webauthn_public_key    = webauthn_public_key
+        self.webauthn_sign_count    = webauthn_sign_count or 0
+        self.theme                  = theme or 'light'
+        self.avatar_color           = avatar_color or '#4361ee'
+
+    @property
+    def has_mfa(self):
+        return bool(self.totp_secret or self.webauthn_credential_id)
+
+    @property
+    def has_totp(self):
+        return bool(self.totp_secret)
+
+    @property
+    def has_webauthn(self):
+        return bool(self.webauthn_credential_id)
+
+    @property
+    def avatar_letter(self):
+        return self.username[0].upper() if self.username else '?'
+
+
+_USER_COLS = ('id, username, password, drop_token, is_admin, '
+              'totp_secret, webauthn_credential_id, webauthn_public_key, '
+              'webauthn_sign_count, theme, avatar_color')
+
+
+def _load_user_by(column, value):
+    cur = get_db().execute(f'SELECT {_USER_COLS} FROM users WHERE {column} = ?', (value,))
+    row = cur.fetchone()
+    return User(*row) if row else None
 
 
 @login_manager.user_loader
 def load_user(user_id):
-    cur = get_db().execute(
-        'SELECT id, username, password, drop_token, is_admin FROM users WHERE id = ?',
-        (user_id,),
-    )
-    row = cur.fetchone()
-    return User(*row) if row else None
+    return _load_user_by('id', user_id)
 
 
 def admin_required(f):
@@ -121,6 +193,18 @@ def admin_required(f):
             abort(403)
         return f(*args, **kwargs)
     return decorated
+
+
+# ── Context processor (thème + avatar global) ─────────────────────────────────
+@app.context_processor
+def inject_globals():
+    if current_user.is_authenticated:
+        return {
+            'user_theme':        current_user.theme,
+            'user_avatar_color': current_user.avatar_color,
+            'user_avatar_letter': current_user.avatar_letter,
+        }
+    return {'user_theme': 'light', 'user_avatar_color': '#4361ee', 'user_avatar_letter': '?'}
 
 
 # ── Formulaires WTForms ───────────────────────────────────────────────────────
@@ -154,6 +238,15 @@ class LoginForm(FlaskForm):
     username = StringField('Nom d\'utilisateur', validators=[DataRequired()])
     password = PasswordField('Mot de passe',     validators=[DataRequired()])
     submit   = SubmitField('Se connecter')
+
+
+class ChangePasswordForm(FlaskForm):
+    current  = PasswordField('Mot de passe actuel', validators=[DataRequired()])
+    password = PasswordField('Nouveau mot de passe', validators=[DataRequired(), Length(min=10)])
+    confirm  = PasswordField('Confirmer', validators=[
+        DataRequired(), EqualTo('password', message='Les mots de passe ne correspondent pas.'),
+    ])
+    submit   = SubmitField('Modifier')
 
 
 class AdminSettingsForm(FlaskForm):
@@ -227,15 +320,26 @@ def init_db():
             )
         ''')
         conn.execute('CREATE INDEX IF NOT EXISTS idx_audit_ts ON audit_logs (timestamp DESC)')
+
         # ── Migrations ────────────────────────────────────────────────────────
         existing_files = {r[1] for r in conn.execute('PRAGMA table_info(files)')}
-        if 'owner_id'    not in existing_files:
-            conn.execute('ALTER TABLE files ADD COLUMN owner_id    INTEGER REFERENCES users(id)')
-        if 'deposited_by' not in existing_files:
-            conn.execute('ALTER TABLE files ADD COLUMN deposited_by TEXT')
+        for col, ddl in [('owner_id', 'INTEGER REFERENCES users(id)'),
+                         ('deposited_by', 'TEXT')]:
+            if col not in existing_files:
+                conn.execute(f'ALTER TABLE files ADD COLUMN {col} {ddl}')
+
         existing_users = {r[1] for r in conn.execute('PRAGMA table_info(users)')}
-        if 'is_admin' not in existing_users:
-            conn.execute('ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0')
+        for col, ddl in [
+            ('is_admin',               'INTEGER DEFAULT 0'),
+            ('totp_secret',            'TEXT'),
+            ('webauthn_credential_id', 'TEXT'),
+            ('webauthn_public_key',    'TEXT'),
+            ('webauthn_sign_count',    'INTEGER DEFAULT 0'),
+            ('theme',                  "TEXT DEFAULT 'light'"),
+            ('avatar_color',           "TEXT DEFAULT '#4361ee'"),
+        ]:
+            if col not in existing_users:
+                conn.execute(f'ALTER TABLE users ADD COLUMN {col} {ddl}')
 
 
 @app.before_request
@@ -252,7 +356,6 @@ def close_connection(exception):
 
 # ── Journal d'audit ───────────────────────────────────────────────────────────
 def audit_log(action: str, target: str = None, details: str = None):
-    """Enregistre une action dans le journal. Doit être appelé dans un contexte de requête."""
     uid   = current_user.id       if current_user.is_authenticated else None
     uname = current_user.username if current_user.is_authenticated else None
     ip    = request.remote_addr
@@ -268,7 +371,6 @@ def audit_log(action: str, target: str = None, details: str = None):
 
 
 def _system_audit_log(action: str, details: str = None):
-    """Journal pour le job de nettoyage (hors contexte de requête)."""
     try:
         with sqlite3.connect(DATABASE) as conn:
             conn.execute(
@@ -279,39 +381,30 @@ def _system_audit_log(action: str, details: str = None):
         app.logger.error("_system_audit_log failed: %s", exc)
 
 
-# ── Nettoyage automatique des fichiers expirés ────────────────────────────────
+# ── Nettoyage automatique ─────────────────────────────────────────────────────
 def cleanup_expired_files():
-    """Supprime les fichiers et enregistrements expirés. Tournant toutes les heures."""
-    app.logger.info("[Cleanup] Vérification des fichiers expirés…")
     now = str(datetime.now())
-    deleted = 0
-    errors  = 0
+    deleted = errors = 0
     try:
         with sqlite3.connect(DATABASE) as conn:
             conn.execute('PRAGMA journal_mode=WAL')
-            expired = conn.execute(
-                'SELECT id FROM files WHERE expiry < ?', (now,)
-            ).fetchall()
+            expired = conn.execute('SELECT id FROM files WHERE expiry < ?', (now,)).fetchall()
             for (fid,) in expired:
                 path = os.path.join(UPLOAD_FOLDER, fid)
                 try:
                     if os.path.exists(path):
                         os.remove(path)
                         deleted += 1
-                except OSError as exc:
-                    app.logger.error("[Cleanup] Erreur suppression %s : %s", fid, exc)
+                except OSError:
                     errors += 1
             conn.execute('DELETE FROM files WHERE expiry < ?', (now,))
-    except Exception as exc:
-        app.logger.error("[Cleanup] Erreur générale : %s", exc)
+    except Exception:
         return
-
     if deleted or errors:
         detail = f"{deleted} fichier(s) supprimé(s)"
         if errors:
             detail += f", {errors} erreur(s)"
         _system_audit_log('cleanup', detail)
-        app.logger.info("[Cleanup] %s.", detail)
 
 
 _scheduler = BackgroundScheduler(daemon=True)
@@ -353,7 +446,6 @@ def _parse_expiry(expiry_str):
 
 
 def _remove_file(file_id: str) -> bool:
-    """Supprime le fichier sur disque. Retourne True si supprimé, False sinon."""
     path = os.path.join(app.config['UPLOAD_FOLDER'], file_id)
     try:
         if os.path.exists(path):
@@ -380,7 +472,6 @@ def upload_file():
 
     settings = get_settings()
 
-    # ── Vérification taille ───────────────────────────────────────────────────
     file.seek(0, 2)
     size_bytes = file.tell()
     file.seek(0)
@@ -389,7 +480,6 @@ def upload_file():
         return {'success': False,
                 'message': f"Fichier trop grand (max {settings['max_file_size_mb']} Mo)."}
 
-    # ── Vérification quota fichiers ───────────────────────────────────────────
     max_files = int(settings['max_files_per_user'])
     if max_files > 0:
         count = g.db.execute(
@@ -399,7 +489,6 @@ def upload_file():
             return {'success': False,
                     'message': f"Quota atteint ({max_files} fichiers maximum)."}
 
-    # ── Vérification quota stockage ───────────────────────────────────────────
     max_storage = int(settings['max_storage_mb'])
     if max_storage > 0:
         file_ids = g.db.execute(
@@ -416,7 +505,6 @@ def upload_file():
             return {'success': False,
                     'message': f"Quota de stockage dépassé ({max_storage} Mo maximum)."}
 
-    # ── Enregistrement ────────────────────────────────────────────────────────
     file_id         = str(uuid.uuid4())
     expiry_time     = get_expiry_time(request.form.get('expiry', settings['default_expiry']))
     max_downloads   = request.form.get('max_downloads', 'unlimited')
@@ -431,7 +519,7 @@ def upload_file():
             fh.write(_encrypt(raw_data))
     except OSError as exc:
         app.logger.error("Erreur écriture fichier %s : %s", file_id, exc)
-        return {'success': False, 'message': 'Erreur interne lors de l\'enregistrement du fichier.'}
+        return {'success': False, 'message': 'Erreur interne lors de l\'enregistrement.'}
 
     g.db.execute(
         'INSERT INTO files (id, filename, original_filename, expiry, max_downloads, password, owner_id)'
@@ -442,7 +530,7 @@ def upload_file():
 
     size_kb = round(size_bytes / 1024, 1)
     audit_log('upload', target=file_id,
-              details=f"{file.filename} ({size_kb} Ko, expire: {expiry_time.strftime('%d/%m/%Y %H:%M')})")
+              details=f"{file.filename} ({size_kb} Ko)")
 
     return {'success': True, 'link': url_for('download_file', file_id=file_id, _external=True)}
 
@@ -477,7 +565,6 @@ def download_file(file_id):
     else:
         remaining = 'Illimité'
 
-    # Gestion mot de passe
     if form.validate_on_submit():
         if hashed_password and not check_password_hash(hashed_password, form.password.data):
             flash('Mot de passe incorrect.', 'danger')
@@ -526,7 +613,6 @@ def download_direct(file_id):
         g.db.commit()
         return redirect(url_for('file_not_found'))
 
-    # Vérifier auth mot de passe (TTL 1 heure)
     if hashed_password:
         auth_ts = session.get(f'auth_{file_id}')
         if not auth_ts or (datetime.now().timestamp() - auth_ts) > 3600:
@@ -535,24 +621,17 @@ def download_direct(file_id):
 
     g.db.execute('UPDATE files SET views = views + 1 WHERE id = ?', (file_id,))
     g.db.commit()
-
     audit_log('download', target=file_id, details=original_filename)
 
     path = os.path.join(app.config['UPLOAD_FOLDER'], file_id)
     try:
         with open(path, 'rb') as fh:
             raw = fh.read()
-    except OSError as exc:
-        app.logger.error("Erreur lecture fichier %s : %s", file_id, exc)
-        flash("Erreur lors de la lecture du fichier.", 'danger')
+    except OSError:
         return redirect(url_for('file_not_found'))
 
     data = _decrypt(raw)
-    return send_file(
-        io.BytesIO(data),
-        as_attachment=True,
-        download_name=original_filename,
-    )
+    return send_file(io.BytesIO(data), as_attachment=True, download_name=original_filename)
 
 
 # ── Authentification ──────────────────────────────────────────────────────────
@@ -591,13 +670,18 @@ def login():
     form = LoginForm()
     if form.validate_on_submit():
         uname = form.username.data.strip()
-        cur   = g.db.execute(
-            'SELECT id, username, password, drop_token, is_admin FROM users WHERE username = ?',
-            (uname,),
-        )
-        row = cur.fetchone()
-        if row and check_password_hash(row[2], form.password.data):
-            login_user(User(*row))
+        user  = _load_user_by('username', uname)
+        if user and check_password_hash(user.password, form.password.data):
+            # MFA check
+            if user.has_mfa:
+                session['_mfa_user_id'] = user.id
+                session['_mfa_methods'] = []
+                if user.has_totp:
+                    session['_mfa_methods'].append('totp')
+                if user.has_webauthn:
+                    session['_mfa_methods'].append('webauthn')
+                return redirect(url_for('mfa_verify'))
+            login_user(user)
             audit_log('login')
             return redirect(request.args.get('next') or url_for('dashboard'))
         audit_log('login_failed', target=uname)
@@ -613,11 +697,272 @@ def logout():
     return redirect(url_for('login'))
 
 
+# ── MFA verification (after password login) ──────────────────────────────────
+def _get_mfa_user():
+    uid = session.get('_mfa_user_id')
+    if not uid:
+        return None
+    return _load_user_by('id', uid)
+
+
+@app.route('/mfa', methods=['GET'])
+def mfa_verify():
+    user = _get_mfa_user()
+    if not user:
+        return redirect(url_for('login'))
+    methods = session.get('_mfa_methods', [])
+    return render_template('mfa.html', methods=methods, settings=get_settings(),
+                           webauthn_available=WEBAUTHN_AVAILABLE)
+
+
+@app.route('/mfa/totp', methods=['POST'])
+@limiter.limit("10 per minute")
+def mfa_totp_verify():
+    user = _get_mfa_user()
+    if not user:
+        return redirect(url_for('login'))
+    code = request.form.get('totp_code', '').strip()
+    secret = _decrypt_secret(user.totp_secret)
+    if secret and pyotp.TOTP(secret).verify(code, valid_window=1):
+        session.pop('_mfa_user_id', None)
+        session.pop('_mfa_methods', None)
+        login_user(user)
+        audit_log('login', details='via TOTP')
+        return redirect(url_for('dashboard'))
+    flash('Code TOTP invalide.', 'danger')
+    return redirect(url_for('mfa_verify'))
+
+
+@app.route('/mfa/webauthn/begin', methods=['POST'])
+def mfa_webauthn_begin():
+    if not WEBAUTHN_AVAILABLE:
+        return jsonify({'error': 'WebAuthn non disponible'}), 400
+    user = _get_mfa_user()
+    if not user or not user.webauthn_credential_id:
+        return jsonify({'error': 'Non autorisé'}), 403
+
+    cred_id = base64.b64decode(user.webauthn_credential_id)
+    options = generate_authentication_options(
+        rp_id=RP_ID,
+        allow_credentials=[PublicKeyCredentialDescriptor(id=cred_id)],
+        user_verification=UserVerificationRequirement.DISCOURAGED,
+    )
+    session['_webauthn_auth_challenge'] = base64.b64encode(options.challenge).decode()
+    return options_to_json(options), 200, {'Content-Type': 'application/json'}
+
+
+@app.route('/mfa/webauthn/complete', methods=['POST'])
+def mfa_webauthn_complete():
+    if not WEBAUTHN_AVAILABLE:
+        return jsonify({'error': 'WebAuthn non disponible'}), 400
+    user = _get_mfa_user()
+    if not user:
+        return jsonify({'error': 'Non autorisé'}), 403
+
+    challenge = base64.b64decode(session.pop('_webauthn_auth_challenge', ''))
+    pub_key   = base64.b64decode(user.webauthn_public_key)
+
+    try:
+        from webauthn.helpers.structs import AuthenticationCredential
+        raw = request.get_data()
+        try:
+            credential = AuthenticationCredential.model_validate_json(raw)
+        except AttributeError:
+            credential = AuthenticationCredential.parse_raw(raw)
+
+        verification = verify_authentication_response(
+            credential=credential,
+            expected_challenge=challenge,
+            expected_rp_id=RP_ID,
+            expected_origin=RP_ORIGIN,
+            credential_public_key=pub_key,
+            credential_current_sign_count=user.webauthn_sign_count,
+        )
+        g.db.execute('UPDATE users SET webauthn_sign_count = ? WHERE id = ?',
+                     (verification.new_sign_count, user.id))
+        g.db.commit()
+    except Exception as exc:
+        app.logger.error("WebAuthn auth failed: %s", exc)
+        return jsonify({'error': 'Échec de la vérification'}), 400
+
+    session.pop('_mfa_user_id', None)
+    session.pop('_mfa_methods', None)
+    login_user(user)
+    audit_log('login', details='via WebAuthn')
+    return jsonify({'success': True, 'redirect': url_for('dashboard')})
+
+
+# ── Profil utilisateur ────────────────────────────────────────────────────────
+@app.route('/profile')
+@login_required
+def profile():
+    form = ChangePasswordForm()
+    return render_template('profile.html', form=form, settings=get_settings(),
+                           avatar_colors=AVATAR_COLORS,
+                           webauthn_available=WEBAUTHN_AVAILABLE)
+
+
+@app.route('/profile/password', methods=['POST'])
+@login_required
+def profile_change_password():
+    form = ChangePasswordForm()
+    if form.validate_on_submit():
+        if not check_password_hash(current_user.password, form.current.data):
+            flash('Mot de passe actuel incorrect.', 'danger')
+        else:
+            g.db.execute('UPDATE users SET password = ? WHERE id = ?',
+                         (generate_password_hash(form.password.data), current_user.id))
+            g.db.commit()
+            audit_log('password_change')
+            flash('Mot de passe modifié.', 'success')
+    else:
+        for field, errors in form.errors.items():
+            for err in errors:
+                flash(f'{err}', 'danger')
+    return redirect(url_for('profile'))
+
+
+@app.route('/profile/theme', methods=['POST'])
+@login_required
+def profile_change_theme():
+    theme = request.form.get('theme', 'light')
+    if theme not in ('light', 'dark'):
+        theme = 'light'
+    g.db.execute('UPDATE users SET theme = ? WHERE id = ?', (theme, current_user.id))
+    g.db.commit()
+    return redirect(request.referrer or url_for('profile'))
+
+
+@app.route('/profile/avatar-color', methods=['POST'])
+@login_required
+def profile_change_avatar_color():
+    color = request.form.get('color', '#4361ee').strip()
+    if color not in AVATAR_COLORS:
+        color = '#4361ee'
+    g.db.execute('UPDATE users SET avatar_color = ? WHERE id = ?', (color, current_user.id))
+    g.db.commit()
+    return redirect(url_for('profile'))
+
+
+# ── Profil : TOTP ─────────────────────────────────────────────────────────────
+@app.route('/profile/totp/setup', methods=['POST'])
+@login_required
+def profile_totp_setup():
+    secret = pyotp.random_base32()
+    session['_totp_setup_secret'] = secret
+    settings = get_settings()
+    uri = pyotp.TOTP(secret).provisioning_uri(
+        name=current_user.username,
+        issuer_name=settings.get('app_name', 'FileShareApp'),
+    )
+    return jsonify({'secret': secret, 'uri': uri})
+
+
+@app.route('/profile/totp/confirm', methods=['POST'])
+@login_required
+def profile_totp_confirm():
+    secret = session.pop('_totp_setup_secret', None)
+    code   = request.form.get('totp_code', '').strip()
+    if not secret:
+        flash('Session expirée, recommencez.', 'danger')
+        return redirect(url_for('profile'))
+    if pyotp.TOTP(secret).verify(code, valid_window=1):
+        g.db.execute('UPDATE users SET totp_secret = ? WHERE id = ?',
+                     (_encrypt_secret(secret), current_user.id))
+        g.db.commit()
+        audit_log('totp_enable')
+        flash('TOTP activé avec succès.', 'success')
+    else:
+        flash('Code invalide. Réessayez.', 'danger')
+    return redirect(url_for('profile'))
+
+
+@app.route('/profile/totp/disable', methods=['POST'])
+@login_required
+def profile_totp_disable():
+    g.db.execute('UPDATE users SET totp_secret = NULL WHERE id = ?', (current_user.id,))
+    g.db.commit()
+    audit_log('totp_disable')
+    flash('TOTP désactivé.', 'success')
+    return redirect(url_for('profile'))
+
+
+# ── Profil : WebAuthn ─────────────────────────────────────────────────────────
+@app.route('/profile/webauthn/register/begin', methods=['POST'])
+@login_required
+def webauthn_register_begin():
+    if not WEBAUTHN_AVAILABLE:
+        return jsonify({'error': 'WebAuthn non disponible'}), 400
+
+    options = generate_registration_options(
+        rp_id=RP_ID,
+        rp_name=RP_NAME,
+        user_id=str(current_user.id).encode(),
+        user_name=current_user.username,
+        user_display_name=current_user.username,
+        authenticator_selection=AuthenticatorSelectionCriteria(
+            resident_key=ResidentKeyRequirement.DISCOURAGED,
+            user_verification=UserVerificationRequirement.DISCOURAGED,
+        ),
+    )
+    session['_webauthn_reg_challenge'] = base64.b64encode(options.challenge).decode()
+    return options_to_json(options), 200, {'Content-Type': 'application/json'}
+
+
+@app.route('/profile/webauthn/register/complete', methods=['POST'])
+@login_required
+def webauthn_register_complete():
+    if not WEBAUTHN_AVAILABLE:
+        return jsonify({'error': 'WebAuthn non disponible'}), 400
+
+    challenge = base64.b64decode(session.pop('_webauthn_reg_challenge', ''))
+    try:
+        from webauthn.helpers.structs import RegistrationCredential
+        raw = request.get_data()
+        try:
+            credential = RegistrationCredential.model_validate_json(raw)
+        except AttributeError:
+            credential = RegistrationCredential.parse_raw(raw)
+
+        verification = verify_registration_response(
+            credential=credential,
+            expected_challenge=challenge,
+            expected_rp_id=RP_ID,
+            expected_origin=RP_ORIGIN,
+        )
+    except Exception as exc:
+        app.logger.error("WebAuthn registration failed: %s", exc)
+        return jsonify({'error': 'Échec de l\'enregistrement'}), 400
+
+    cred_id = base64.b64encode(verification.credential_id).decode()
+    pub_key = base64.b64encode(verification.credential_public_key).decode()
+    g.db.execute(
+        'UPDATE users SET webauthn_credential_id=?, webauthn_public_key=?, webauthn_sign_count=? WHERE id=?',
+        (cred_id, pub_key, verification.sign_count, current_user.id),
+    )
+    g.db.commit()
+    audit_log('webauthn_register', details='Clé de sécurité enregistrée')
+    return jsonify({'success': True})
+
+
+@app.route('/profile/webauthn/delete', methods=['POST'])
+@login_required
+def webauthn_delete():
+    g.db.execute(
+        'UPDATE users SET webauthn_credential_id=NULL, webauthn_public_key=NULL, webauthn_sign_count=0 WHERE id=?',
+        (current_user.id,),
+    )
+    g.db.commit()
+    audit_log('webauthn_delete', details='Clé de sécurité supprimée')
+    flash('Clé de sécurité supprimée.', 'success')
+    return redirect(url_for('profile'))
+
+
 # ── Dashboard ─────────────────────────────────────────────────────────────────
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    cur  = g.db.execute(
+    cur = g.db.execute(
         'SELECT id, original_filename, expiry, views, max_downloads, deposited_by'
         ' FROM files WHERE owner_id = ? ORDER BY expiry DESC',
         (current_user.id,),
@@ -629,13 +974,10 @@ def dashboard():
         expired   = now > exp
         remaining = 'Illimité' if max_dl == 'unlimited' else max(0, int(max_dl) - views)
         files.append({
-            'id':           fid,
-            'name':         name,
-            'expiry':       exp.strftime('%d/%m/%Y %H:%M'),
-            'expired':      expired,
-            'remaining':    remaining,
-            'exhausted':    remaining == 0,
-            'deposited_by': dep_by,
+            'id': fid, 'name': name,
+            'expiry': exp.strftime('%d/%m/%Y %H:%M'),
+            'expired': expired, 'remaining': remaining,
+            'exhausted': remaining == 0, 'deposited_by': dep_by,
         })
     drop_url = url_for('drop_zone', drop_token=current_user.drop_token, _external=True)
     return render_template('dashboard.html', files=files, drop_url=drop_url, settings=get_settings())
@@ -644,9 +986,7 @@ def dashboard():
 @app.route('/delete/<file_id>', methods=['POST'])
 @login_required
 def delete_file(file_id):
-    cur = g.db.execute(
-        'SELECT owner_id, original_filename FROM files WHERE id = ?', (file_id,)
-    )
+    cur = g.db.execute('SELECT owner_id, original_filename FROM files WHERE id = ?', (file_id,))
     row = cur.fetchone()
     if row and row[0] == current_user.id:
         _remove_file(file_id)
@@ -680,8 +1020,7 @@ def drop_zone(drop_token):
                 raw_data = file.read()
                 with open(dest, 'wb') as fh:
                     fh.write(_encrypt(raw_data))
-            except OSError as exc:
-                app.logger.error("drop_zone: erreur écriture %s : %s", file_id, exc)
+            except OSError:
                 flash("Erreur interne lors de l'enregistrement.", 'danger')
                 return render_template('drop.html', recipient=recipient_name,
                                        drop_token=drop_token, success=False,
@@ -693,7 +1032,7 @@ def drop_zone(drop_token):
             )
             g.db.commit()
             audit_log('drop_upload', target=file_id,
-                      details=f"{file.filename} déposé pour {recipient_name} par {sender_name}")
+                      details=f"{file.filename} pour {recipient_name} par {sender_name}")
             success = True
         else:
             flash('Type de fichier non autorisé.', 'danger')
@@ -707,13 +1046,10 @@ def drop_zone(drop_token):
 @login_required
 @admin_required
 def admin_panel():
-    # Utilisateurs + stats
     rows = g.db.execute('''
         SELECT u.id, u.username, u.created_at, u.is_admin, COUNT(f.id) AS file_count
-        FROM users u
-        LEFT JOIN files f ON f.owner_id = u.id
-        GROUP BY u.id
-        ORDER BY u.created_at
+        FROM users u LEFT JOIN files f ON f.owner_id = u.id
+        GROUP BY u.id ORDER BY u.created_at
     ''').fetchall()
 
     users = []
@@ -727,20 +1063,14 @@ def admin_panel():
             except OSError:
                 pass
         users.append({
-            'id':         uid,
-            'username':   username,
-            'created_at': created_at,
-            'is_admin':   bool(is_admin),
-            'file_count': file_count,
+            'id': uid, 'username': username, 'created_at': created_at,
+            'is_admin': bool(is_admin), 'file_count': file_count,
             'storage_mb': round(used / (1024 * 1024), 2),
         })
 
-    # Derniers 300 événements d'audit
     log_rows = g.db.execute('''
         SELECT id, timestamp, username, action, target, details, ip_address
-        FROM audit_logs
-        ORDER BY id DESC
-        LIMIT 300
+        FROM audit_logs ORDER BY id DESC LIMIT 300
     ''').fetchall()
     logs = [
         {'id': r[0], 'timestamp': r[1], 'username': r[2] or 'system',
@@ -750,17 +1080,15 @@ def admin_panel():
 
     settings = get_settings()
     form = AdminSettingsForm(data={
-        'app_name':           settings['app_name'],
-        'contact_email':      settings['contact_email'],
-        'max_file_size_mb':   int(settings['max_file_size_mb']),
+        'app_name': settings['app_name'], 'contact_email': settings['contact_email'],
+        'max_file_size_mb': int(settings['max_file_size_mb']),
         'blocked_extensions': settings['blocked_extensions'],
         'allow_registration': settings['allow_registration'] == '1',
-        'default_expiry':     settings['default_expiry'],
+        'default_expiry': settings['default_expiry'],
         'max_files_per_user': int(settings['max_files_per_user']),
-        'max_storage_mb':     int(settings['max_storage_mb']),
+        'max_storage_mb': int(settings['max_storage_mb']),
     })
-    return render_template('admin.html', users=users, form=form,
-                           settings=settings, logs=logs)
+    return render_template('admin.html', users=users, form=form, settings=settings, logs=logs)
 
 
 @app.route('/admin/settings', methods=['POST'])
@@ -770,14 +1098,14 @@ def admin_save_settings():
     form = AdminSettingsForm()
     if form.validate_on_submit():
         values = {
-            'app_name':           form.app_name.data.strip(),
-            'contact_email':      form.contact_email.data.strip(),
-            'max_file_size_mb':   str(form.max_file_size_mb.data),
+            'app_name': form.app_name.data.strip(),
+            'contact_email': form.contact_email.data.strip(),
+            'max_file_size_mb': str(form.max_file_size_mb.data),
             'blocked_extensions': form.blocked_extensions.data.strip().lower(),
             'allow_registration': '1' if form.allow_registration.data else '0',
-            'default_expiry':     form.default_expiry.data,
+            'default_expiry': form.default_expiry.data,
             'max_files_per_user': str(form.max_files_per_user.data),
-            'max_storage_mb':     str(form.max_storage_mb.data),
+            'max_storage_mb': str(form.max_storage_mb.data),
         }
         for key, value in values.items():
             g.db.execute('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', (key, value))
@@ -803,15 +1131,11 @@ def admin_delete_user(user_id):
         return redirect(url_for('admin_panel'))
     target_username = row[0]
     file_ids = g.db.execute('SELECT id FROM files WHERE owner_id = ?', (user_id,)).fetchall()
-    n_deleted = 0
-    for (fid,) in file_ids:
-        if _remove_file(fid):
-            n_deleted += 1
+    n = sum(1 for (fid,) in file_ids if _remove_file(fid))
     g.db.execute('DELETE FROM files WHERE owner_id = ?', (user_id,))
     g.db.execute('DELETE FROM users WHERE id = ?', (user_id,))
     g.db.commit()
-    audit_log('admin_delete_user', target=target_username,
-              details=f"{n_deleted} fichier(s) supprimé(s)")
+    audit_log('admin_delete_user', target=target_username, details=f"{n} fichier(s) supprimé(s)")
     flash(f"Utilisateur « {target_username} » supprimé.", 'success')
     return redirect(url_for('admin_panel'))
 
@@ -828,8 +1152,8 @@ def admin_toggle_admin(user_id):
         new_val = 0 if row[1] else 1
         g.db.execute('UPDATE users SET is_admin = ? WHERE id = ?', (new_val, user_id))
         g.db.commit()
-        action_str = 'Promu administrateur' if new_val else 'Droits admin retirés'
-        audit_log('admin_toggle_admin', target=row[0], details=action_str)
+        audit_log('admin_toggle_admin', target=row[0],
+                  details='Promu administrateur' if new_val else 'Droits admin retirés')
     return redirect(url_for('admin_panel'))
 
 

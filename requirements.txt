@@ -6,4 +6,6 @@ Flask-Limiter
 redis
 cryptography
 APScheduler
+pyotp
+py_webauthn>=2.0
 gunicorn

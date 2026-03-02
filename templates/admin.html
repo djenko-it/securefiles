@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" data-bs-theme="{{ user_theme }}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -28,7 +28,8 @@
       <a href="{{ url_for('dashboard') }}" class="btn btn-sm btn-outline-light">
         <i class="fas fa-table-list me-1"></i>Mes partages
       </a>
-      <a href="{{ url_for('logout') }}" class="text-secondary small ms-1">Déconnexion</a>
+      <a href="{{ url_for('profile') }}" class="user-avatar" style="background:{{ user_avatar_color }}"
+         title="Mon profil">{{ user_avatar_letter }}</a>
     </div>
   </div>
 </nav>

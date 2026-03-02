@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" data-bs-theme="{{ user_theme }}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,15 +13,16 @@
     <div class="container">
       <a class="navbar-brand" href="/"><i class="fas fa-shield-halved me-2"></i>{{ settings.app_name }}</a>
       <div class="d-flex align-items-center gap-2">
-        <span class="text-secondary small d-none d-sm-inline">
-          <i class="fas fa-user me-1"></i>{{ current_user.username }}
-        </span>
         {% if current_user.is_admin %}
         <a href="{{ url_for('admin_panel') }}" class="btn btn-sm btn-outline-warning">
           <i class="fas fa-screwdriver-wrench me-1"></i>Admin
         </a>
         {% endif %}
-        <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-light">Déconnexion</a>
+        <a href="{{ url_for('index') }}" class="btn btn-sm btn-outline-light">
+          <i class="fas fa-plus me-1"></i>Nouveau
+        </a>
+        <a href="{{ url_for('profile') }}" class="user-avatar" style="background:{{ user_avatar_color }}"
+           title="Mon profil">{{ user_avatar_letter }}</a>
       </div>
     </div>
   </nav>
