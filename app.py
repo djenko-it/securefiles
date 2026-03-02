@@ -2,13 +2,13 @@ import os
 import uuid
 import sqlite3
 from datetime import datetime, timedelta
-from flask import Flask, request, redirect, render_template, url_for, flash, send_from_directory, g, session
+from functools import wraps
+from flask import Flask, request, redirect, render_template, url_for, flash, send_from_directory, g, session, abort
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
-from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_wtf import FlaskForm
-from wtforms import FileField, SelectField, PasswordField, SubmitField, StringField
-from wtforms.validators import DataRequired, Length, EqualTo
+from wtforms import FileField, SelectField, PasswordField, SubmitField, StringField, BooleanField, IntegerField
+from wtforms.validators import DataRequired, Length, EqualTo, Optional, NumberRange
 from flask_wtf.csrf import CSRFProtect
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -34,46 +34,72 @@ login_manager.login_view = 'login'
 login_manager.login_message = 'Veuillez vous connecter pour accéder à cette page.'
 login_manager.login_message_category = 'warning'
 
-DATABASE = '/app/messages.db'
+DATABASE      = '/app/messages.db'
 UPLOAD_FOLDER = '/app/data'
-ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'zip', 'rar'}
+ALLOWED_EXTENSIONS = {
+    'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'zip', 'rar',
+    'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'csv',
+    'mp3', 'mp4', 'avi', 'mov', 'ogg', 'webm', 'svg',
+}
+
+SETTINGS_DEFAULTS = {
+    'app_name':           'FileShareApp',
+    'contact_email':      'djenko-it@protonmail.com',
+    'max_file_size_mb':   '16',
+    'blocked_extensions': 'exe,bat,cmd,sh,msi,dll,com,scr,vbs,ps1',
+    'allow_registration': '1',
+    'default_expiry':     '1d',
+    'max_files_per_user': '0',
+    'max_storage_mb':     '0',
+}
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 
 class User(UserMixin):
-    def __init__(self, id, username, password, drop_token):
-        self.id = id
-        self.username = username
-        self.password = password
+    def __init__(self, id, username, password, drop_token, is_admin=False):
+        self.id         = id
+        self.username   = username
+        self.password   = password
         self.drop_token = drop_token
+        self.is_admin   = bool(is_admin)
 
 
 @login_manager.user_loader
 def load_user(user_id):
     cur = get_db().execute(
-        'SELECT id, username, password, drop_token FROM users WHERE id = ?', (user_id,)
+        'SELECT id, username, password, drop_token, is_admin FROM users WHERE id = ?',
+        (user_id,)
     )
     row = cur.fetchone()
     return User(*row) if row else None
 
 
+def admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not current_user.is_authenticated or not current_user.is_admin:
+            abort(403)
+        return f(*args, **kwargs)
+    return decorated
+
+
 # ── Forms ─────────────────────────────────────────────────────────────────────
 class PasswordForm(FlaskForm):
     password = PasswordField('Mot de passe', validators=[DataRequired()])
-    submit = SubmitField('Soumettre')
+    submit   = SubmitField('Soumettre')
 
 
 class FileUploadForm(FlaskForm):
-    file = FileField('Choisissez un fichier', validators=[DataRequired()])
-    expiry = SelectField('Durée de validité', choices=[
+    file          = FileField('Choisissez un fichier', validators=[DataRequired()])
+    expiry        = SelectField('Durée de validité', choices=[
         ('3h', '3 heures'), ('1d', '1 jour'), ('1w', '1 semaine'), ('1m', '1 mois')
     ])
     max_downloads = SelectField('Nombre maximal de téléchargements', choices=[
         ('1', '1'), ('5', '5'), ('10', '10'), ('unlimited', 'Illimité')
     ], validators=[DataRequired()])
-    password = PasswordField('Mot de passe (optionnel)')
-    submit = SubmitField('Téléverser')
+    password      = PasswordField('Mot de passe (optionnel)')
+    submit        = SubmitField('Téléverser')
 
 
 class RegisterForm(FlaskForm):
@@ -82,20 +108,36 @@ class RegisterForm(FlaskForm):
     confirm  = PasswordField('Confirmer', validators=[
         DataRequired(), EqualTo('password', message='Les mots de passe ne correspondent pas.')
     ])
-    submit = SubmitField('Créer un compte')
+    submit   = SubmitField('Créer un compte')
 
 
 class LoginForm(FlaskForm):
     username = StringField('Nom d\'utilisateur', validators=[DataRequired()])
     password = PasswordField('Mot de passe', validators=[DataRequired()])
-    submit = SubmitField('Se connecter')
+    submit   = SubmitField('Se connecter')
+
+
+class AdminSettingsForm(FlaskForm):
+    app_name           = StringField('Nom de l\'application',
+                                     validators=[DataRequired(), Length(max=64)])
+    contact_email      = StringField('E-mail de contact administrateur',
+                                     validators=[DataRequired(), Length(max=128)])
+    max_file_size_mb   = IntegerField('Taille max des fichiers (Mo)',
+                                      validators=[DataRequired(), NumberRange(min=1, max=2048)])
+    blocked_extensions = StringField('Extensions bloquées (séparées par des virgules)',
+                                     validators=[Optional(), Length(max=256)])
+    allow_registration = BooleanField('Autoriser les inscriptions')
+    default_expiry     = SelectField('Expiration par défaut', choices=[
+        ('3h', '3 heures'), ('1d', '1 jour'), ('1w', '1 semaine'), ('1m', '1 mois')
+    ])
+    max_files_per_user = IntegerField('Quota fichiers par utilisateur (0 = illimité)',
+                                      validators=[NumberRange(min=0)])
+    max_storage_mb     = IntegerField('Quota stockage par utilisateur en Mo (0 = illimité)',
+                                      validators=[NumberRange(min=0)])
+    submit             = SubmitField('Sauvegarder')
 
 
 # ── Base de données ───────────────────────────────────────────────────────────
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-
 def get_db():
     if 'db' not in g:
         g.db = sqlite3.connect(DATABASE, timeout=10, check_same_thread=False)
@@ -110,6 +152,7 @@ def init_db():
                 username   TEXT UNIQUE NOT NULL,
                 password   TEXT NOT NULL,
                 drop_token TEXT UNIQUE NOT NULL,
+                is_admin   INTEGER DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
@@ -124,12 +167,21 @@ def init_db():
                 password          TEXT
             )
         ''')
-        # Migration sans casser les données existantes
-        existing = {row[1] for row in conn.execute('PRAGMA table_info(files)')}
-        if 'owner_id' not in existing:
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS settings (
+                key   TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )
+        ''')
+        # Migrations sans casser les données existantes
+        existing_files = {row[1] for row in conn.execute('PRAGMA table_info(files)')}
+        if 'owner_id' not in existing_files:
             conn.execute('ALTER TABLE files ADD COLUMN owner_id INTEGER REFERENCES users(id)')
-        if 'deposited_by' not in existing:
+        if 'deposited_by' not in existing_files:
             conn.execute('ALTER TABLE files ADD COLUMN deposited_by TEXT')
+        existing_users = {row[1] for row in conn.execute('PRAGMA table_info(users)')}
+        if 'is_admin' not in existing_users:
+            conn.execute('ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0')
 
 
 @app.before_request
@@ -144,6 +196,24 @@ def close_connection(exception):
         db.close()
 
 
+def get_settings():
+    rows = g.db.execute('SELECT key, value FROM settings').fetchall()
+    s = dict(SETTINGS_DEFAULTS)
+    s.update({r[0]: r[1] for r in rows})
+    s['blocked_ext_set'] = {e.strip().lower() for e in s['blocked_extensions'].split(',') if e.strip()}
+    return s
+
+
+def allowed_file(filename):
+    if '.' not in filename:
+        return False
+    ext = filename.rsplit('.', 1)[1].lower()
+    s = get_settings()
+    if ext in s.get('blocked_ext_set', set()):
+        return False
+    return ext in ALLOWED_EXTENSIONS
+
+
 def get_expiry_time(expiry_option):
     if expiry_option == '3h':
         return datetime.now() + timedelta(hours=3)
@@ -154,16 +224,6 @@ def get_expiry_time(expiry_option):
     elif expiry_option == '1m':
         return datetime.now() + timedelta(days=30)
     return None
-
-
-def get_settings():
-    return {
-        'software_name':       os.environ.get('SOFTWARE_NAME',       'FileShareApp'),
-        'contact_email':       os.environ.get('CONTACT_EMAIL',       'djenko-it@protonmail.com'),
-        'title_upload_file':   os.environ.get('TITLE_UPLOAD_FILE',   'Téléverser un Fichier'),
-        'title_download_file': os.environ.get('TITLE_DOWNLOAD_FILE', 'Télécharger un Fichier'),
-        'max_file_size':       os.environ.get('MAX_FILE_SIZE',       '10'),
-    }
 
 
 def _parse_expiry(expiry_str):
@@ -185,28 +245,63 @@ def index():
 @login_required
 def upload_file():
     file = request.files.get('file')
-    if file and allowed_file(file.filename):
-        file_id         = str(uuid.uuid4())
-        expiry_time     = get_expiry_time(request.form.get('expiry', '1d'))
-        max_downloads   = request.form.get('max_downloads', 'unlimited')
-        password        = request.form.get('password', '')
-        hashed_password = generate_password_hash(password) if password else None
-        owner_id        = current_user.id if current_user.is_authenticated else None
+    if not file or not allowed_file(file.filename):
+        return {"success": False, "message": "Fichier absent ou type non autorisé"}
 
-        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-        file.save(os.path.join(app.config['UPLOAD_FOLDER'], file_id))
+    settings = get_settings()
 
-        with g.db:
-            g.db.execute(
-                'INSERT INTO files (id, filename, original_filename, expiry, max_downloads, password, owner_id)'
-                ' VALUES (?, ?, ?, ?, ?, ?, ?)',
-                (file_id, file_id, file.filename, expiry_time, max_downloads, hashed_password, owner_id)
-            )
-            g.db.commit()
+    # Vérifier la taille du fichier
+    file.seek(0, 2)
+    size_bytes = file.tell()
+    file.seek(0)
+    max_bytes = int(settings['max_file_size_mb']) * 1024 * 1024
+    if size_bytes > max_bytes:
+        return {"success": False,
+                "message": f"Fichier trop grand (max {settings['max_file_size_mb']} Mo)"}
 
-        return {"success": True, "link": url_for('download_file', file_id=file_id, _external=True)}
+    # Vérifier le quota fichiers par utilisateur
+    max_files = int(settings['max_files_per_user'])
+    if max_files > 0:
+        count = g.db.execute(
+            'SELECT COUNT(*) FROM files WHERE owner_id = ?', (current_user.id,)
+        ).fetchone()[0]
+        if count >= max_files:
+            return {"success": False,
+                    "message": f"Quota atteint ({max_files} fichiers maximum)"}
 
-    return {"success": False, "message": "No file selected or file type is not allowed"}
+    # Vérifier le quota stockage par utilisateur
+    max_storage = int(settings['max_storage_mb'])
+    if max_storage > 0:
+        rows = g.db.execute(
+            'SELECT id FROM files WHERE owner_id = ?', (current_user.id,)
+        ).fetchall()
+        used = sum(
+            os.path.getsize(os.path.join(app.config['UPLOAD_FOLDER'], r[0]))
+            for r in rows
+            if os.path.exists(os.path.join(app.config['UPLOAD_FOLDER'], r[0]))
+        )
+        if used + size_bytes > max_storage * 1024 * 1024:
+            return {"success": False,
+                    "message": f"Quota de stockage dépassé ({max_storage} Mo maximum)"}
+
+    file_id         = str(uuid.uuid4())
+    expiry_time     = get_expiry_time(request.form.get('expiry', settings['default_expiry']))
+    max_downloads   = request.form.get('max_downloads', 'unlimited')
+    password        = request.form.get('password', '')
+    hashed_password = generate_password_hash(password) if password else None
+
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    file.save(os.path.join(app.config['UPLOAD_FOLDER'], file_id))
+
+    with g.db:
+        g.db.execute(
+            'INSERT INTO files (id, filename, original_filename, expiry, max_downloads, password, owner_id)'
+            ' VALUES (?, ?, ?, ?, ?, ?, ?)',
+            (file_id, file_id, file.filename, expiry_time, max_downloads, hashed_password, current_user.id)
+        )
+        g.db.commit()
+
+    return {"success": True, "link": url_for('download_file', file_id=file_id, _external=True)}
 
 
 @app.route('/download/<file_id>', methods=['GET', 'POST'])
@@ -241,12 +336,14 @@ def download_file(file_id):
         if form.validate_on_submit():
             if hashed_password and not check_password_hash(hashed_password, form.password.data):
                 flash("Mot de passe incorrect.")
-                return render_template('password_required.html', file_id=file_id, form=form, settings=get_settings())
+                return render_template('password_required.html', file_id=file_id, form=form,
+                                       settings=get_settings())
             if hashed_password:
                 session[f'auth_{file_id}'] = True
 
         if hashed_password and request.method == 'GET':
-            return render_template('password_required.html', file_id=file_id, form=form, settings=get_settings())
+            return render_template('password_required.html', file_id=file_id, form=form,
+                                   settings=get_settings())
 
         return render_template('download.html',
                                file_id=file_id,
@@ -296,19 +393,27 @@ def download_direct(file_id):
 def register():
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
+    settings = get_settings()
+    if settings['allow_registration'] == '0':
+        flash("Les inscriptions sont désactivées.", 'warning')
+        return redirect(url_for('login'))
     form = RegisterForm()
     if form.validate_on_submit():
         try:
-            g.db.execute('INSERT INTO users (username, password, drop_token) VALUES (?, ?, ?)',
-                         (form.username.data.strip(),
-                          generate_password_hash(form.password.data),
-                          str(uuid.uuid4())))
+            # Le premier compte créé devient administrateur
+            user_count = g.db.execute('SELECT COUNT(*) FROM users').fetchone()[0]
+            is_admin   = 1 if user_count == 0 else 0
+            g.db.execute(
+                'INSERT INTO users (username, password, drop_token, is_admin) VALUES (?, ?, ?, ?)',
+                (form.username.data.strip(), generate_password_hash(form.password.data),
+                 str(uuid.uuid4()), is_admin)
+            )
             g.db.commit()
             flash('Compte créé ! Vous pouvez vous connecter.', 'success')
             return redirect(url_for('login'))
         except sqlite3.IntegrityError:
             flash("Ce nom d'utilisateur est déjà pris.", 'danger')
-    return render_template('register.html', form=form, settings=get_settings())
+    return render_template('register.html', form=form, settings=settings)
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -318,7 +423,7 @@ def login():
     form = LoginForm()
     if form.validate_on_submit():
         cur = g.db.execute(
-            'SELECT id, username, password, drop_token FROM users WHERE username = ?',
+            'SELECT id, username, password, drop_token, is_admin FROM users WHERE username = ?',
             (form.username.data.strip(),)
         )
         row = cur.fetchone()
@@ -333,7 +438,7 @@ def login():
 @login_required
 def logout():
     logout_user()
-    return redirect(url_for('index'))
+    return redirect(url_for('login'))
 
 
 # ── Dashboard ─────────────────────────────────────────────────────────────────
@@ -345,11 +450,11 @@ def dashboard():
         ' FROM files WHERE owner_id = ? ORDER BY expiry DESC',
         (current_user.id,)
     )
-    now = datetime.now()
+    now   = datetime.now()
     files = []
     for fid, name, expiry, views, max_dl, dep_by in cur.fetchall():
-        exp = _parse_expiry(expiry)
-        expired = now > exp
+        exp      = _parse_expiry(expiry)
+        expired  = now > exp
         remaining = 'Illimité' if max_dl == 'unlimited' else max(0, int(max_dl) - views)
         files.append({
             'id':           fid,
@@ -390,10 +495,10 @@ def drop_zone(drop_token):
 
     success = False
     if request.method == 'POST':
-        file = request.files.get('file')
+        file        = request.files.get('file')
         sender_name = request.form.get('sender_name', '').strip() or 'Anonyme'
         if file and allowed_file(file.filename):
-            file_id = str(uuid.uuid4())
+            file_id     = str(uuid.uuid4())
             expiry_time = datetime.now() + timedelta(days=30)
             os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
             file.save(os.path.join(app.config['UPLOAD_FOLDER'], file_id))
@@ -412,6 +517,113 @@ def drop_zone(drop_token):
                            drop_token=drop_token,
                            success=success,
                            settings=get_settings())
+
+
+# ── Administration ────────────────────────────────────────────────────────────
+@app.route('/admin')
+@login_required
+@admin_required
+def admin_panel():
+    rows = g.db.execute('''
+        SELECT u.id, u.username, u.created_at, u.is_admin, COUNT(f.id) AS file_count
+        FROM users u
+        LEFT JOIN files f ON f.owner_id = u.id
+        GROUP BY u.id
+        ORDER BY u.created_at
+    ''').fetchall()
+
+    users = []
+    for uid, username, created_at, is_admin, file_count in rows:
+        file_ids   = g.db.execute('SELECT id FROM files WHERE owner_id = ?', (uid,)).fetchall()
+        used_bytes = sum(
+            os.path.getsize(os.path.join(app.config['UPLOAD_FOLDER'], r[0]))
+            for r in file_ids
+            if os.path.exists(os.path.join(app.config['UPLOAD_FOLDER'], r[0]))
+        )
+        users.append({
+            'id':         uid,
+            'username':   username,
+            'created_at': created_at,
+            'is_admin':   bool(is_admin),
+            'file_count': file_count,
+            'storage_mb': round(used_bytes / (1024 * 1024), 2),
+        })
+
+    settings = get_settings()
+    form = AdminSettingsForm(data={
+        'app_name':           settings['app_name'],
+        'contact_email':      settings['contact_email'],
+        'max_file_size_mb':   int(settings['max_file_size_mb']),
+        'blocked_extensions': settings['blocked_extensions'],
+        'allow_registration': settings['allow_registration'] == '1',
+        'default_expiry':     settings['default_expiry'],
+        'max_files_per_user': int(settings['max_files_per_user']),
+        'max_storage_mb':     int(settings['max_storage_mb']),
+    })
+    return render_template('admin.html', users=users, form=form, settings=settings)
+
+
+@app.route('/admin/settings', methods=['POST'])
+@login_required
+@admin_required
+def admin_save_settings():
+    form = AdminSettingsForm()
+    if form.validate_on_submit():
+        values = {
+            'app_name':           form.app_name.data.strip(),
+            'contact_email':      form.contact_email.data.strip(),
+            'max_file_size_mb':   str(form.max_file_size_mb.data),
+            'blocked_extensions': form.blocked_extensions.data.strip().lower(),
+            'allow_registration': '1' if form.allow_registration.data else '0',
+            'default_expiry':     form.default_expiry.data,
+            'max_files_per_user': str(form.max_files_per_user.data),
+            'max_storage_mb':     str(form.max_storage_mb.data),
+        }
+        for key, value in values.items():
+            g.db.execute(
+                'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', (key, value)
+            )
+        g.db.commit()
+        flash('Paramètres sauvegardés.', 'success')
+    else:
+        for field, errors in form.errors.items():
+            for err in errors:
+                flash(f'{field} : {err}', 'danger')
+    return redirect(url_for('admin_panel') + '#settings')
+
+
+@app.route('/admin/users/<int:user_id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def admin_delete_user(user_id):
+    if user_id == current_user.id:
+        flash("Impossible de supprimer votre propre compte.", 'danger')
+        return redirect(url_for('admin_panel'))
+    file_ids = g.db.execute('SELECT id FROM files WHERE owner_id = ?', (user_id,)).fetchall()
+    for (fid,) in file_ids:
+        path = os.path.join(app.config['UPLOAD_FOLDER'], fid)
+        if os.path.exists(path):
+            os.remove(path)
+    g.db.execute('DELETE FROM files WHERE owner_id = ?', (user_id,))
+    g.db.execute('DELETE FROM users WHERE id = ?', (user_id,))
+    g.db.commit()
+    flash('Utilisateur supprimé.', 'success')
+    return redirect(url_for('admin_panel'))
+
+
+@app.route('/admin/users/<int:user_id>/toggle-admin', methods=['POST'])
+@login_required
+@admin_required
+def admin_toggle_admin(user_id):
+    if user_id == current_user.id:
+        flash("Impossible de modifier vos propres droits.", 'danger')
+        return redirect(url_for('admin_panel'))
+    row = g.db.execute('SELECT is_admin FROM users WHERE id = ?', (user_id,)).fetchone()
+    if row:
+        g.db.execute('UPDATE users SET is_admin = ? WHERE id = ?',
+                     (0 if row[0] else 1, user_id))
+        g.db.commit()
+    return redirect(url_for('admin_panel'))
 
 
 # ── Pages d'erreur ────────────────────────────────────────────────────────────

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{ settings.software_name }}</title>
+  <title>{{ settings.app_name }}</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <link href="/static/css/custom.css" rel="stylesheet">
@@ -11,9 +11,14 @@
 <body>
   <nav class="navbar navbar-dark mb-4">
     <div class="container">
-      <a class="navbar-brand" href="/"><i class="fas fa-shield-halved me-2"></i>{{ settings.software_name }}</a>
+      <a class="navbar-brand" href="/"><i class="fas fa-shield-halved me-2"></i>{{ settings.app_name }}</a>
       <div class="d-flex align-items-center gap-2">
         {% if current_user.is_authenticated %}
+          {% if current_user.is_admin %}
+          <a href="{{ url_for('admin_panel') }}" class="btn btn-sm btn-outline-warning">
+            <i class="fas fa-screwdriver-wrench me-1"></i>Admin
+          </a>
+          {% endif %}
           <a href="{{ url_for('dashboard') }}" class="btn btn-sm btn-outline-light">
             <i class="fas fa-table-list me-1"></i>Mes partages
           </a>
@@ -32,7 +37,7 @@
         <div class="dropzone" id="dropzone">
           <div class="dz-icon"><i class="fas fa-cloud-arrow-up"></i></div>
           <div class="fw-semibold mb-1">Glissez un fichier ici ou cliquez pour parcourir</div>
-          <small class="text-muted">Taille maximale : {{ settings.max_file_size }} Mo</small>
+          <small class="text-muted">Taille maximale : {{ settings.max_file_size_mb }} Mo</small>
         </div>
       </div>
     </div>
@@ -106,7 +111,7 @@
   </div>
 
   <footer>
-    {{ settings.software_name }} &mdash;
+    {{ settings.app_name }} &mdash;
     <a href="mailto:{{ settings.contact_email }}">{{ settings.contact_email }}</a>
   </footer>
 
@@ -121,11 +126,11 @@
       const copySuccess = document.getElementById('copy-success')
       const uploadModal = new bootstrap.Modal(document.getElementById('uploadModal'))
       const linkModal   = new bootstrap.Modal(document.getElementById('linkModal'))
-      const maxBytes    = {{ settings.max_file_size }} * 1024 * 1024
+      const maxBytes    = {{ settings.max_file_size_mb }} * 1024 * 1024
 
       function sizeOk(file) {
         if (file.size > maxBytes) {
-          alert('Ce fichier dépasse la taille maximale de {{ settings.max_file_size }} Mo.')
+          alert('Ce fichier dépasse la taille maximale de {{ settings.max_file_size_mb }} Mo.')
           return false
         }
         return true
