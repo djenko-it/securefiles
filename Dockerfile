@@ -1,5 +1,5 @@
 # Utiliser une image Python officielle comme image de base
-FROM python:3.9
+FROM python:3.11
 
 # Installer Node.js et npm
 RUN apt-get update && apt-get install -y nodejs npm
