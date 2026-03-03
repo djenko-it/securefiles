@@ -805,12 +805,22 @@ def mfa_webauthn_complete():
     pub_key   = base64.b64decode(user.webauthn_public_key)
 
     try:
-        from webauthn.helpers.structs import AuthenticationCredential
+        from webauthn.helpers.structs import (
+            AuthenticationCredential, AuthenticatorAssertionResponse)
+        from webauthn.helpers import base64url_to_bytes as _b64
         raw = request.get_data()
-        if hasattr(AuthenticationCredential, 'model_validate_json'):
-            credential = AuthenticationCredential.model_validate_json(raw)
-        else:
-            credential = AuthenticationCredential.parse_raw(raw)
+        data = json.loads(raw)
+        resp_data = data['response']
+        credential = AuthenticationCredential(
+            id=data['id'],
+            raw_id=_b64(data['rawId']),
+            response=AuthenticatorAssertionResponse(
+                client_data_json=_b64(resp_data['clientDataJSON']),
+                authenticator_data=_b64(resp_data['authenticatorData']),
+                signature=_b64(resp_data['signature']),
+                user_handle=_b64(resp_data['userHandle']) if resp_data.get('userHandle') else None,
+            ),
+        )
 
         verification = verify_authentication_response(
             credential=credential,
@@ -959,12 +969,24 @@ def webauthn_register_complete():
 
     challenge = base64.b64decode(session.pop('_webauthn_reg_challenge', ''))
     try:
-        from webauthn.helpers.structs import RegistrationCredential
+        from webauthn.helpers.structs import (
+            RegistrationCredential, AuthenticatorAttestationResponse, AuthenticatorTransport)
+        from webauthn.helpers import base64url_to_bytes as _b64
         raw = request.get_data()
-        if hasattr(RegistrationCredential, 'model_validate_json'):
-            credential = RegistrationCredential.model_validate_json(raw)
-        else:
-            credential = RegistrationCredential.parse_raw(raw)
+        data = json.loads(raw)
+        resp_data = data['response']
+        valid_transports = {e.value for e in AuthenticatorTransport}
+        transports = [AuthenticatorTransport(t) for t in resp_data.get('transports', [])
+                      if t in valid_transports]
+        credential = RegistrationCredential(
+            id=data['id'],
+            raw_id=_b64(data['rawId']),
+            response=AuthenticatorAttestationResponse(
+                client_data_json=_b64(resp_data['clientDataJSON']),
+                attestation_object=_b64(resp_data['attestationObject']),
+                transports=transports or None,
+            ),
+        )
 
         verification = verify_registration_response(
             credential=credential,
