@@ -9,3 +9,4 @@ APScheduler
 pyotp
 webauthn>=2.0
 gunicorn
+requests

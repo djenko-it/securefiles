@@ -3,10 +3,14 @@ import io
 import json
 import logging
 import os
+import secrets
 import sqlite3
 import uuid
 from datetime import datetime, timedelta
 from functools import wraps
+from urllib.parse import urlencode
+
+import requests
 
 import pyotp
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -80,6 +84,12 @@ SETTINGS_DEFAULTS = {
     'default_expiry':     '1d',
     'max_files_per_user': '0',
     'max_storage_mb':     '0',
+    # SSO / OIDC
+    'sso_enabled':        '0',
+    'sso_provider_name':  'SSO',
+    'sso_discovery_url':  '',
+    'sso_client_id':      '',
+    'sso_client_secret':  '',
 }
 
 AVATAR_COLORS = [
@@ -267,6 +277,19 @@ class AdminSettingsForm(FlaskForm):
     max_storage_mb     = IntegerField('Quota stockage / utilisateur en Mo (0 = illimité)',
                                       validators=[NumberRange(min=0)])
     submit             = SubmitField('Sauvegarder')
+
+
+class SSOSettingsForm(FlaskForm):
+    sso_enabled       = BooleanField('Activer le SSO (OIDC)')
+    sso_provider_name = StringField('Nom du fournisseur',
+                                    validators=[Optional(), Length(max=64)])
+    sso_discovery_url = StringField('Discovery URL',
+                                    validators=[Optional(), Length(max=512)])
+    sso_client_id     = StringField('Client ID',
+                                    validators=[Optional(), Length(max=256)])
+    sso_client_secret = PasswordField('Client Secret (laisser vide pour ne pas changer)',
+                                      validators=[Optional(), Length(max=512)])
+    submit            = SubmitField('Sauvegarder SSO')
 
 
 # ── Base de données ───────────────────────────────────────────────────────────
@@ -1093,7 +1116,14 @@ def admin_panel():
         'max_files_per_user': int(settings['max_files_per_user']),
         'max_storage_mb': int(settings['max_storage_mb']),
     })
-    return render_template('admin.html', users=users, form=form, settings=settings, logs=logs)
+    sso_form = SSOSettingsForm(data={
+        'sso_enabled':       settings.get('sso_enabled') == '1',
+        'sso_provider_name': settings.get('sso_provider_name', 'SSO'),
+        'sso_discovery_url': settings.get('sso_discovery_url', ''),
+        'sso_client_id':     settings.get('sso_client_id', ''),
+    })
+    return render_template('admin.html', users=users, form=form, sso_form=sso_form,
+                           settings=settings, logs=logs)
 
 
 @app.route('/admin/settings', methods=['POST'])
@@ -1160,6 +1190,127 @@ def admin_toggle_admin(user_id):
         audit_log('admin_toggle_admin', target=row[0],
                   details='Promu administrateur' if new_val else 'Droits admin retirés')
     return redirect(url_for('admin_panel'))
+
+
+# ── SSO / OIDC ────────────────────────────────────────────────────────────────
+@app.route('/auth/sso')
+def sso_login():
+    settings = get_settings()
+    if settings.get('sso_enabled') != '1' or not settings.get('sso_discovery_url'):
+        abort(404)
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
+    try:
+        discovery = requests.get(settings['sso_discovery_url'], timeout=5).json()
+    except Exception:
+        flash("Impossible de contacter le fournisseur SSO.", 'danger')
+        return redirect(url_for('login'))
+    state = secrets.token_urlsafe(16)
+    nonce = secrets.token_urlsafe(16)
+    session['_sso_state']            = state
+    session['_sso_nonce']            = nonce
+    session['_sso_token_endpoint']   = discovery['token_endpoint']
+    session['_sso_userinfo_endpoint'] = discovery.get('userinfo_endpoint', '')
+    params = urlencode({
+        'response_type': 'code',
+        'client_id':     settings['sso_client_id'],
+        'redirect_uri':  url_for('sso_callback', _external=True),
+        'scope':         'openid email profile',
+        'state':         state,
+        'nonce':         nonce,
+    })
+    return redirect(f"{discovery['authorization_endpoint']}?{params}")
+
+
+@app.route('/auth/sso/callback')
+def sso_callback():
+    settings = get_settings()
+    if settings.get('sso_enabled') != '1':
+        abort(404)
+    if request.args.get('state') != session.pop('_sso_state', None):
+        flash("Erreur de sécurité SSO (state invalide).", 'danger')
+        return redirect(url_for('login'))
+    code = request.args.get('code')
+    if not code:
+        flash("Connexion SSO échouée.", 'danger')
+        return redirect(url_for('login'))
+    token_endpoint    = session.pop('_sso_token_endpoint', '')
+    userinfo_endpoint = session.pop('_sso_userinfo_endpoint', '')
+    session.pop('_sso_nonce', None)
+    try:
+        token_resp = requests.post(token_endpoint, data={
+            'grant_type':   'authorization_code',
+            'code':         code,
+            'redirect_uri': url_for('sso_callback', _external=True),
+            'client_id':    settings['sso_client_id'],
+            'client_secret': settings['sso_client_secret'],
+        }, timeout=10)
+        token_data = token_resp.json()
+    except Exception:
+        flash("Impossible d'échanger le code SSO.", 'danger')
+        return redirect(url_for('login'))
+    access_token = token_data.get('access_token')
+    if not access_token:
+        flash("Connexion SSO échouée (pas de token).", 'danger')
+        return redirect(url_for('login'))
+    try:
+        ui = requests.get(
+            userinfo_endpoint,
+            headers={'Authorization': f'Bearer {access_token}'},
+            timeout=5,
+        ).json()
+    except Exception:
+        flash("Impossible de récupérer les informations SSO.", 'danger')
+        return redirect(url_for('login'))
+    raw_username = ui.get('preferred_username') or ui.get('email') or ui.get('sub', '')
+    username = ''.join(c for c in raw_username.split('@')[0] if c.isalnum() or c in '-_.')[:64]
+    if not username:
+        flash("Le fournisseur SSO n'a pas fourni d'identifiant utilisable.", 'danger')
+        return redirect(url_for('login'))
+    user = _load_user_by('username', username)
+    if user is None:
+        drop_token   = str(uuid.uuid4())
+        avatar_color = AVATAR_COLORS[hash(username) % len(AVATAR_COLORS)]
+        random_pw    = generate_password_hash(secrets.token_hex(32))
+        is_first     = g.db.execute('SELECT COUNT(*) FROM users').fetchone()[0] == 0
+        g.db.execute(
+            'INSERT INTO users (username, password, drop_token, is_admin, avatar_color) '
+            'VALUES (?, ?, ?, ?, ?)',
+            (username, random_pw, drop_token, 1 if is_first else 0, avatar_color),
+        )
+        g.db.commit()
+        user = _load_user_by('username', username)
+        audit_log('sso_register', target=username, details='Compte créé via SSO')
+    login_user(user)
+    audit_log('sso_login')
+    return redirect(url_for('dashboard'))
+
+
+@app.route('/admin/sso', methods=['POST'])
+@login_required
+@admin_required
+def admin_save_sso():
+    form = SSOSettingsForm()
+    if form.validate_on_submit():
+        existing = get_settings()
+        new_secret = form.sso_client_secret.data.strip()
+        values = {
+            'sso_enabled':       '1' if form.sso_enabled.data else '0',
+            'sso_provider_name': form.sso_provider_name.data.strip() or 'SSO',
+            'sso_discovery_url': form.sso_discovery_url.data.strip(),
+            'sso_client_id':     form.sso_client_id.data.strip(),
+            'sso_client_secret': new_secret if new_secret else existing.get('sso_client_secret', ''),
+        }
+        for key, value in values.items():
+            g.db.execute('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', (key, value))
+        g.db.commit()
+        audit_log('admin_settings', details='Paramètres SSO mis à jour')
+        flash('Configuration SSO sauvegardée.', 'success')
+    else:
+        for field, errors in form.errors.items():
+            for err in errors:
+                flash(f'{field} : {err}', 'danger')
+    return redirect(url_for('admin_panel') + '#sso')
 
 
 # ── Pages d'erreur ────────────────────────────────────────────────────────────

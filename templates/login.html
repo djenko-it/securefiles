@@ -47,6 +47,19 @@
           </div>
         </form>
 
+        {% if settings.sso_enabled == '1' %}
+        <div class="d-flex align-items-center my-3 gap-2">
+          <hr class="flex-grow-1 my-0">
+          <span class="text-muted small">ou</span>
+          <hr class="flex-grow-1 my-0">
+        </div>
+        <div class="d-grid">
+          <a href="{{ url_for('sso_login') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-key me-2"></i>Se connecter via {{ settings.sso_provider_name }}
+          </a>
+        </div>
+        {% endif %}
+
         <div class="text-center mt-3">
           <small class="text-muted">Pas encore de compte ?
             <a href="{{ url_for('register') }}">S'inscrire</a>
