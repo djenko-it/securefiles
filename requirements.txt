@@ -7,5 +7,5 @@ redis
 cryptography
 APScheduler
 pyotp
-py_webauthn>=2.0
+webauthn>=2.0
 gunicorn
