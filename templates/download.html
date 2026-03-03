@@ -49,11 +49,51 @@
           </div>
         </div>
 
-        <div class="d-grid">
-          <a href="{{ url_for('download_direct', file_id=file_id) }}" class="btn btn-primary btn-lg">
-            <i class="fas fa-download me-2"></i>Télécharger
-          </a>
+        <!-- Aperçu inline (chargé par JS, ignoré si E2E) -->
+        {% set ext = original_filename.rsplit('.', 1)[-1].lower() if '.' in original_filename else '' %}
+        {% if ext in ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'] %}
+        <div id="preview-holder" data-src="{{ url_for('preview_file', file_id=file_id) }}" data-type="image" class="mb-4 text-center"></div>
+        {% elif ext in ['mp4', 'webm', 'ogv'] %}
+        <div id="preview-holder" data-src="{{ url_for('preview_file', file_id=file_id) }}" data-type="video" class="mb-4"></div>
+        {% elif ext in ['mp3', 'ogg', 'wav', 'flac', 'aac', 'm4a'] %}
+        <div id="preview-holder" data-src="{{ url_for('preview_file', file_id=file_id) }}" data-type="audio" class="mb-4"></div>
+        {% elif ext == 'pdf' %}
+        <div id="preview-holder" data-src="{{ url_for('preview_file', file_id=file_id) }}" data-type="pdf" class="mb-4"></div>
+        {% endif %}
+
+        <!-- Bandeau E2E (affiché par JS si #k= présent) -->
+        <div id="e2e-info" style="display:none;">
+          <div class="alert alert-success d-flex align-items-start gap-2 mb-3 py-2">
+            <i class="fas fa-shield-halved mt-1 flex-shrink-0"></i>
+            <span style="font-size:.87rem;">
+              Ce fichier est <strong>chiffré de bout en bout</strong>.
+              La clé n'a jamais transité par le serveur.
+            </span>
+          </div>
         </div>
+
+        <!-- Bouton téléchargement direct (masqué si E2E) -->
+        <div id="download-direct-section">
+          <div class="d-grid">
+            <a href="{{ url_for('download_direct', file_id=file_id) }}" class="btn btn-primary btn-lg">
+              <i class="fas fa-download me-2"></i>Télécharger
+            </a>
+          </div>
+        </div>
+
+        <!-- Bouton déchiffrement E2E (affiché par JS si #k= présent) -->
+        <div id="e2e-decrypt-section" style="display:none;">
+          <div class="d-grid">
+            <button id="decrypt-btn" type="button" class="btn btn-success btn-lg">
+              <i class="fas fa-unlock me-2"></i>Déchiffrer &amp; télécharger
+            </button>
+          </div>
+          <div id="decrypt-progress" class="text-center text-muted small mt-2" style="display:none;">
+            <i class="fas fa-spinner fa-spin me-1"></i>Déchiffrement en cours…
+          </div>
+          <div id="decrypt-error" class="alert alert-danger mt-2 mb-0" style="display:none;"></div>
+        </div>
+
       </div>
     </div>
   </main>
@@ -63,5 +103,89 @@
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const hash = window.location.hash
+
+      // Clé E2E : fragment direct ou restaurée depuis sessionStorage (après auth mot de passe)
+      let e2eKey = hash.startsWith('#k=') ? hash.slice(3) : null
+      if (!e2eKey) {
+        const stored = sessionStorage.getItem('e2e_{{ file_id }}')
+        if (stored) {
+          e2eKey = stored
+          sessionStorage.removeItem('e2e_{{ file_id }}')
+          history.replaceState(null, '', location.pathname + '#k=' + e2eKey)
+        }
+      }
+
+      const previewHolder = document.getElementById('preview-holder')
+
+      if (e2eKey) {
+        // ── Mode E2E : masquer téléchargement direct et aperçu ────────────────
+        document.getElementById('download-direct-section').style.display = 'none'
+        document.getElementById('e2e-info').style.display = 'block'
+        document.getElementById('e2e-decrypt-section').style.display = 'block'
+
+        document.getElementById('decrypt-btn').addEventListener('click', async function () {
+          const btn      = this
+          const progress = document.getElementById('decrypt-progress')
+          const errBox   = document.getElementById('decrypt-error')
+          btn.disabled   = true
+          progress.style.display = 'block'
+          errBox.style.display   = 'none'
+
+          try {
+            function fromB64url(s) {
+              s = s.replace(/-/g, '+').replace(/_/g, '/')
+              while (s.length % 4) s += '='
+              return Uint8Array.from(atob(s), c => c.charCodeAt(0))
+            }
+
+            const keyBytes = fromB64url(e2eKey)
+            const key      = await crypto.subtle.importKey('raw', keyBytes, { name: 'AES-GCM' }, false, ['decrypt'])
+
+            const resp = await fetch('{{ url_for("download_direct", file_id=file_id) }}')
+            if (!resp.ok) throw new Error('Erreur HTTP ' + resp.status)
+            const ctype = resp.headers.get('Content-Type') || ''
+            if (ctype.includes('text/html')) throw new Error('Authentification requise')
+
+            const combined = new Uint8Array(await resp.arrayBuffer())
+            const iv       = combined.slice(0, 12)
+            const ct       = combined.slice(12)
+            const plain    = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv }, key, ct)
+
+            const blob = new Blob([plain])
+            const url  = URL.createObjectURL(blob)
+            const a    = document.createElement('a')
+            a.href     = url
+            a.download = {{ original_filename | tojson }}
+            document.body.appendChild(a)
+            a.click()
+            a.remove()
+            URL.revokeObjectURL(url)
+          } catch (err) {
+            errBox.textContent   = 'Déchiffrement impossible : ' + err.message
+            errBox.style.display = 'block'
+          } finally {
+            btn.disabled           = false
+            progress.style.display = 'none'
+          }
+        })
+      } else {
+        // ── Mode normal : activer l'aperçu inline ─────────────────────────────
+        if (previewHolder) {
+          const src  = previewHolder.dataset.src
+          const type = previewHolder.dataset.type
+          const map  = {
+            image: '<img src="' + src + '" class="img-fluid rounded" style="max-height:350px;" alt="Aperçu">',
+            video: '<video controls class="w-100 rounded" style="max-height:280px;"><source src="' + src + '"></video>',
+            audio: '<audio controls class="w-100"><source src="' + src + '"></audio>',
+            pdf:   '<iframe src="' + src + '" class="w-100 rounded border-0" style="height:500px;" title="Aperçu PDF"></iframe>',
+          }
+          if (map[type]) previewHolder.innerHTML = map[type]
+        }
+      }
+    })
+  </script>
 </body>
 </html>

@@ -44,8 +44,8 @@
       <div class="card-body p-4">
         <div class="dropzone" id="dropzone">
           <div class="dz-icon"><i class="fas fa-cloud-arrow-up"></i></div>
-          <div class="fw-semibold mb-1">Glissez un fichier ici ou cliquez pour parcourir</div>
-          <small class="text-muted">Taille maximale : {{ settings.max_file_size_mb }} Mo</small>
+          <div class="fw-semibold mb-1">Glissez un ou plusieurs fichiers ici ou cliquez pour parcourir</div>
+          <small class="text-muted">Taille maximale : {{ settings.max_file_size_mb }} Mo par fichier</small>
         </div>
       </div>
     </div>
@@ -67,7 +67,10 @@
         <div class="modal-body">
           <form id="upload-form" method="post" enctype="multipart/form-data" action="/upload">
             {{ form.hidden_tag() }}
-            <input type="file" id="file-input" name="file" style="display:none;">
+            <input type="file" id="file-input" name="file" style="display:none;" multiple>
+
+            <!-- Liste des fichiers sélectionnés -->
+            <div id="file-list" class="mb-3" style="display:none;"></div>
 
             <div class="mb-3">
               <label class="form-label-sm">Mot de passe (optionnel)</label>
@@ -77,14 +80,36 @@
               <label class="form-label-sm">Durée de validité</label>
               {{ form.expiry(class="form-select") }}
             </div>
-            <div class="mb-4">
+            <div class="mb-3">
               <label class="form-label-sm">Téléchargements max</label>
               {{ form.max_downloads(class="form-select") }}
             </div>
+
+            <!-- Chiffrement E2E -->
+            <div class="mb-4 p-3 rounded" style="background:rgba(25,135,84,.07);border:1px solid rgba(25,135,84,.22);">
+              <div class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" id="e2e-toggle" role="switch">
+                <label class="form-check-label" for="e2e-toggle">
+                  <span class="fw-medium"><i class="fas fa-shield-halved me-1 text-success"></i>Chiffrement de bout en bout</span>
+                  <small class="text-muted d-block mt-1" style="font-size:.78rem;">
+                    La clé ne quitte jamais votre navigateur. Le serveur ne peut pas lire le contenu.
+                  </small>
+                </label>
+              </div>
+            </div>
+
             <div class="d-grid">
-              <button type="submit" class="btn btn-primary btn-lg">
+              <button type="submit" class="btn btn-primary btn-lg" id="upload-btn">
                 <i class="fas fa-upload me-2"></i>Envoyer
               </button>
+            </div>
+
+            <!-- Progression -->
+            <div id="upload-progress" class="mt-3" style="display:none;">
+              <div class="progress mb-1" style="height:5px;">
+                <div id="upload-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" style="width:0%;"></div>
+              </div>
+              <small class="text-muted" id="upload-status"></small>
             </div>
           </form>
         </div>
@@ -92,26 +117,42 @@
     </div>
   </div>
 
-  <!-- Modal : lien généré -->
+  <!-- Modal : lien(s) généré(s) -->
   <div class="modal fade" id="linkModal" tabindex="-1" aria-labelledby="linkModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
         <div class="modal-header border-0 pb-0">
           <h5 class="modal-title fw-semibold" id="linkModalLabel">
-            <i class="fas fa-circle-check text-success me-2"></i>Fichier prêt !
+            <i class="fas fa-circle-check text-success me-2"></i>Fichier(s) prêt(s) !
           </h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
         </div>
         <div class="modal-body pt-2">
-          <p class="text-muted small mb-2">Copiez et partagez ce lien :</p>
-          <div class="input-group">
-            <input type="text" id="download-link" class="form-control font-monospace small" readonly>
-            <button id="copy-link-btn" class="btn btn-outline-primary" type="button" title="Copier">
-              <i class="fas fa-copy"></i>
-            </button>
+          <!-- Résultat fichier unique -->
+          <div id="single-result">
+            <p class="text-muted small mb-2">Copiez et partagez ce lien :</p>
+            <div class="input-group">
+              <input type="text" id="download-link" class="form-control font-monospace small" readonly>
+              <button id="copy-link-btn" class="btn btn-outline-primary" type="button" title="Copier">
+                <i class="fas fa-copy"></i>
+              </button>
+            </div>
+            <div id="copy-success" class="text-success small mt-2" style="display:none;">
+              <i class="fas fa-check me-1"></i>Lien copié dans le presse-papier
+            </div>
           </div>
-          <div id="copy-success" class="text-success small mt-2" style="display:none;">
-            <i class="fas fa-check me-1"></i>Lien copié dans le presse-papier
+          <!-- Résultats multi-fichiers -->
+          <div id="multi-result" style="display:none;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <p class="text-muted small mb-0">Liens générés :</p>
+              <button id="copy-all-btn" class="btn btn-sm btn-outline-secondary" type="button">
+                <i class="fas fa-copy me-1"></i>Copier tout
+              </button>
+            </div>
+            <div id="multi-links" style="max-height:280px; overflow-y:auto;"></div>
+            <div id="copy-all-success" class="text-success small mt-1" style="display:none;">
+              <i class="fas fa-check me-1"></i>Liens copiés !
+            </div>
           </div>
         </div>
       </div>
@@ -126,59 +167,193 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function () {
-      const dropzone    = document.getElementById('dropzone')
-      const fileInput   = document.getElementById('file-input')
-      const uploadForm  = document.getElementById('upload-form')
-      const dlLink      = document.getElementById('download-link')
-      const copyBtn     = document.getElementById('copy-link-btn')
-      const copySuccess = document.getElementById('copy-success')
-      const uploadModal = new bootstrap.Modal(document.getElementById('uploadModal'))
-      const linkModal   = new bootstrap.Modal(document.getElementById('linkModal'))
-      const maxBytes    = {{ settings.max_file_size_mb }} * 1024 * 1024
+      const dropzone     = document.getElementById('dropzone')
+      const fileInput    = document.getElementById('file-input')
+      const uploadForm   = document.getElementById('upload-form')
+      const uploadBtn    = document.getElementById('upload-btn')
+      const dlLink       = document.getElementById('download-link')
+      const copyBtn      = document.getElementById('copy-link-btn')
+      const copySuccess  = document.getElementById('copy-success')
+      const uploadModal  = new bootstrap.Modal(document.getElementById('uploadModal'))
+      const linkModal    = new bootstrap.Modal(document.getElementById('linkModal'))
+      const maxBytes     = {{ settings.max_file_size_mb }} * 1024 * 1024
+      let selectedFiles  = []
 
       function sizeOk(file) {
         if (file.size > maxBytes) {
-          alert('Ce fichier dépasse la taille maximale de {{ settings.max_file_size_mb }} Mo.')
+          alert('Le fichier "' + file.name + '" dépasse la taille maximale de {{ settings.max_file_size_mb }} Mo.')
           return false
         }
         return true
       }
 
+      function fmtSize(n) {
+        return n > 1048576 ? (n / 1048576).toFixed(1) + ' Mo' : (n / 1024).toFixed(0) + ' Ko'
+      }
+
+      function updateFileList() {
+        const container = document.getElementById('file-list')
+        const label     = document.getElementById('uploadModalLabel')
+        if (!selectedFiles.length) { container.style.display = 'none'; return }
+        label.innerHTML = selectedFiles.length === 1
+          ? '<i class="fas fa-sliders me-2 text-primary"></i>Options du partage'
+          : '<i class="fas fa-sliders me-2 text-primary"></i>Options &mdash; ' + selectedFiles.length + ' fichiers'
+        container.style.display = 'block'
+        container.innerHTML =
+          '<div class="border rounded p-2" style="max-height:110px;overflow-y:auto;background:var(--bs-body-bg);">' +
+          selectedFiles.map(f =>
+            '<div class="d-flex justify-content-between py-1" style="font-size:.83rem;">' +
+            '<span class="text-truncate me-2"><i class="fas fa-file me-2 text-muted"></i>' + f.name + '</span>' +
+            '<small class="text-muted flex-shrink-0">' + fmtSize(f.size) + '</small></div>'
+          ).join('') + '</div>'
+      }
+
+      // Drag & drop
       dropzone.addEventListener('dragover',  e => { e.preventDefault(); dropzone.classList.add('dragover') })
       dropzone.addEventListener('dragleave', ()  => dropzone.classList.remove('dragover'))
       dropzone.addEventListener('drop', function (e) {
         e.preventDefault()
         dropzone.classList.remove('dragover')
-        const f = e.dataTransfer.files[0]
-        if (!f || !sizeOk(f)) return
-        fileInput.files = e.dataTransfer.files
+        const files = Array.from(e.dataTransfer.files).filter(sizeOk)
+        if (!files.length) return
+        selectedFiles = files
+        updateFileList()
         uploadModal.show()
       })
 
       dropzone.addEventListener('click', () => fileInput.click())
       fileInput.addEventListener('change', function () {
-        if (!fileInput.files[0] || !sizeOk(fileInput.files[0])) return
+        const files = Array.from(fileInput.files).filter(sizeOk)
+        if (!files.length) return
+        selectedFiles = files
+        updateFileList()
         uploadModal.show()
       })
 
-      uploadForm.addEventListener('submit', function (e) {
+      // ── Chiffrement E2E (AES-GCM 256) ────────────────────────────────────────
+      function toB64url(buf) {
+        return btoa(Array.from(new Uint8Array(buf), b => String.fromCharCode(b)).join(''))
+          .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
+      }
+
+      async function encryptE2E(file) {
+        const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt'])
+        const iv  = crypto.getRandomValues(new Uint8Array(12))
+        const ct  = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, await file.arrayBuffer())
+        const out = new Uint8Array(12 + ct.byteLength)
+        out.set(iv, 0)
+        out.set(new Uint8Array(ct), 12)
+        const rawKey = await crypto.subtle.exportKey('raw', key)
+        return { blob: new Blob([out], { type: file.type }), keyB64: toB64url(rawKey) }
+      }
+
+      // ── Soumission du formulaire (single ou multi) ────────────────────────────
+      uploadForm.addEventListener('submit', async function (e) {
         e.preventDefault()
-        const fd = new FormData(uploadForm)
-        fd.set('file', fileInput.files[0])
-        fetch('/upload', { method: 'POST', body: fd })
-          .then(r => r.json())
-          .then(data => {
-            if (data.success) {
-              dlLink.value = data.link
-              uploadModal.hide()
-              linkModal.show()
-            } else {
-              alert('Erreur : ' + (data.message || 'type de fichier non autorisé.'))
+        if (!selectedFiles.length) return
+
+        const e2e       = document.getElementById('e2e-toggle').checked
+        const password  = document.querySelector('#upload-form [name="password"]').value
+        const expiry    = document.querySelector('#upload-form [name="expiry"]').value
+        const maxDl     = document.querySelector('#upload-form [name="max_downloads"]').value
+        const csrfToken = document.querySelector('#upload-form [name="csrf_token"]').value
+
+        uploadBtn.disabled = true
+        const progress    = document.getElementById('upload-progress')
+        const statusEl    = document.getElementById('upload-status')
+        const progressBar = document.getElementById('upload-progress-bar')
+        progress.style.display = 'block'
+
+        const results = []
+        for (let i = 0; i < selectedFiles.length; i++) {
+          const file = selectedFiles[i]
+          statusEl.textContent = 'Envoi de "' + file.name + '" (' + (i + 1) + '/' + selectedFiles.length + ')…'
+          progressBar.style.width = Math.round(i / selectedFiles.length * 100) + '%'
+
+          const fd = new FormData()
+          fd.append('csrf_token', csrfToken)
+          fd.append('password', password)
+          fd.append('expiry', expiry)
+          fd.append('max_downloads', maxDl)
+
+          let e2eKey = null
+          if (e2e) {
+            try {
+              const enc = await encryptE2E(file)
+              fd.append('file', new File([enc.blob], file.name, { type: file.type }))
+              e2eKey = enc.keyB64
+            } catch (err) {
+              results.push({ name: file.name, success: false, error: 'Chiffrement : ' + err.message })
+              continue
             }
-          })
-          .catch(() => alert("Erreur lors de l'envoi du fichier."))
+          } else {
+            fd.append('file', file)
+          }
+
+          try {
+            const r    = await fetch('/upload', { method: 'POST', body: fd })
+            const data = await r.json()
+            if (data.success) {
+              results.push({ name: file.name, success: true, link: e2eKey ? data.link + '#k=' + e2eKey : data.link })
+            } else {
+              results.push({ name: file.name, success: false, error: data.message || 'Erreur inconnue' })
+            }
+          } catch {
+            results.push({ name: file.name, success: false, error: 'Erreur réseau' })
+          }
+        }
+
+        progressBar.style.width = '100%'
+        statusEl.textContent = 'Terminé !'
+        setTimeout(() => {
+          uploadBtn.disabled = false
+          progress.style.display = 'none'
+          progressBar.style.width = '0%'
+          uploadModal.hide()
+          showResults(results)
+        }, 350)
       })
 
+      function showResults(results) {
+        const single = document.getElementById('single-result')
+        const multi  = document.getElementById('multi-result')
+        if (results.length === 1 && results[0].success) {
+          single.style.display = 'block'
+          multi.style.display  = 'none'
+          dlLink.value = results[0].link
+        } else {
+          single.style.display = 'none'
+          multi.style.display  = 'block'
+          const container = document.getElementById('multi-links')
+          container.innerHTML = results.map(r => {
+            if (!r.success) {
+              return '<div class="py-1 text-danger small"><i class="fas fa-times-circle me-2"></i>' + r.name + ' : ' + r.error + '</div>'
+            }
+            const badge = r.link.includes('#k=')
+              ? ' <span class="badge bg-success ms-1" style="font-size:.6rem;vertical-align:middle;"><i class="fas fa-lock me-1"></i>E2E</span>'
+              : ''
+            const safeLink = r.link.replace(/"/g, '&quot;')
+            return '<div class="mb-2">' +
+              '<small class="text-muted d-block mb-1 text-truncate">' + r.name + badge + '</small>' +
+              '<div class="input-group input-group-sm">' +
+              '<input type="text" class="form-control font-monospace" value="' + safeLink + '" readonly>' +
+              '<button class="btn btn-outline-primary copy-multi-btn" data-url="' + safeLink + '" type="button"><i class="fas fa-copy"></i></button>' +
+              '</div></div>'
+          }).join('')
+          container.querySelectorAll('.copy-multi-btn').forEach(btn => {
+            btn.addEventListener('click', function () {
+              navigator.clipboard.writeText(this.dataset.url).then(() => {
+                const icon = this.querySelector('i')
+                icon.className = 'fas fa-check text-success'
+                setTimeout(() => { icon.className = 'fas fa-copy' }, 2000)
+              })
+            })
+          })
+        }
+        linkModal.show()
+      }
+
+      // Copier le lien unique
       copyBtn.addEventListener('click', function () {
         navigator.clipboard.writeText(dlLink.value).then(() => {
           copySuccess.style.display = 'block'
@@ -188,6 +363,27 @@
             copyBtn.innerHTML = '<i class="fas fa-copy"></i>'
           }, 2500)
         })
+      })
+
+      // Copier tous les liens
+      document.getElementById('copy-all-btn').addEventListener('click', function () {
+        const links = Array.from(document.querySelectorAll('#multi-links input')).map(i => i.value).join('\n')
+        navigator.clipboard.writeText(links).then(() => {
+          const ok = document.getElementById('copy-all-success')
+          ok.style.display = 'block'
+          this.innerHTML = '<i class="fas fa-check me-1"></i>Copié !'
+          setTimeout(() => {
+            ok.style.display = 'none'
+            this.innerHTML = '<i class="fas fa-copy me-1"></i>Copier tout'
+          }, 2500)
+        })
+      })
+
+      // Réinitialiser à la fermeture de la modale
+      document.getElementById('uploadModal').addEventListener('hidden.bs.modal', function () {
+        selectedFiles = []
+        fileInput.value = ''
+        updateFileList()
       })
     })
   </script>

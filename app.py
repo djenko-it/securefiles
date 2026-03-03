@@ -2,6 +2,7 @@ import base64
 import io
 import json
 import logging
+import mimetypes
 import os
 import secrets
 import sqlite3
@@ -674,6 +675,48 @@ def download_direct(file_id):
 
     data = _decrypt(raw)
     return send_file(io.BytesIO(data), as_attachment=True, download_name=original_filename)
+
+
+@app.route('/preview/<file_id>')
+def preview_file(file_id):
+    """Sert le fichier inline pour l'aperçu (ne compte pas comme téléchargement)."""
+    cur = g.db.execute(
+        'SELECT original_filename, expiry, views, max_downloads, password FROM files WHERE id = ?',
+        (file_id,),
+    )
+    row = cur.fetchone()
+    if not row:
+        abort(404)
+
+    original_filename, expiry, views, max_downloads, hashed_password = row
+    expiry_time = _parse_expiry(expiry)
+
+    if datetime.now() > expiry_time:
+        abort(410)
+
+    if max_downloads != 'unlimited' and int(max_downloads) - views <= 0:
+        abort(410)
+
+    if hashed_password:
+        auth_ts = session.get(f'auth_{file_id}')
+        if not auth_ts or (datetime.now().timestamp() - auth_ts) > 3600:
+            abort(403)
+
+    path = os.path.join(app.config['UPLOAD_FOLDER'], file_id)
+    try:
+        with open(path, 'rb') as fh:
+            raw = fh.read()
+    except OSError:
+        abort(404)
+
+    data = _decrypt(raw)
+    mime_type, _ = mimetypes.guess_type(original_filename)
+    return send_file(
+        io.BytesIO(data),
+        mimetype=mime_type or 'application/octet-stream',
+        as_attachment=False,
+        download_name=original_filename,
+    )
 
 
 # ── Authentification ──────────────────────────────────────────────────────────
