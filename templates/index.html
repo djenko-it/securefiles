@@ -22,8 +22,15 @@
           <a href="{{ url_for('dashboard') }}" class="btn btn-sm btn-outline-light">
             <i class="fas fa-table-list me-1"></i>Mes partages
           </a>
-          <a href="{{ url_for('profile') }}" class="user-avatar" style="background:{{ user_avatar_color }}"
-             title="Mon profil">{{ user_avatar_letter }}</a>
+          <div class="dropdown">
+            <a class="user-avatar" style="background:{{ user_avatar_color }}" role="button"
+               data-bs-toggle="dropdown" aria-expanded="false">{{ user_avatar_letter }}</a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="{{ url_for('profile') }}"><i class="fas fa-user me-2"></i>Mon profil</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item text-danger" href="{{ url_for('logout') }}"><i class="fas fa-right-from-bracket me-2"></i>Se déconnecter</a></li>
+            </ul>
+          </div>
         {% else %}
           <a href="{{ url_for('login') }}" class="btn btn-sm btn-outline-light">Connexion</a>
           <a href="{{ url_for('register') }}" class="btn btn-sm btn-primary">Inscription</a>
