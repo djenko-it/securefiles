@@ -24,6 +24,7 @@ from flask_login import (LoginManager, UserMixin, current_user, login_required,
 from flask_wtf import FlaskForm
 from flask_wtf.csrf import CSRFProtect
 from redis import Redis
+from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
 from wtforms import (BooleanField, FileField, IntegerField, PasswordField,
                      SelectField, StringField, SubmitField)
@@ -49,6 +50,7 @@ except ImportError:
 
 # ── Application ───────────────────────────────────────────────────────────────
 app = Flask(__name__)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 app.secret_key = os.environ.get('SECRET_KEY', 'supersecretkey')
 csrf = CSRFProtect(app)
 logging.basicConfig(level=logging.INFO)
