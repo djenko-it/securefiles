@@ -807,9 +807,9 @@ def mfa_webauthn_complete():
     try:
         from webauthn.helpers.structs import AuthenticationCredential
         raw = request.get_data()
-        try:
+        if hasattr(AuthenticationCredential, 'model_validate_json'):
             credential = AuthenticationCredential.model_validate_json(raw)
-        except AttributeError:
+        else:
             credential = AuthenticationCredential.parse_raw(raw)
 
         verification = verify_authentication_response(
@@ -961,9 +961,9 @@ def webauthn_register_complete():
     try:
         from webauthn.helpers.structs import RegistrationCredential
         raw = request.get_data()
-        try:
+        if hasattr(RegistrationCredential, 'model_validate_json'):
             credential = RegistrationCredential.model_validate_json(raw)
-        except AttributeError:
+        else:
             credential = RegistrationCredential.parse_raw(raw)
 
         verification = verify_registration_response(
