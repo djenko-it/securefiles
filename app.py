@@ -103,9 +103,21 @@ AVATAR_COLORS = [
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # ── WebAuthn config ───────────────────────────────────────────────────────────
-RP_ID     = os.environ.get('WEBAUTHN_RP_ID', 'localhost')
-RP_ORIGIN = os.environ.get('WEBAUTHN_RP_ORIGIN', 'http://localhost:5000')
-RP_NAME   = 'FileShareApp'
+RP_NAME = 'FileShareApp'
+
+
+def get_rp_id():
+    override = os.environ.get('WEBAUTHN_RP_ID')
+    if override:
+        return override
+    return request.host.split(':')[0]  # domaine seul, sans port
+
+
+def get_rp_origin():
+    override = os.environ.get('WEBAUTHN_RP_ORIGIN')
+    if override:
+        return override
+    return f"{request.scheme}://{request.host}"
 
 # ── Chiffrement Fernet ────────────────────────────────────────────────────────
 _raw_key = os.environ.get('ENCRYPTION_KEY', '').strip().strip('"').strip("'")
@@ -773,7 +785,7 @@ def mfa_webauthn_begin():
 
     cred_id = base64.b64decode(user.webauthn_credential_id)
     options = generate_authentication_options(
-        rp_id=RP_ID,
+        rp_id=get_rp_id(),
         allow_credentials=[PublicKeyCredentialDescriptor(id=cred_id)],
         user_verification=UserVerificationRequirement.DISCOURAGED,
     )
@@ -803,8 +815,8 @@ def mfa_webauthn_complete():
         verification = verify_authentication_response(
             credential=credential,
             expected_challenge=challenge,
-            expected_rp_id=RP_ID,
-            expected_origin=RP_ORIGIN,
+            expected_rp_id=get_rp_id(),
+            expected_origin=get_rp_origin(),
             credential_public_key=pub_key,
             credential_current_sign_count=user.webauthn_sign_count,
         )
@@ -925,7 +937,7 @@ def webauthn_register_begin():
         return jsonify({'error': 'WebAuthn non disponible'}), 400
 
     options = generate_registration_options(
-        rp_id=RP_ID,
+        rp_id=get_rp_id(),
         rp_name=RP_NAME,
         user_id=str(current_user.id).encode(),
         user_name=current_user.username,
@@ -957,8 +969,8 @@ def webauthn_register_complete():
         verification = verify_registration_response(
             credential=credential,
             expected_challenge=challenge,
-            expected_rp_id=RP_ID,
-            expected_origin=RP_ORIGIN,
+            expected_rp_id=get_rp_id(),
+            expected_origin=get_rp_origin(),
         )
     except Exception as exc:
         app.logger.error("WebAuthn registration failed: %s", exc)
