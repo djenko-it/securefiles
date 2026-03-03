@@ -457,6 +457,11 @@ def _remove_file(file_id: str) -> bool:
 
 
 # ── Routes principales ────────────────────────────────────────────────────────
+@app.route('/health')
+def health():
+    return '', 200
+
+
 @app.route('/')
 @login_required
 def index():
