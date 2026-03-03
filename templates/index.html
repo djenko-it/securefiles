@@ -143,13 +143,13 @@
           </div>
           <!-- Résultats multi-fichiers -->
           <div id="multi-result" style="display:none;">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-              <p class="text-muted small mb-0">Liens générés :</p>
+            <div id="copy-all-wrapper" class="d-flex justify-content-between align-items-center mb-2" style="display:none!important;">
+              <p class="text-muted small mb-0">Liens individuels :</p>
               <button id="copy-all-btn" class="btn btn-sm btn-outline-secondary" type="button">
                 <i class="fas fa-copy me-1"></i>Copier tout
               </button>
             </div>
-            <div id="multi-links" style="max-height:280px; overflow-y:auto;"></div>
+            <div id="multi-links" style="max-height:320px; overflow-y:auto;"></div>
             <div id="copy-all-success" class="text-success small mt-1" style="display:none;">
               <i class="fas fa-check me-1"></i>Liens copiés !
             </div>
@@ -314,43 +314,118 @@
         }, 350)
       })
 
-      function showResults(results) {
+      // ── Affichage des résultats ───────────────────────────────────────────────
+      async function showResults(results) {
         const single = document.getElementById('single-result')
         const multi  = document.getElementById('multi-result')
+
+        // Cas fichier unique
         if (results.length === 1 && results[0].success) {
           single.style.display = 'block'
           multi.style.display  = 'none'
           dlLink.value = results[0].link
-        } else {
+          linkModal.show()
+          return
+        }
+
+        // Cas multi-fichiers tous réussis sans E2E → bundle ZIP
+        const allOk  = results.every(r => r.success)
+        const hasE2E = results.some(r => r.link && r.link.includes('#k='))
+        if (allOk && !hasE2E) {
           single.style.display = 'none'
           multi.style.display  = 'block'
           const container = document.getElementById('multi-links')
-          container.innerHTML = results.map(r => {
-            if (!r.success) {
-              return '<div class="py-1 text-danger small"><i class="fas fa-times-circle me-2"></i>' + r.name + ' : ' + r.error + '</div>'
+          container.innerHTML = '<div class="py-2 text-muted small"><i class="fas fa-spinner fa-spin me-2"></i>Création de l\'archive…</div>'
+          document.getElementById('copy-all-wrapper').style.removeProperty('display')
+          document.getElementById('copy-all-wrapper').style.display = 'none'
+          linkModal.show()
+
+          try {
+            const csrfToken = document.querySelector('#upload-form [name="csrf_token"]').value
+            const fileIds   = results.map(r => { const u = new URL(r.link); return u.pathname.split('/').pop() })
+            const resp      = await fetch('/bundle/create', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+              body: JSON.stringify({ file_ids: fileIds }),
+            })
+            const data = await resp.json()
+            if (data.success) {
+              renderBundle(container, data.link, results)
+              return
             }
-            const badge = r.link.includes('#k=')
-              ? ' <span class="badge bg-success ms-1" style="font-size:.6rem;vertical-align:middle;"><i class="fas fa-lock me-1"></i>E2E</span>'
-              : ''
-            const safeLink = r.link.replace(/"/g, '&quot;')
-            return '<div class="mb-2">' +
-              '<small class="text-muted d-block mb-1 text-truncate">' + r.name + badge + '</small>' +
-              '<div class="input-group input-group-sm">' +
-              '<input type="text" class="form-control font-monospace" value="' + safeLink + '" readonly>' +
-              '<button class="btn btn-outline-primary copy-multi-btn" data-url="' + safeLink + '" type="button"><i class="fas fa-copy"></i></button>' +
-              '</div></div>'
-          }).join('')
-          container.querySelectorAll('.copy-multi-btn').forEach(btn => {
-            btn.addEventListener('click', function () {
-              navigator.clipboard.writeText(this.dataset.url).then(() => {
-                const icon = this.querySelector('i')
-                icon.className = 'fas fa-check text-success'
-                setTimeout(() => { icon.className = 'fas fa-copy' }, 2000)
-              })
+          } catch { /* fallback */ }
+
+          // Bundle KO → liens individuels
+          renderIndividual(container, results)
+          document.getElementById('copy-all-wrapper').style.display = 'flex'
+          return
+        }
+
+        // Cas avec erreurs ou E2E → liens individuels
+        single.style.display = 'none'
+        multi.style.display  = 'block'
+        document.getElementById('copy-all-wrapper').style.display = 'flex'
+        renderIndividual(document.getElementById('multi-links'), results)
+        linkModal.show()
+      }
+
+      function renderBundle(container, bundleLink, results) {
+        const safe = bundleLink.replace(/"/g, '&quot;')
+        container.innerHTML =
+          '<div class="mb-3">' +
+          '<p class="text-muted small mb-1"><i class="fas fa-file-zipper me-1"></i>Lien archive ZIP :</p>' +
+          '<div class="input-group">' +
+          '<input type="text" class="form-control font-monospace small" id="bundle-link-input" value="' + safe + '" readonly>' +
+          '<button class="btn btn-outline-primary" id="copy-bundle-btn" type="button" title="Copier"><i class="fas fa-copy"></i></button>' +
+          '</div></div>' +
+          '<details>' +
+          '<summary class="text-muted small" style="cursor:pointer;user-select:none;list-style:none;">' +
+          '<i class="fas fa-list me-1"></i>Liens individuels (' + results.length + ' fichiers)' +
+          '</summary>' +
+          '<div class="mt-2">' + linksHtml(results) + '</div>' +
+          '</details>'
+        document.getElementById('copy-bundle-btn').addEventListener('click', function () {
+          navigator.clipboard.writeText(bundleLink).then(() => {
+            this.innerHTML = '<i class="fas fa-check"></i>'
+            setTimeout(() => { this.innerHTML = '<i class="fas fa-copy"></i>' }, 2000)
+          })
+        })
+        bindCopy(container)
+      }
+
+      function renderIndividual(container, results) {
+        container.innerHTML = linksHtml(results)
+        bindCopy(container)
+      }
+
+      function linksHtml(results) {
+        return results.map(r => {
+          if (!r.success) {
+            return '<div class="py-1 text-danger small"><i class="fas fa-times-circle me-2"></i>' + r.name + ' : ' + r.error + '</div>'
+          }
+          const badge = r.link.includes('#k=')
+            ? ' <span class="badge bg-success ms-1" style="font-size:.6rem;vertical-align:middle;"><i class="fas fa-lock me-1"></i>E2E</span>'
+            : ''
+          const safe = r.link.replace(/"/g, '&quot;')
+          return '<div class="mb-2">' +
+            '<small class="text-muted d-block mb-1 text-truncate">' + r.name + badge + '</small>' +
+            '<div class="input-group input-group-sm">' +
+            '<input type="text" class="form-control font-monospace" value="' + safe + '" readonly>' +
+            '<button class="btn btn-outline-primary copy-multi-btn" data-url="' + safe + '" type="button"><i class="fas fa-copy"></i></button>' +
+            '</div></div>'
+        }).join('')
+      }
+
+      function bindCopy(container) {
+        container.querySelectorAll('.copy-multi-btn').forEach(btn => {
+          btn.addEventListener('click', function () {
+            navigator.clipboard.writeText(this.dataset.url).then(() => {
+              const icon = this.querySelector('i')
+              icon.className = 'fas fa-check text-success'
+              setTimeout(() => { icon.className = 'fas fa-copy' }, 2000)
             })
           })
-        }
-        linkModal.show()
+        })
       }
 
       // Copier le lien unique
@@ -365,9 +440,9 @@
         })
       })
 
-      // Copier tous les liens
+      // Copier tous les liens individuels
       document.getElementById('copy-all-btn').addEventListener('click', function () {
-        const links = Array.from(document.querySelectorAll('#multi-links input')).map(i => i.value).join('\n')
+        const links = Array.from(document.querySelectorAll('#multi-links input:not(#bundle-link-input)')).map(i => i.value).join('\n')
         navigator.clipboard.writeText(links).then(() => {
           const ok = document.getElementById('copy-all-success')
           ok.style.display = 'block'

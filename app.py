@@ -7,6 +7,7 @@ import os
 import secrets
 import sqlite3
 import uuid
+import zipfile
 from datetime import datetime, timedelta
 from functools import wraps
 from urllib.parse import urlencode
@@ -358,6 +359,15 @@ def init_db():
             )
         ''')
         conn.execute('CREATE INDEX IF NOT EXISTS idx_audit_ts ON audit_logs (timestamp DESC)')
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS bundles (
+                id         TEXT PRIMARY KEY,
+                file_ids   TEXT NOT NULL,
+                owner_id   INTEGER,
+                password   TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
 
         # ── Migrations ────────────────────────────────────────────────────────
         existing_files = {r[1] for r in conn.execute('PRAGMA table_info(files)')}
@@ -717,6 +727,149 @@ def preview_file(file_id):
         as_attachment=False,
         download_name=original_filename,
     )
+
+
+# ── Bundles (archives ZIP multi-fichiers) ─────────────────────────────────────
+@app.route('/bundle/create', methods=['POST'])
+@login_required
+def bundle_create():
+    data = request.get_json(silent=True) or {}
+    file_ids = data.get('file_ids', [])
+    if not isinstance(file_ids, list) or len(file_ids) < 2:
+        return jsonify({'success': False, 'message': 'Au moins 2 fichiers requis.'})
+
+    hashed_password = None
+    for fid in file_ids:
+        row = g.db.execute(
+            'SELECT id, password FROM files WHERE id = ? AND owner_id = ?',
+            (fid, current_user.id),
+        ).fetchone()
+        if not row:
+            return jsonify({'success': False, 'message': 'Fichier introuvable.'})
+        if hashed_password is None:
+            hashed_password = row[1]
+
+    bundle_id = str(uuid.uuid4())
+    g.db.execute(
+        'INSERT INTO bundles (id, file_ids, owner_id, password) VALUES (?, ?, ?, ?)',
+        (bundle_id, json.dumps(file_ids), current_user.id, hashed_password),
+    )
+    g.db.commit()
+    audit_log('bundle_create', target=bundle_id, details=f'{len(file_ids)} fichiers')
+    return jsonify({'success': True, 'link': url_for('bundle_download', bundle_id=bundle_id, _external=True)})
+
+
+@app.route('/bundle/<bundle_id>', methods=['GET', 'POST'])
+def bundle_download(bundle_id):
+    row = g.db.execute(
+        'SELECT file_ids, password FROM bundles WHERE id = ?', (bundle_id,)
+    ).fetchone()
+    if not row:
+        return redirect(url_for('file_not_found'))
+
+    file_ids_json, hashed_password = row
+    file_ids = json.loads(file_ids_json)
+
+    valid_files = []
+    earliest_expiry = None
+    for fid in file_ids:
+        frow = g.db.execute(
+            'SELECT original_filename, expiry, views, max_downloads FROM files WHERE id = ?', (fid,)
+        ).fetchone()
+        if not frow:
+            continue
+        fname, expiry, views, max_downloads = frow
+        expiry_time = _parse_expiry(expiry)
+        if datetime.now() > expiry_time:
+            continue
+        if max_downloads != 'unlimited' and int(max_downloads) - views <= 0:
+            continue
+        valid_files.append(fname)
+        if earliest_expiry is None or expiry_time < earliest_expiry:
+            earliest_expiry = expiry_time
+
+    if not valid_files:
+        return redirect(url_for('file_expired'))
+
+    form = PasswordForm()
+    if form.validate_on_submit():
+        if hashed_password and not check_password_hash(hashed_password, form.password.data):
+            flash('Mot de passe incorrect.', 'danger')
+            return render_template('bundle.html',
+                                   bundle_id=bundle_id, form=form, needs_password=True,
+                                   file_count=len(valid_files),
+                                   expiry_time=earliest_expiry.strftime('%Y-%m-%d %H:%M:%S'),
+                                   settings=get_settings())
+        if hashed_password:
+            session[f'auth_bundle_{bundle_id}'] = datetime.now().timestamp()
+
+    if hashed_password and request.method == 'GET':
+        auth_ts = session.get(f'auth_bundle_{bundle_id}')
+        if not auth_ts or (datetime.now().timestamp() - auth_ts) > 3600:
+            session.pop(f'auth_bundle_{bundle_id}', None)
+            return render_template('bundle.html',
+                                   bundle_id=bundle_id, form=form, needs_password=True,
+                                   file_count=len(valid_files),
+                                   expiry_time=earliest_expiry.strftime('%Y-%m-%d %H:%M:%S'),
+                                   settings=get_settings())
+
+    return render_template('bundle.html',
+                           bundle_id=bundle_id, form=None, needs_password=False,
+                           file_count=len(valid_files),
+                           file_names=valid_files,
+                           expiry_time=earliest_expiry.strftime('%Y-%m-%d %H:%M:%S'),
+                           settings=get_settings())
+
+
+@app.route('/bundle/<bundle_id>/zip')
+def bundle_zip(bundle_id):
+    row = g.db.execute(
+        'SELECT file_ids, password FROM bundles WHERE id = ?', (bundle_id,)
+    ).fetchone()
+    if not row:
+        return redirect(url_for('file_not_found'))
+
+    file_ids_json, hashed_password = row
+    file_ids = json.loads(file_ids_json)
+
+    if hashed_password:
+        auth_ts = session.get(f'auth_bundle_{bundle_id}')
+        if not auth_ts or (datetime.now().timestamp() - auth_ts) > 3600:
+            session.pop(f'auth_bundle_{bundle_id}', None)
+            return redirect(url_for('bundle_download', bundle_id=bundle_id))
+
+    buf = io.BytesIO()
+    added = 0
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for fid in file_ids:
+            frow = g.db.execute(
+                'SELECT original_filename, expiry, views, max_downloads FROM files WHERE id = ?', (fid,)
+            ).fetchone()
+            if not frow:
+                continue
+            fname, expiry, views, max_downloads = frow
+            expiry_time = _parse_expiry(expiry)
+            if datetime.now() > expiry_time:
+                continue
+            if max_downloads != 'unlimited' and int(max_downloads) - views <= 0:
+                continue
+            path = os.path.join(app.config['UPLOAD_FOLDER'], fid)
+            try:
+                with open(path, 'rb') as fh:
+                    raw = fh.read()
+            except OSError:
+                continue
+            zf.writestr(fname, _decrypt(raw))
+            g.db.execute('UPDATE files SET views = views + 1 WHERE id = ?', (fid,))
+            added += 1
+
+    if added == 0:
+        return redirect(url_for('file_expired'))
+
+    g.db.commit()
+    audit_log('bundle_download', target=bundle_id, details=f'{added} fichiers')
+    buf.seek(0)
+    return send_file(buf, as_attachment=True, download_name='archive.zip', mimetype='application/zip')
 
 
 # ── Authentification ──────────────────────────────────────────────────────────
