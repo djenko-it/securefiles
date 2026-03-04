@@ -164,7 +164,8 @@ class User(UserMixin):
     def __init__(self, id, username, password, drop_token, is_admin=False,
                  totp_secret=None, webauthn_credential_id=None,
                  webauthn_public_key=None, webauthn_sign_count=0,
-                 theme='light', avatar_color='#4361ee', drop_enabled=True):
+                 theme='light', avatar_color='#4361ee', drop_enabled=True,
+                 sso_user=False):
         self.id                     = id
         self.username               = username
         self.password               = password
@@ -177,6 +178,7 @@ class User(UserMixin):
         self.theme                  = theme or 'light'
         self.avatar_color           = avatar_color or '#4361ee'
         self.drop_enabled           = bool(drop_enabled) if drop_enabled is not None else True
+        self.sso_user               = bool(sso_user)
 
     @property
     def has_mfa(self):
@@ -197,7 +199,7 @@ class User(UserMixin):
 
 _USER_COLS = ('id, username, password, drop_token, is_admin, '
               'totp_secret, webauthn_credential_id, webauthn_public_key, '
-              'webauthn_sign_count, theme, avatar_color, drop_enabled')
+              'webauthn_sign_count, theme, avatar_color, drop_enabled, sso_user')
 
 
 def _load_user_by(column, value):
@@ -386,6 +388,7 @@ def init_db():
             ('theme',                  "TEXT DEFAULT 'light'"),
             ('avatar_color',           "TEXT DEFAULT '#4361ee'"),
             ('drop_enabled',           'INTEGER DEFAULT 1'),
+            ('sso_user',               'INTEGER DEFAULT 0'),
         ]:
             if col not in existing_users:
                 conn.execute(f'ALTER TABLE users ADD COLUMN {col} {ddl}')
@@ -1530,16 +1533,19 @@ def sso_callback():
         drop_token   = str(uuid.uuid4())
         avatar_color = AVATAR_COLORS[hash(username) % len(AVATAR_COLORS)]
         random_pw    = generate_password_hash(secrets.token_hex(32))
-        # En mode SSO forcé : premier compte SSO admin si aucun admin n'existe déjà.
+        # En mode SSO forcé : premier compte SSO créé obtient admin si aucun
+        # admin SSO n'existe encore (couvre la transition depuis un admin local).
         # En mode normal   : premier compte tout court est admin.
         if settings.get('sso_force') == '1':
-            no_admin = g.db.execute('SELECT COUNT(*) FROM users WHERE is_admin=1').fetchone()[0] == 0
-            grant_admin = 1 if no_admin else 0
+            no_sso_admin = g.db.execute(
+                'SELECT COUNT(*) FROM users WHERE is_admin=1 AND sso_user=1'
+            ).fetchone()[0] == 0
+            grant_admin = 1 if no_sso_admin else 0
         else:
             grant_admin = 1 if g.db.execute('SELECT COUNT(*) FROM users').fetchone()[0] == 0 else 0
         g.db.execute(
-            'INSERT INTO users (username, password, drop_token, is_admin, avatar_color) '
-            'VALUES (?, ?, ?, ?, ?)',
+            'INSERT INTO users (username, password, drop_token, is_admin, avatar_color, sso_user) '
+            'VALUES (?, ?, ?, ?, ?, 1)',
             (username, random_pw, drop_token, grant_admin, avatar_color),
         )
         g.db.commit()
