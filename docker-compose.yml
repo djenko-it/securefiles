@@ -9,13 +9,3 @@ services:
       - .env
     volumes:
       - .:/app
-    depends_on:
-      - redis
-
-  redis:
-    image: "redis:alpine"
-    volumes:
-      - redis-data:/data  # Volume pour persister les données Redis
-
-volumes:
-  redis-data:

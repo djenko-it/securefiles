@@ -25,7 +25,6 @@ from flask_login import (LoginManager, UserMixin, current_user, login_required,
                          login_user, logout_user)
 from flask_wtf import FlaskForm
 from flask_wtf.csrf import CSRFProtect
-from redis import Redis
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
 from wtforms import (BooleanField, FileField, IntegerField, PasswordField,
@@ -57,12 +56,10 @@ app.secret_key = os.environ.get('SECRET_KEY', 'supersecretkey')
 csrf = CSRFProtect(app)
 logging.basicConfig(level=logging.INFO)
 
-redis_client = Redis(host='redis', port=6379)
-
 limiter = Limiter(
     get_remote_address,
     app=app,
-    storage_uri='redis://redis:6379',
+    storage_uri='memory://',
     default_limits=["200 per day", "50 per hour"],
 )
 
