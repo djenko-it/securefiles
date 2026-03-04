@@ -356,10 +356,23 @@
               L'URL de découverte se termine généralement par <code>/.well-known/openid-configuration</code>.
             </p>
 
-            <div class="mb-3">
+            <div class="mb-2">
               <div class="form-check form-switch">
                 {{ sso_form.sso_enabled(class="form-check-input", role="switch", id="ssoEnabled") }}
                 <label class="form-check-label" for="ssoEnabled">{{ sso_form.sso_enabled.label.text }}</label>
+              </div>
+            </div>
+
+            <div class="mb-3 ms-4 ps-1" id="ssoForceWrapper">
+              <div class="form-check form-switch">
+                {{ sso_form.sso_force(class="form-check-input", role="switch", id="ssoForce") }}
+                <label class="form-check-label" for="ssoForce">{{ sso_form.sso_force.label.text }}</label>
+              </div>
+              <div class="form-text text-warning-emphasis">
+                <i class="fas fa-triangle-exclamation me-1"></i>
+                Quand activé, <code>/login</code> redirige directement vers le fournisseur SSO.
+                Les liens de partage et de dépôt restent accessibles sans compte.
+                Le premier compte créé via SSO obtient automatiquement les droits administrateur.
               </div>
             </div>
 
@@ -409,6 +422,21 @@
   const hashTabMap = { '#settings': 'tab-settings-btn', '#logs': 'tab-logs-btn', '#sso': 'tab-sso-btn' };
   const targetBtn  = hashTabMap[window.location.hash];
   if (targetBtn) bootstrap.Tab.getOrCreateInstance(document.getElementById(targetBtn)).show();
+
+  // Afficher/masquer le toggle "Forcer SSO" selon l'état du switch "Activer SSO"
+  const ssoEnabledSwitch = document.getElementById('ssoEnabled');
+  const ssoForceWrapper  = document.getElementById('ssoForceWrapper');
+  const ssoForceSwitch   = document.getElementById('ssoForce');
+  function updateSsoForceVisibility() {
+    if (ssoEnabledSwitch && ssoForceWrapper) {
+      ssoForceWrapper.style.display = ssoEnabledSwitch.checked ? '' : 'none';
+      if (!ssoEnabledSwitch.checked && ssoForceSwitch) ssoForceSwitch.checked = false;
+    }
+  }
+  if (ssoEnabledSwitch) {
+    updateSsoForceVisibility();
+    ssoEnabledSwitch.addEventListener('change', updateSsoForceVisibility);
+  }
 
   // Filtre côté client pour le journal d'audit
   const filterSel  = document.getElementById('log-filter');

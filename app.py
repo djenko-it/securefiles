@@ -87,6 +87,7 @@ SETTINGS_DEFAULTS = {
     'max_storage_mb':     '0',
     # SSO / OIDC
     'sso_enabled':        '0',
+    'sso_force':          '0',
     'sso_provider_name':  'SSO',
     'sso_discovery_url':  '',
     'sso_client_id':      '',
@@ -295,6 +296,7 @@ class AdminSettingsForm(FlaskForm):
 
 class SSOSettingsForm(FlaskForm):
     sso_enabled       = BooleanField('Activer le SSO (OIDC)')
+    sso_force         = BooleanField('Forcer le SSO (désactiver la connexion locale)')
     sso_provider_name = StringField('Nom du fournisseur',
                                     validators=[Optional(), Length(max=64)])
     sso_discovery_url = StringField('Discovery URL',
@@ -904,6 +906,14 @@ def register():
 def login():
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
+    settings = get_settings()
+    # Mode SSO forcé : rediriger directement vers le fournisseur OIDC.
+    # Le paramètre ?sso_error=1 est positionné par sso_callback() en cas d'échec
+    # pour éviter une boucle infinie de redirections.
+    if (settings.get('sso_enabled') == '1'
+            and settings.get('sso_force') == '1'
+            and not request.args.get('sso_error')):
+        return redirect(url_for('sso_login'))
     form = LoginForm()
     if form.validate_on_submit():
         uname = form.username.data.strip()
@@ -923,7 +933,7 @@ def login():
             return redirect(request.args.get('next') or url_for('dashboard'))
         audit_log('login_failed', target=uname)
         flash('Identifiants incorrects.', 'danger')
-    return render_template('login.html', form=form, settings=get_settings())
+    return render_template('login.html', form=form, settings=settings)
 
 
 @app.route('/logout')
@@ -1360,6 +1370,7 @@ def admin_panel():
     })
     sso_form = SSOSettingsForm(data={
         'sso_enabled':       settings.get('sso_enabled') == '1',
+        'sso_force':         settings.get('sso_force') == '1',
         'sso_provider_name': settings.get('sso_provider_name', 'SSO'),
         'sso_discovery_url': settings.get('sso_discovery_url', ''),
         'sso_client_id':     settings.get('sso_client_id', ''),
@@ -1469,13 +1480,20 @@ def sso_callback():
     settings = get_settings()
     if settings.get('sso_enabled') != '1':
         abort(404)
-    if request.args.get('state') != session.pop('_sso_state', None):
-        flash("Erreur de sécurité SSO (state invalide).", 'danger')
+
+    def _sso_fail(msg):
+        """Redirige vers /login. En mode SSO forcé, ajoute ?sso_error=1
+        pour éviter une boucle infinie login → sso_login → callback → login."""
+        flash(msg, 'danger')
+        if settings.get('sso_force') == '1':
+            return redirect(url_for('login', sso_error=1))
         return redirect(url_for('login'))
+
+    if request.args.get('state') != session.pop('_sso_state', None):
+        return _sso_fail("Erreur de sécurité SSO (state invalide).")
     code = request.args.get('code')
     if not code:
-        flash("Connexion SSO échouée.", 'danger')
-        return redirect(url_for('login'))
+        return _sso_fail("Connexion SSO échouée.")
     token_endpoint    = session.pop('_sso_token_endpoint', '')
     userinfo_endpoint = session.pop('_sso_userinfo_endpoint', '')
     session.pop('_sso_nonce', None)
@@ -1489,12 +1507,10 @@ def sso_callback():
         }, timeout=10)
         token_data = token_resp.json()
     except Exception:
-        flash("Impossible d'échanger le code SSO.", 'danger')
-        return redirect(url_for('login'))
+        return _sso_fail("Impossible d'échanger le code SSO.")
     access_token = token_data.get('access_token')
     if not access_token:
-        flash("Connexion SSO échouée (pas de token).", 'danger')
-        return redirect(url_for('login'))
+        return _sso_fail("Connexion SSO échouée (pas de token).")
     try:
         ui = requests.get(
             userinfo_endpoint,
@@ -1502,13 +1518,11 @@ def sso_callback():
             timeout=5,
         ).json()
     except Exception:
-        flash("Impossible de récupérer les informations SSO.", 'danger')
-        return redirect(url_for('login'))
+        return _sso_fail("Impossible de récupérer les informations SSO.")
     raw_username = ui.get('preferred_username') or ui.get('email') or ui.get('sub', '')
     username = ''.join(c for c in raw_username.split('@')[0] if c.isalnum() or c in '-_.')[:64]
     if not username:
-        flash("Le fournisseur SSO n'a pas fourni d'identifiant utilisable.", 'danger')
-        return redirect(url_for('login'))
+        return _sso_fail("Le fournisseur SSO n'a pas fourni d'identifiant utilisable.")
     user = _load_user_by('username', username)
     if user is None:
         drop_token   = str(uuid.uuid4())
@@ -1536,8 +1550,12 @@ def admin_save_sso():
     if form.validate_on_submit():
         existing = get_settings()
         new_secret = form.sso_client_secret.data.strip()
+        # sso_force ne peut être activé que si sso_enabled l'est aussi
+        sso_enabled = form.sso_enabled.data
+        sso_force   = form.sso_force.data and sso_enabled
         values = {
-            'sso_enabled':       '1' if form.sso_enabled.data else '0',
+            'sso_enabled':       '1' if sso_enabled else '0',
+            'sso_force':         '1' if sso_force else '0',
             'sso_provider_name': form.sso_provider_name.data.strip() or 'SSO',
             'sso_discovery_url': form.sso_discovery_url.data.strip(),
             'sso_client_id':     form.sso_client_id.data.strip(),
