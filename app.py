@@ -1530,15 +1530,22 @@ def sso_callback():
         drop_token   = str(uuid.uuid4())
         avatar_color = AVATAR_COLORS[hash(username) % len(AVATAR_COLORS)]
         random_pw    = generate_password_hash(secrets.token_hex(32))
-        is_first     = g.db.execute('SELECT COUNT(*) FROM users').fetchone()[0] == 0
+        # En mode SSO forcé : premier compte SSO admin si aucun admin n'existe déjà.
+        # En mode normal   : premier compte tout court est admin.
+        if settings.get('sso_force') == '1':
+            no_admin = g.db.execute('SELECT COUNT(*) FROM users WHERE is_admin=1').fetchone()[0] == 0
+            grant_admin = 1 if no_admin else 0
+        else:
+            grant_admin = 1 if g.db.execute('SELECT COUNT(*) FROM users').fetchone()[0] == 0 else 0
         g.db.execute(
             'INSERT INTO users (username, password, drop_token, is_admin, avatar_color) '
             'VALUES (?, ?, ?, ?, ?)',
-            (username, random_pw, drop_token, 1 if is_first else 0, avatar_color),
+            (username, random_pw, drop_token, grant_admin, avatar_color),
         )
         g.db.commit()
         user = _load_user_by('username', username)
-        audit_log('sso_register', target=username, details='Compte créé via SSO')
+        audit_log('sso_register', target=username,
+                  details=f'Compte créé via SSO{"  (admin)" if grant_admin else ""}')
     login_user(user)
     audit_log('sso_login')
     return redirect(url_for('dashboard'))
