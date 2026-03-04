@@ -879,6 +879,8 @@ def register():
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
     settings = get_settings()
+    if settings.get('sso_force') == '1':
+        return redirect(url_for('sso_login'))
     if settings['allow_registration'] == '0':
         flash("Les inscriptions sont désactivées.", 'warning')
         return redirect(url_for('login'))

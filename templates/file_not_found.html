@@ -19,8 +19,14 @@
           </a>
           <a href="{{ url_for('logout') }}" class="text-secondary small ms-1">Déconnexion</a>
         {%- else %}
-          <a href="{{ url_for('login') }}" class="btn btn-sm btn-outline-light">Connexion</a>
-          <a href="{{ url_for('register') }}" class="btn btn-sm btn-primary">Inscription</a>
+          {% if settings.sso_force == '1' %}
+            <a href="{{ url_for('sso_login') }}" class="btn btn-sm btn-outline-light">
+              <i class="fas fa-key me-1"></i>{{ settings.sso_provider_name }}
+            </a>
+          {% else %}
+            <a href="{{ url_for('login') }}" class="btn btn-sm btn-outline-light">Connexion</a>
+            <a href="{{ url_for('register') }}" class="btn btn-sm btn-primary">Inscription</a>
+          {% endif %}
         {%- endif %}
       </div>
     </div>
