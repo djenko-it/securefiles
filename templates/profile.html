@@ -114,41 +114,6 @@
     </div>
   </div>
 
-  <!-- ── Lien de dépôt ── -->
-  <div class="card mb-3">
-    <div class="card-body p-4">
-      <div class="d-flex justify-content-between align-items-center mb-2">
-        <p class="section-title mb-0"><i class="fas fa-inbox me-2"></i>Lien de dépôt</p>
-        {% if current_user.drop_enabled %}
-          <span class="badge bg-success">Activé</span>
-        {% else %}
-          <span class="badge bg-secondary">Désactivé</span>
-        {% endif %}
-      </div>
-      <p class="text-muted small mb-3">
-        Permet à n'importe qui de vous déposer un fichier sans compte, via votre lien personnel.
-        {% if current_user.drop_enabled %}
-          En le désactivant, le lien retournera une erreur "introuvable".
-        {% endif %}
-      </p>
-      <form method="post" action="{{ url_for('profile_drop_toggle') }}"
-            {% if current_user.drop_enabled %}
-            onsubmit="return confirm('Désactiver le lien de dépôt ? Les personnes ayant votre lien ne pourront plus vous envoyer de fichiers.')"
-            {% endif %}>
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        {% if current_user.drop_enabled %}
-          <button class="btn btn-sm btn-outline-danger" type="submit">
-            <i class="fas fa-xmark me-1"></i>Désactiver
-          </button>
-        {% else %}
-          <button class="btn btn-sm btn-primary" type="submit">
-            <i class="fas fa-check me-1"></i>Activer
-          </button>
-        {% endif %}
-      </form>
-    </div>
-  </div>
-
   <!-- ── TOTP ── -->
   <div class="card mb-3">
     <div class="card-body p-4">

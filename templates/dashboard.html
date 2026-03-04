@@ -39,15 +39,21 @@
     <!-- Lien de dépôt -->
     <div class="card mb-4">
       <div class="card-body p-4">
-        <div class="d-flex justify-content-between align-items-start mb-1">
+        <div class="d-flex justify-content-between align-items-center mb-2">
           <p class="fw-semibold mb-0" style="font-size:.8rem; letter-spacing:.05em; text-transform:uppercase; color:#6c757d;">
             <i class="fas fa-inbox me-2"></i>Mon lien de dépôt
           </p>
-          {% if drop_enabled %}
-            <span class="badge bg-success" style="font-size:.65rem;">Activé</span>
-          {% else %}
-            <span class="badge bg-secondary" style="font-size:.65rem;">Désactivé</span>
-          {% endif %}
+          <form method="post" action="{{ url_for('profile_drop_toggle') }}" id="drop-toggle-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="form-check form-switch mb-0 d-flex align-items-center gap-2">
+              <input class="form-check-input" type="checkbox" id="drop-toggle-switch" role="switch"
+                     style="width:2.2em; height:1.2em; cursor:pointer;"
+                     {{ 'checked' if drop_enabled else '' }}>
+              <label class="form-check-label small text-muted" for="drop-toggle-switch" style="cursor:pointer;">
+                {{ 'Activé' if drop_enabled else 'Désactivé' }}
+              </label>
+            </div>
+          </form>
         </div>
 
         {% if drop_enabled %}
@@ -60,12 +66,9 @@
             <i class="fas fa-check me-1"></i>Lien copié !
           </div>
         {% else %}
-          <p class="text-muted small mb-2">
-            Le lien de dépôt est désactivé — personne ne peut vous envoyer de fichiers via ce lien.
+          <p class="text-muted small mb-0 opacity-75">
+            Activez ce lien pour permettre à n'importe qui de vous envoyer des fichiers sans compte.
           </p>
-          <a href="{{ url_for('profile') }}#drop" class="btn btn-sm btn-outline-secondary">
-            <i class="fas fa-gear me-1"></i>Activer dans le profil
-          </a>
         {% endif %}
       </div>
     </div>
@@ -185,6 +188,17 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
+    const dropSwitch = document.getElementById('drop-toggle-switch')
+    if (dropSwitch) {
+      dropSwitch.addEventListener('change', function () {
+        if (!this.checked && !confirm('Désactiver le lien de dépôt ? Les personnes ayant votre lien ne pourront plus vous envoyer de fichiers.')) {
+          this.checked = true
+          return
+        }
+        document.getElementById('drop-toggle-form').submit()
+      })
+    }
+
     const copyDropBtn = document.getElementById('copy-drop-btn')
     if (copyDropBtn) {
       copyDropBtn.addEventListener('click', function () {

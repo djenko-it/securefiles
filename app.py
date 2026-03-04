@@ -1266,8 +1266,7 @@ def profile_drop_toggle():
     g.db.execute('UPDATE users SET drop_enabled = ? WHERE id = ?', (new_val, current_user.id))
     g.db.commit()
     audit_log('drop_toggle', details='activé' if new_val else 'désactivé')
-    flash(f"Lien de dépôt {'activé' if new_val else 'désactivé'}.", 'success')
-    return redirect(url_for('profile'))
+    return redirect(request.referrer or url_for('dashboard'))
 
 
 # ── Zone de dépôt ─────────────────────────────────────────────────────────────
