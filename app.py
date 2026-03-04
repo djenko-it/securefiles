@@ -52,7 +52,14 @@ except ImportError:
 # ── Application ───────────────────────────────────────────────────────────────
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
-app.secret_key = os.environ.get('SECRET_KEY', 'supersecretkey')
+_secret_key = os.environ.get('SECRET_KEY', '')
+if not _secret_key or _secret_key == 'supersecretkey':
+    raise RuntimeError(
+        "SECRET_KEY non définie ou valeur par défaut insécurisée. "
+        "Définissez SECRET_KEY dans votre .env avec une valeur aléatoire forte, "
+        "par exemple : python -c \"import secrets; print(secrets.token_hex(32))\""
+    )
+app.secret_key = _secret_key
 csrf = CSRFProtect(app)
 logging.basicConfig(level=logging.INFO)
 
@@ -648,14 +655,19 @@ def download_file(file_id):
 @app.route('/download_direct/<file_id>')
 def download_direct(file_id):
     cur = g.db.execute(
-        'SELECT original_filename, expiry, views, max_downloads, password FROM files WHERE id = ?',
+        'SELECT original_filename, expiry, views, max_downloads, password, owner_id FROM files WHERE id = ?',
         (file_id,),
     )
     row = cur.fetchone()
     if not row:
         return redirect(url_for('file_not_found'))
 
-    original_filename, expiry, views, max_downloads, hashed_password = row
+    original_filename, expiry, views, max_downloads, hashed_password, owner_id = row
+
+    # Un utilisateur authentifié ne peut accéder qu'à ses propres fichiers
+    if owner_id and current_user.is_authenticated:
+        if current_user.id != owner_id and not current_user.is_admin:
+            abort(403)
     expiry_time = _parse_expiry(expiry)
 
     if datetime.now() > expiry_time:
@@ -695,14 +707,19 @@ def download_direct(file_id):
 def preview_file(file_id):
     """Sert le fichier inline pour l'aperçu (ne compte pas comme téléchargement)."""
     cur = g.db.execute(
-        'SELECT original_filename, expiry, views, max_downloads, password FROM files WHERE id = ?',
+        'SELECT original_filename, expiry, views, max_downloads, password, owner_id FROM files WHERE id = ?',
         (file_id,),
     )
     row = cur.fetchone()
     if not row:
         abort(404)
 
-    original_filename, expiry, views, max_downloads, hashed_password = row
+    original_filename, expiry, views, max_downloads, hashed_password, owner_id = row
+
+    # Un utilisateur authentifié ne peut accéder qu'à ses propres fichiers
+    if owner_id and current_user.is_authenticated:
+        if current_user.id != owner_id and not current_user.is_admin:
+            abort(403)
     expiry_time = _parse_expiry(expiry)
 
     if datetime.now() > expiry_time:
@@ -986,6 +1003,7 @@ def mfa_totp_verify():
 
 
 @app.route('/mfa/webauthn/begin', methods=['POST'])
+@limiter.limit("10 per minute")
 def mfa_webauthn_begin():
     if not WEBAUTHN_AVAILABLE:
         return jsonify({'error': 'WebAuthn non disponible'}), 400
@@ -1004,6 +1022,7 @@ def mfa_webauthn_begin():
 
 
 @app.route('/mfa/webauthn/complete', methods=['POST'])
+@limiter.limit("10 per minute")
 def mfa_webauthn_complete():
     if not WEBAUTHN_AVAILABLE:
         return jsonify({'error': 'WebAuthn non disponible'}), 400
@@ -1294,7 +1313,9 @@ def drop_zone(drop_token):
     success = False
     if request.method == 'POST':
         file        = request.files.get('file')
-        sender_name = request.form.get('sender_name', '').strip() or 'Anonyme'
+        sender_name = request.form.get('sender_name', '').strip()[:64] or 'Anonyme'
+        # Nettoyage XSS : conserver uniquement caractères sûrs
+        sender_name = ''.join(c for c in sender_name if c.isprintable() and c not in '<>"&\'')
         if file and allowed_file(file.filename):
             file_id     = str(uuid.uuid4())
             settings    = get_settings()
@@ -1508,7 +1529,7 @@ def sso_callback():
             'code':         code,
             'redirect_uri': url_for('sso_callback', _external=True),
             'client_id':    settings['sso_client_id'],
-            'client_secret': settings['sso_client_secret'],
+            'client_secret': _decrypt_secret(settings['sso_client_secret']),
         }, timeout=10)
         token_data = token_resp.json()
     except Exception:
@@ -1574,7 +1595,7 @@ def admin_save_sso():
             'sso_provider_name': form.sso_provider_name.data.strip() or 'SSO',
             'sso_discovery_url': form.sso_discovery_url.data.strip(),
             'sso_client_id':     form.sso_client_id.data.strip(),
-            'sso_client_secret': new_secret if new_secret else existing.get('sso_client_secret', ''),
+            'sso_client_secret': _encrypt_secret(new_secret) if new_secret else existing.get('sso_client_secret', ''),
         }
         for key, value in values.items():
             g.db.execute('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', (key, value))
