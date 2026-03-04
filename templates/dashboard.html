@@ -39,17 +39,34 @@
     <!-- Lien de dépôt -->
     <div class="card mb-4">
       <div class="card-body p-4">
-        <p class="fw-semibold mb-1" style="font-size:.8rem; letter-spacing:.05em; text-transform:uppercase; color:#6c757d;">
-          <i class="fas fa-inbox me-2"></i>Mon lien de dépôt
-        </p>
-        <p class="text-muted small mb-2">Partagez ce lien pour recevoir des fichiers sans que l'expéditeur ait besoin d'un compte :</p>
-        <div class="input-group" style="max-width:600px;">
-          <input id="drop-url" type="text" class="form-control font-monospace small" value="{{ drop_url }}" readonly>
-          <button id="copy-drop-btn" class="btn btn-outline-primary" type="button"><i class="fas fa-copy"></i></button>
+        <div class="d-flex justify-content-between align-items-start mb-1">
+          <p class="fw-semibold mb-0" style="font-size:.8rem; letter-spacing:.05em; text-transform:uppercase; color:#6c757d;">
+            <i class="fas fa-inbox me-2"></i>Mon lien de dépôt
+          </p>
+          {% if drop_enabled %}
+            <span class="badge bg-success" style="font-size:.65rem;">Activé</span>
+          {% else %}
+            <span class="badge bg-secondary" style="font-size:.65rem;">Désactivé</span>
+          {% endif %}
         </div>
-        <div id="copy-drop-ok" class="text-success small mt-1" style="display:none;">
-          <i class="fas fa-check me-1"></i>Lien copié !
-        </div>
+
+        {% if drop_enabled %}
+          <p class="text-muted small mb-2">Partagez ce lien pour recevoir des fichiers sans que l'expéditeur ait besoin d'un compte :</p>
+          <div class="input-group" style="max-width:600px;">
+            <input id="drop-url" type="text" class="form-control font-monospace small" value="{{ drop_url }}" readonly>
+            <button id="copy-drop-btn" class="btn btn-outline-primary" type="button"><i class="fas fa-copy"></i></button>
+          </div>
+          <div id="copy-drop-ok" class="text-success small mt-1" style="display:none;">
+            <i class="fas fa-check me-1"></i>Lien copié !
+          </div>
+        {% else %}
+          <p class="text-muted small mb-2">
+            Le lien de dépôt est désactivé — personne ne peut vous envoyer de fichiers via ce lien.
+          </p>
+          <a href="{{ url_for('profile') }}#drop" class="btn btn-sm btn-outline-secondary">
+            <i class="fas fa-gear me-1"></i>Activer dans le profil
+          </a>
+        {% endif %}
       </div>
     </div>
 
@@ -168,14 +185,17 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
-    document.getElementById('copy-drop-btn').addEventListener('click', function () {
-      navigator.clipboard.writeText(document.getElementById('drop-url').value).then(() => {
-        const ok = document.getElementById('copy-drop-ok')
-        ok.style.display = 'block'
-        this.innerHTML = '<i class="fas fa-check"></i>'
-        setTimeout(() => { ok.style.display = 'none'; this.innerHTML = '<i class="fas fa-copy"></i>' }, 2500)
+    const copyDropBtn = document.getElementById('copy-drop-btn')
+    if (copyDropBtn) {
+      copyDropBtn.addEventListener('click', function () {
+        navigator.clipboard.writeText(document.getElementById('drop-url').value).then(() => {
+          const ok = document.getElementById('copy-drop-ok')
+          ok.style.display = 'block'
+          this.innerHTML = '<i class="fas fa-check"></i>'
+          setTimeout(() => { ok.style.display = 'none'; this.innerHTML = '<i class="fas fa-copy"></i>' }, 2500)
+        })
       })
-    })
+    }
 
     document.querySelectorAll('.copy-link-btn').forEach(btn => {
       btn.addEventListener('click', function () {

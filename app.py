@@ -166,7 +166,7 @@ class User(UserMixin):
     def __init__(self, id, username, password, drop_token, is_admin=False,
                  totp_secret=None, webauthn_credential_id=None,
                  webauthn_public_key=None, webauthn_sign_count=0,
-                 theme='light', avatar_color='#4361ee'):
+                 theme='light', avatar_color='#4361ee', drop_enabled=True):
         self.id                     = id
         self.username               = username
         self.password               = password
@@ -178,6 +178,7 @@ class User(UserMixin):
         self.webauthn_sign_count    = webauthn_sign_count or 0
         self.theme                  = theme or 'light'
         self.avatar_color           = avatar_color or '#4361ee'
+        self.drop_enabled           = bool(drop_enabled) if drop_enabled is not None else True
 
     @property
     def has_mfa(self):
@@ -198,7 +199,7 @@ class User(UserMixin):
 
 _USER_COLS = ('id, username, password, drop_token, is_admin, '
               'totp_secret, webauthn_credential_id, webauthn_public_key, '
-              'webauthn_sign_count, theme, avatar_color')
+              'webauthn_sign_count, theme, avatar_color, drop_enabled')
 
 
 def _load_user_by(column, value):
@@ -385,6 +386,7 @@ def init_db():
             ('webauthn_sign_count',    'INTEGER DEFAULT 0'),
             ('theme',                  "TEXT DEFAULT 'light'"),
             ('avatar_color',           "TEXT DEFAULT '#4361ee'"),
+            ('drop_enabled',           'INTEGER DEFAULT 1'),
         ]:
             if col not in existing_users:
                 conn.execute(f'ALTER TABLE users ADD COLUMN {col} {ddl}')
@@ -1240,7 +1242,8 @@ def dashboard():
             'exhausted': remaining == 0, 'deposited_by': dep_by,
         })
     drop_url = url_for('drop_zone', drop_token=current_user.drop_token, _external=True)
-    return render_template('dashboard.html', files=files, drop_url=drop_url, settings=get_settings())
+    return render_template('dashboard.html', files=files, drop_url=drop_url,
+                           drop_enabled=current_user.drop_enabled, settings=get_settings())
 
 
 @app.route('/delete/<file_id>', methods=['POST'])
@@ -1256,15 +1259,26 @@ def delete_file(file_id):
     return redirect(url_for('dashboard'))
 
 
+@app.route('/profile/drop-toggle', methods=['POST'])
+@login_required
+def profile_drop_toggle():
+    new_val = 0 if current_user.drop_enabled else 1
+    g.db.execute('UPDATE users SET drop_enabled = ? WHERE id = ?', (new_val, current_user.id))
+    g.db.commit()
+    audit_log('drop_toggle', details='activé' if new_val else 'désactivé')
+    flash(f"Lien de dépôt {'activé' if new_val else 'désactivé'}.", 'success')
+    return redirect(url_for('profile'))
+
+
 # ── Zone de dépôt ─────────────────────────────────────────────────────────────
 @app.route('/drop/<drop_token>', methods=['GET', 'POST'])
 @limiter.limit("20 per hour")
 def drop_zone(drop_token):
-    cur      = g.db.execute('SELECT id, username FROM users WHERE drop_token = ?', (drop_token,))
+    cur      = g.db.execute('SELECT id, username, drop_enabled FROM users WHERE drop_token = ?', (drop_token,))
     user_row = cur.fetchone()
-    if not user_row:
+    if not user_row or not user_row[2]:
         return redirect(url_for('file_not_found'))
-    recipient_id, recipient_name = user_row
+    recipient_id, recipient_name, _ = user_row
 
     success = False
     if request.method == 'POST':
