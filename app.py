@@ -77,11 +77,6 @@ login_manager.login_message_category = 'warning'
 
 DATABASE      = '/app/messages.db'
 UPLOAD_FOLDER = '/app/data'
-ALLOWED_EXTENSIONS = {
-    'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'zip', 'rar',
-    'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'csv',
-    'mp3', 'mp4', 'avi', 'mov', 'ogg', 'webm', 'svg',
-}
 
 SETTINGS_DEFAULTS = {
     'app_name':           'FileShareApp',
@@ -516,7 +511,7 @@ def allowed_file(filename):
         return False
     ext = filename.rsplit('.', 1)[1].lower()
     s = get_settings()
-    return ext not in s.get('blocked_ext_set', set()) and ext in ALLOWED_EXTENSIONS
+    return ext not in s.get('blocked_ext_set', set())
 
 
 def get_expiry_time(expiry_option):
