@@ -472,6 +472,9 @@ def before_request():
 
 @app.after_request
 def set_security_headers(response):
+    # /preview/ doit pouvoir s'afficher dans une iframe same-origin (aperçu PDF/vidéo)
+    is_preview     = request.path.startswith('/preview/')
+    frame_ancestors = "'self'" if is_preview else "'none'"
     csp = (
         "default-src 'self'; "
         "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
@@ -479,15 +482,15 @@ def set_security_headers(response):
         "font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com data:; "
         "img-src 'self' data: blob:; "
         "connect-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
-        "frame-ancestors 'none'; "
+        f"frame-ancestors {frame_ancestors}; "
         "object-src 'none'; "
         "base-uri 'self';"
     )
-    response.headers['Content-Security-Policy'] = csp
-    response.headers['X-Frame-Options']         = 'DENY'
-    response.headers['X-Content-Type-Options']  = 'nosniff'
-    response.headers['Referrer-Policy']         = 'strict-origin-when-cross-origin'
-    response.headers['Permissions-Policy']      = 'camera=(), microphone=(), geolocation=()'
+    response.headers['Content-Security-Policy']   = csp
+    response.headers['X-Frame-Options']           = 'SAMEORIGIN' if is_preview else 'DENY'
+    response.headers['X-Content-Type-Options']    = 'nosniff'
+    response.headers['Referrer-Policy']           = 'strict-origin-when-cross-origin'
+    response.headers['Permissions-Policy']        = 'camera=(), microphone=(), geolocation=()'
     response.headers['Strict-Transport-Security'] = 'max-age=63072000; includeSubDomains; preload'
     return response
 
