@@ -90,6 +90,7 @@ SETTINGS_DEFAULTS = {
     'welcome_banner':            '',
     'audit_log_retention_days':  '0',
     'max_file_size_unit':        'mo',
+    'e2e_mode':                  'optional',
     # SSO / OIDC
     'sso_enabled':        '0',
     'sso_force':          '0',
@@ -303,6 +304,11 @@ class AdminSettingsForm(FlaskForm):
                                             validators=[NumberRange(min=0)])
     audit_log_retention_days = IntegerField('Rétention des logs d\'audit (jours, 0 = illimité)',
                                             validators=[NumberRange(min=0)])
+    e2e_mode                 = SelectField('Chiffrement de bout en bout', choices=[
+        ('optional', 'Optionnel — l\'utilisateur choisit'),
+        ('disabled', 'Désactivé — option masquée'),
+        ('required', 'Obligatoire — forcé pour tous les partages'),
+    ])
     submit                   = SubmitField('Sauvegarder')
 
 
@@ -1426,6 +1432,7 @@ def admin_panel():
         'max_files_per_user':       int(settings['max_files_per_user']),
         'max_storage_mb':           int(settings['max_storage_mb']),
         'audit_log_retention_days': int(settings.get('audit_log_retention_days', '0')),
+        'e2e_mode':                 settings.get('e2e_mode', 'optional'),
     })
     sso_form = SSOSettingsForm(data={
         'sso_enabled':       settings.get('sso_enabled') == '1',
@@ -1459,6 +1466,7 @@ def admin_save_settings():
             'max_files_per_user':       str(form.max_files_per_user.data),
             'max_storage_mb':           str(form.max_storage_mb.data),
             'audit_log_retention_days': str(form.audit_log_retention_days.data),
+            'e2e_mode':                 form.e2e_mode.data,
         }
         for key, value in values.items():
             g.db.execute('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', (key, value))

@@ -266,6 +266,22 @@
 
             <hr class="my-3">
             <p class="text-uppercase fw-semibold text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em">
+              <i class="fas fa-shield-halved me-1"></i>Chiffrement de bout en bout (E2E)
+            </p>
+            <div class="row g-3 mb-4">
+              <div class="col-md-8">
+                <label class="form-label">{{ form.e2e_mode.label.text }}</label>
+                {{ form.e2e_mode(class="form-select") }}
+                <div class="form-text">
+                  <strong>Optionnel</strong> : le toggle est visible, l'utilisateur décide.
+                  <strong>Désactivé</strong> : l'option est masquée (aucun chiffrement E2E possible).
+                  <strong>Obligatoire</strong> : le chiffrement est forcé et verrouillé pour tous les partages.
+                </div>
+              </div>
+            </div>
+
+            <hr class="my-3">
+            <p class="text-uppercase fw-semibold text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em">
               <i class="fas fa-scroll me-1"></i>Journal d'audit
             </p>
             <div class="row g-3 mb-4">
