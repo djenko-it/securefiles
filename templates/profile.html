@@ -160,6 +160,34 @@
     </div>
   </div>
 
+  <!-- ── Codes de récupération TOTP ── -->
+  {% if current_user.has_totp %}
+  <div class="card mb-3">
+    <div class="card-body p-4">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <p class="section-title mb-0"><i class="fas fa-key me-2"></i>Codes de récupération</p>
+        <span class="badge {{ 'bg-success' if backup_remaining > 0 else 'bg-danger' }}">
+          {{ backup_remaining }} restant{{ 's' if backup_remaining != 1 }}
+        </span>
+      </div>
+      <p class="text-muted small mb-3">
+        Utilisez ces codes si vous perdez accès à votre application d'authentification.
+        Chaque code n'est utilisable qu'une seule fois.
+        {% if backup_remaining == 0 %}
+          <strong class="text-danger">Vous n'avez plus de codes — régénérez-en immédiatement.</strong>
+        {% endif %}
+      </p>
+      <form method="post" action="{{ url_for('profile_totp_backup_regenerate') }}"
+            onsubmit="return confirm('Générer de nouveaux codes invalidera les anciens. Continuer ?')">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-sm btn-outline-warning">
+          <i class="fas fa-rotate me-1"></i>Régénérer les codes
+        </button>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
   <!-- ── WebAuthn ── -->
   {% if webauthn_available %}
   <div class="card mb-3">

@@ -1,4 +1,5 @@
 import base64
+import hashlib
 import io
 import json
 import logging
@@ -104,6 +105,10 @@ SETTINGS_DEFAULTS = {
     'sso_client_secret':  '',
 }
 
+LOGIN_MAX_ATTEMPTS    = 10
+LOGIN_LOCKOUT_MINUTES = 15
+BACKUP_CODE_COUNT     = 8
+
 AVATAR_COLORS = [
     '#4361ee', '#e63946', '#2a9d8f', '#e9c46a', '#f4a261',
     '#264653', '#6c5ce7', '#00b894', '#fd79a8', '#636e72',
@@ -167,6 +172,22 @@ def _decrypt_secret(encrypted: str) -> str:
         return fernet.decrypt(encrypted.encode()).decode()
     except (InvalidToken, Exception):
         return encrypted
+
+
+# ── Backup codes (TOTP recovery) ──────────────────────────────────────────────
+def _hash_backup_code(code: str) -> str:
+    """SHA-256 d'un code normalisé (minuscules, sans tiret)."""
+    return hashlib.sha256(code.lower().replace('-', '').encode()).hexdigest()
+
+
+def _generate_backup_codes():
+    """Génère BACKUP_CODE_COUNT codes aléatoires.
+    Retourne (codes_lisibles, json_des_hashes).
+    Les codes sont au format 'xxxx-xxxx' (8 hex chars)."""
+    raw     = [secrets.token_hex(4) for _ in range(BACKUP_CODE_COUNT)]
+    display = [f"{c[:4]}-{c[4:]}" for c in raw]
+    hashes  = json.dumps([_hash_backup_code(c) for c in raw])
+    return display, hashes
 
 
 # ── Modèle utilisateur ────────────────────────────────────────────────────────
@@ -416,6 +437,9 @@ def init_db():
             ('avatar_color',           "TEXT DEFAULT '#4361ee'"),
             ('drop_enabled',           'INTEGER DEFAULT 1'),
             ('sso_user',               'INTEGER DEFAULT 0'),
+            ('failed_attempts',        'INTEGER DEFAULT 0'),
+            ('locked_until',           'TEXT'),
+            ('totp_backup_codes',      'TEXT'),
         ]:
             if col not in existing_users:
                 conn.execute(f'ALTER TABLE users ADD COLUMN {col} {ddl}')
@@ -445,7 +469,7 @@ def before_request():
             and current_user.is_authenticated
             and not current_user.sso_user
             and not current_user.has_mfa):
-        _exempt_mfa = ('/profile', '/mfa', '/logout', '/admin', '/health')
+        _exempt_mfa = ('/profile', '/mfa', '/logout', '/admin', '/health', '/auth/sso')
         if not any(request.path.startswith(p) for p in _exempt_mfa):
             flash('La double authentification (2FA) est obligatoire. '
                   'Veuillez l\'activer sur votre profil.', 'warning')
@@ -1030,7 +1054,31 @@ def login():
     if form.validate_on_submit():
         uname = form.username.data.strip()
         user  = _load_user_by('username', uname)
+
+        # ── Vérification du verrou de compte ─────────────────────────────────
+        if user:
+            lock_row = g.db.execute(
+                'SELECT failed_attempts, locked_until FROM users WHERE id = ?',
+                (user.id,)
+            ).fetchone()
+            if lock_row and lock_row[1]:
+                try:
+                    lock_time = _parse_expiry(lock_row[1])
+                    if datetime.now() < lock_time:
+                        remaining = max(1, int((lock_time - datetime.now()).total_seconds() / 60) + 1)
+                        audit_log('login_blocked', target=uname)
+                        flash(f'Compte verrouillé. Réessayez dans {remaining} minute(s).', 'danger')
+                        return render_template('login.html', form=form, settings=settings)
+                except ValueError:
+                    pass  # date corrompue, on laisse passer
+
         if user and check_password_hash(user.password, form.password.data):
+            # Réinitialiser le compteur d'échecs
+            g.db.execute(
+                'UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = ?',
+                (user.id,)
+            )
+            g.db.commit()
             # MFA check
             if user.has_mfa:
                 session['_mfa_user_id'] = user.id
@@ -1040,9 +1088,32 @@ def login():
                 if user.has_webauthn:
                     session['_mfa_methods'].append('webauthn')
                 return redirect(url_for('mfa_verify'))
+            session.clear()
             login_user(user)
             audit_log('login')
             return redirect(request.args.get('next') or url_for('dashboard'))
+
+        # ── Échec : incrémenter le compteur ──────────────────────────────────
+        if user:
+            attempts = (lock_row[0] or 0) + 1 if lock_row else 1
+            if attempts >= LOGIN_MAX_ATTEMPTS:
+                locked_until = (datetime.now() + timedelta(minutes=LOGIN_LOCKOUT_MINUTES)
+                                ).strftime('%Y-%m-%d %H:%M:%S')
+                g.db.execute(
+                    'UPDATE users SET failed_attempts = ?, locked_until = ? WHERE id = ?',
+                    (attempts, locked_until, user.id)
+                )
+                g.db.commit()
+                audit_log('login_locked', target=uname,
+                          details=f'Verrou {LOGIN_LOCKOUT_MINUTES} min après {attempts} échecs')
+                flash(f'Compte verrouillé pendant {LOGIN_LOCKOUT_MINUTES} minutes '
+                      f'après trop de tentatives.', 'danger')
+                return render_template('login.html', form=form, settings=settings)
+            g.db.execute(
+                'UPDATE users SET failed_attempts = ? WHERE id = ?',
+                (attempts, user.id)
+            )
+            g.db.commit()
         audit_log('login_failed', target=uname)
         flash('Identifiants incorrects.', 'danger')
     return render_template('login.html', form=form, settings=settings)
@@ -1083,11 +1154,11 @@ def mfa_totp_verify():
     code = request.form.get('totp_code', '').strip()
     secret = _decrypt_secret(user.totp_secret)
     if secret and pyotp.TOTP(secret).verify(code, valid_window=1):
-        session.pop('_mfa_user_id', None)
-        session.pop('_mfa_methods', None)
+        session.clear()
         login_user(user)
         audit_log('login', details='via TOTP')
         return redirect(url_for('dashboard'))
+    audit_log('mfa_failed', target=user.username, details='TOTP invalide')
     flash('Code TOTP invalide.', 'danger')
     return redirect(url_for('mfa_verify'))
 
@@ -1154,10 +1225,10 @@ def mfa_webauthn_complete():
         g.db.commit()
     except Exception as exc:
         app.logger.error("WebAuthn auth failed: %s", exc)
+        audit_log('mfa_failed', target=user.username if user else None, details='WebAuthn invalide')
         return jsonify({'error': 'Échec de la vérification'}), 400
 
-    session.pop('_mfa_user_id', None)
-    session.pop('_mfa_methods', None)
+    session.clear()
     login_user(user)
     audit_log('login', details='via WebAuthn')
     return jsonify({'success': True, 'redirect': url_for('dashboard')})
@@ -1168,9 +1239,17 @@ def mfa_webauthn_complete():
 @login_required
 def profile():
     form = ChangePasswordForm()
+    backup_remaining = 0
+    if current_user.has_totp:
+        row = g.db.execute(
+            'SELECT totp_backup_codes FROM users WHERE id = ?', (current_user.id,)
+        ).fetchone()
+        if row and row[0]:
+            backup_remaining = len(json.loads(row[0]))
     return render_template('profile.html', form=form, settings=get_settings(),
                            avatar_colors=AVATAR_COLORS,
-                           webauthn_available=WEBAUTHN_AVAILABLE)
+                           webauthn_available=WEBAUTHN_AVAILABLE,
+                           backup_remaining=backup_remaining)
 
 
 @app.route('/profile/password', methods=['POST'])
@@ -1238,24 +1317,88 @@ def profile_totp_confirm():
         flash('Session expirée, recommencez.', 'danger')
         return redirect(url_for('profile'))
     if pyotp.TOTP(secret).verify(code, valid_window=1):
-        g.db.execute('UPDATE users SET totp_secret = ? WHERE id = ?',
-                     (_encrypt_secret(secret), current_user.id))
+        display_codes, hashes_json = _generate_backup_codes()
+        g.db.execute(
+            'UPDATE users SET totp_secret = ?, totp_backup_codes = ? WHERE id = ?',
+            (_encrypt_secret(secret), hashes_json, current_user.id)
+        )
         g.db.commit()
         audit_log('totp_enable')
-        flash('TOTP activé avec succès.', 'success')
-    else:
-        flash('Code invalide. Réessayez.', 'danger')
+        session['_backup_codes_display'] = display_codes
+        return redirect(url_for('profile_totp_backup_show'))
+    flash('Code invalide. Réessayez.', 'danger')
     return redirect(url_for('profile'))
 
 
 @app.route('/profile/totp/disable', methods=['POST'])
 @login_required
 def profile_totp_disable():
-    g.db.execute('UPDATE users SET totp_secret = NULL WHERE id = ?', (current_user.id,))
+    g.db.execute(
+        'UPDATE users SET totp_secret = NULL, totp_backup_codes = NULL WHERE id = ?',
+        (current_user.id,)
+    )
     g.db.commit()
     audit_log('totp_disable')
     flash('TOTP désactivé.', 'success')
     return redirect(url_for('profile'))
+
+
+# ── Profil : codes de récupération TOTP ──────────────────────────────────────
+@app.route('/profile/totp/backup/show')
+@login_required
+def profile_totp_backup_show():
+    codes = session.pop('_backup_codes_display', None)
+    if not codes:
+        flash('Aucun code de récupération à afficher.', 'warning')
+        return redirect(url_for('profile'))
+    return render_template('backup_codes.html', codes=codes, settings=get_settings())
+
+
+@app.route('/profile/totp/backup/regenerate', methods=['POST'])
+@login_required
+def profile_totp_backup_regenerate():
+    if not current_user.has_totp:
+        flash('Activez d\'abord le TOTP pour générer des codes de récupération.', 'warning')
+        return redirect(url_for('profile'))
+    display_codes, hashes_json = _generate_backup_codes()
+    g.db.execute(
+        'UPDATE users SET totp_backup_codes = ? WHERE id = ?',
+        (hashes_json, current_user.id)
+    )
+    g.db.commit()
+    audit_log('totp_backup_regenerate')
+    session['_backup_codes_display'] = display_codes
+    return redirect(url_for('profile_totp_backup_show'))
+
+
+@app.route('/mfa/backup', methods=['POST'])
+@limiter.limit("5 per minute")
+def mfa_backup_verify():
+    user = _get_mfa_user()
+    if not user:
+        return redirect(url_for('login'))
+    submitted = request.form.get('backup_code', '').strip()
+    row = get_db().execute(
+        'SELECT totp_backup_codes FROM users WHERE id = ?', (user.id,)
+    ).fetchone()
+    if row and row[0]:
+        hashes = json.loads(row[0])
+        submitted_hash = _hash_backup_code(submitted)
+        for i, h in enumerate(hashes):
+            if h == submitted_hash:
+                hashes.pop(i)
+                g.db.execute(
+                    'UPDATE users SET totp_backup_codes = ? WHERE id = ?',
+                    (json.dumps(hashes), user.id)
+                )
+                g.db.commit()
+                session.clear()
+                login_user(user)
+                audit_log('login', details=f'via code de récupération ({len(hashes)} restants)')
+                return redirect(url_for('dashboard'))
+    audit_log('mfa_failed', target=user.username, details='Code de récupération invalide')
+    flash('Code de récupération invalide.', 'danger')
+    return redirect(url_for('mfa_verify'))
 
 
 # ── Profil : WebAuthn ─────────────────────────────────────────────────────────
@@ -1710,6 +1853,7 @@ def sso_callback():
         user = _load_user_by('username', username)
         audit_log('sso_register', target=username,
                   details=f'Compte créé via SSO{"  (admin)" if grant_admin else ""}')
+    session.clear()
     login_user(user)
     audit_log('sso_login')
     return redirect(url_for('dashboard'))
