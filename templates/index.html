@@ -40,12 +40,22 @@
   </nav>
 
   <main class="container pb-5" style="max-width: 680px;">
+    {% if settings.welcome_banner %}
+    <div class="alert alert-info alert-dismissible fade show py-2 mb-3" role="alert">
+      <i class="fas fa-circle-info me-2"></i>{{ settings.welcome_banner }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fermer"></button>
+    </div>
+    {% endif %}
     <div class="card mb-3">
       <div class="card-body p-4">
         <div class="dropzone" id="dropzone">
           <div class="dz-icon"><i class="fas fa-cloud-arrow-up"></i></div>
           <div class="fw-semibold mb-1">Glissez un ou plusieurs fichiers ici ou cliquez pour parcourir</div>
-          <small class="text-muted">Taille maximale : {{ settings.max_file_size_mb }} Mo par fichier</small>
+          {% if settings.max_file_size_unit == 'go' %}
+            <small class="text-muted">Taille maximale : {{ (settings.max_file_size_mb | int) // 1024 }} Go par fichier</small>
+          {% else %}
+            <small class="text-muted">Taille maximale : {{ settings.max_file_size_mb }} Mo par fichier</small>
+          {% endif %}
         </div>
       </div>
     </div>
@@ -179,9 +189,11 @@
       const maxBytes     = {{ settings.max_file_size_mb }} * 1024 * 1024
       let selectedFiles  = []
 
+      const maxLabel = {% if settings.max_file_size_unit == 'go' %}({{ settings.max_file_size_mb }} / 1024).toFixed(0) + ' Go'{% else %}'{{ settings.max_file_size_mb }} Mo'{% endif %}
+
       function sizeOk(file) {
         if (file.size > maxBytes) {
-          alert('Le fichier "' + file.name + '" dépasse la taille maximale de {{ settings.max_file_size_mb }} Mo.')
+          alert('Le fichier "' + file.name + '" dépasse la taille maximale de ' + maxLabel + '.')
           return false
         }
         return true

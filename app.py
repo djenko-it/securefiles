@@ -28,7 +28,7 @@ from flask_wtf.csrf import CSRFProtect
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
 from wtforms import (BooleanField, FileField, IntegerField, PasswordField,
-                     SelectField, StringField, SubmitField)
+                     SelectField, StringField, SubmitField, TextAreaField)
 from wtforms.validators import DataRequired, EqualTo, Length, NumberRange, Optional
 
 try:
@@ -92,6 +92,9 @@ SETTINGS_DEFAULTS = {
     'default_expiry':     '1d',
     'max_files_per_user': '0',
     'max_storage_mb':     '0',
+    'welcome_banner':            '',
+    'audit_log_retention_days':  '0',
+    'max_file_size_unit':        'mo',
     # SSO / OIDC
     'sso_enabled':        '0',
     'sso_force':          '0',
@@ -284,23 +287,28 @@ class ChangePasswordForm(FlaskForm):
 
 
 class AdminSettingsForm(FlaskForm):
-    app_name           = StringField('Nom de l\'application',
-                                     validators=[DataRequired(), Length(max=64)])
-    contact_email      = StringField('E-mail de contact',
-                                     validators=[DataRequired(), Length(max=128)])
-    max_file_size_mb   = IntegerField('Taille max des fichiers (Mo)',
-                                      validators=[DataRequired(), NumberRange(min=1, max=2048)])
-    blocked_extensions = StringField('Extensions bloquées (virgules)',
-                                     validators=[Optional(), Length(max=256)])
-    allow_registration = BooleanField('Autoriser les inscriptions')
-    default_expiry     = SelectField('Expiration par défaut', choices=[
+    app_name                 = StringField('Nom de l\'application',
+                                           validators=[DataRequired(), Length(max=64)])
+    contact_email            = StringField('E-mail de contact',
+                                           validators=[DataRequired(), Length(max=128)])
+    welcome_banner           = TextAreaField('Bannière / message d\'accueil',
+                                             validators=[Optional(), Length(max=512)])
+    max_file_size_value      = IntegerField('Taille max des fichiers',
+                                            validators=[DataRequired(), NumberRange(min=1, max=1048576)])
+    max_file_size_unit       = SelectField('Unité', choices=[('mo', 'Mo'), ('go', 'Go')])
+    blocked_extensions       = StringField('Extensions bloquées (virgules)',
+                                           validators=[Optional(), Length(max=256)])
+    allow_registration       = BooleanField('Autoriser les inscriptions')
+    default_expiry           = SelectField('Expiration par défaut', choices=[
         ('3h', '3 heures'), ('1d', '1 jour'), ('1w', '1 semaine'), ('1m', '1 mois'),
     ])
-    max_files_per_user = IntegerField('Quota fichiers / utilisateur (0 = illimité)',
-                                      validators=[NumberRange(min=0)])
-    max_storage_mb     = IntegerField('Quota stockage / utilisateur en Mo (0 = illimité)',
-                                      validators=[NumberRange(min=0)])
-    submit             = SubmitField('Sauvegarder')
+    max_files_per_user       = IntegerField('Quota fichiers / utilisateur (0 = illimité)',
+                                            validators=[NumberRange(min=0)])
+    max_storage_mb           = IntegerField('Quota stockage / utilisateur en Mo (0 = illimité)',
+                                            validators=[NumberRange(min=0)])
+    audit_log_retention_days = IntegerField('Rétention des logs d\'audit (jours, 0 = illimité)',
+                                            validators=[NumberRange(min=0)])
+    submit                   = SubmitField('Sauvegarder')
 
 
 class SSOSettingsForm(FlaskForm):
@@ -466,9 +474,31 @@ def cleanup_expired_files():
         _system_audit_log('cleanup', detail)
 
 
+def purge_old_audit_logs():
+    """Supprime les logs d'audit plus anciens que audit_log_retention_days jours (0 = pas de purge)."""
+    try:
+        with sqlite3.connect(DATABASE) as conn:
+            conn.execute('PRAGMA journal_mode=WAL')
+            row = conn.execute("SELECT value FROM settings WHERE key='audit_log_retention_days'").fetchone()
+            days = int(row[0]) if row and row[0] else 0
+            if days <= 0:
+                return
+            cutoff = str(datetime.now() - timedelta(days=days))
+            result = conn.execute('DELETE FROM audit_logs WHERE timestamp < ?', (cutoff,))
+            if result.rowcount:
+                conn.execute(
+                    'INSERT INTO audit_logs (username, action, details) VALUES (?, ?, ?)',
+                    ('system', 'cleanup', f'{result.rowcount} log(s) purgé(s) (rétention {days}j)'),
+                )
+    except Exception as exc:
+        app.logger.error("purge_old_audit_logs failed: %s", exc)
+
+
 _scheduler = BackgroundScheduler(daemon=True)
 _scheduler.add_job(cleanup_expired_files, 'interval', hours=1, id='cleanup',
                    next_run_time=datetime.now() + timedelta(minutes=1))
+_scheduler.add_job(purge_old_audit_logs, 'interval', hours=24, id='purge_logs',
+                   next_run_time=datetime.now() + timedelta(minutes=2))
 _scheduler.start()
 
 
@@ -1385,14 +1415,21 @@ def admin_panel():
     ]
 
     settings = get_settings()
+    _unit = settings.get('max_file_size_unit', 'mo')
+    _mb   = int(settings['max_file_size_mb'])
+    _display_val = _mb // 1024 if _unit == 'go' else _mb
     form = AdminSettingsForm(data={
-        'app_name': settings['app_name'], 'contact_email': settings['contact_email'],
-        'max_file_size_mb': int(settings['max_file_size_mb']),
-        'blocked_extensions': settings['blocked_extensions'],
-        'allow_registration': settings['allow_registration'] == '1',
-        'default_expiry': settings['default_expiry'],
-        'max_files_per_user': int(settings['max_files_per_user']),
-        'max_storage_mb': int(settings['max_storage_mb']),
+        'app_name':                 settings['app_name'],
+        'contact_email':            settings['contact_email'],
+        'welcome_banner':           settings.get('welcome_banner', ''),
+        'max_file_size_value':      _display_val,
+        'max_file_size_unit':       _unit,
+        'blocked_extensions':       settings['blocked_extensions'],
+        'allow_registration':       settings['allow_registration'] == '1',
+        'default_expiry':           settings['default_expiry'],
+        'max_files_per_user':       int(settings['max_files_per_user']),
+        'max_storage_mb':           int(settings['max_storage_mb']),
+        'audit_log_retention_days': int(settings.get('audit_log_retention_days', '0')),
     })
     sso_form = SSOSettingsForm(data={
         'sso_enabled':       settings.get('sso_enabled') == '1',
@@ -1411,19 +1448,26 @@ def admin_panel():
 def admin_save_settings():
     form = AdminSettingsForm()
     if form.validate_on_submit():
+        _unit = form.max_file_size_unit.data
+        _val  = form.max_file_size_value.data
+        _mb   = _val * 1024 if _unit == 'go' else _val
         values = {
-            'app_name': form.app_name.data.strip(),
-            'contact_email': form.contact_email.data.strip(),
-            'max_file_size_mb': str(form.max_file_size_mb.data),
-            'blocked_extensions': form.blocked_extensions.data.strip().lower(),
-            'allow_registration': '1' if form.allow_registration.data else '0',
-            'default_expiry': form.default_expiry.data,
-            'max_files_per_user': str(form.max_files_per_user.data),
-            'max_storage_mb': str(form.max_storage_mb.data),
+            'app_name':                 form.app_name.data.strip(),
+            'contact_email':            form.contact_email.data.strip(),
+            'welcome_banner':           (form.welcome_banner.data or '').strip(),
+            'max_file_size_mb':         str(_mb),
+            'max_file_size_unit':       _unit,
+            'blocked_extensions':       form.blocked_extensions.data.strip().lower(),
+            'allow_registration':       '1' if form.allow_registration.data else '0',
+            'default_expiry':           form.default_expiry.data,
+            'max_files_per_user':       str(form.max_files_per_user.data),
+            'max_storage_mb':           str(form.max_storage_mb.data),
+            'audit_log_retention_days': str(form.audit_log_retention_days.data),
         }
         for key, value in values.items():
             g.db.execute('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', (key, value))
         g.db.commit()
+        purge_old_audit_logs()
         audit_log('admin_settings', details='Paramètres mis à jour')
         flash('Paramètres sauvegardés.', 'success')
     else:

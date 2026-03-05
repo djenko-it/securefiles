@@ -180,6 +180,11 @@
                 <label class="form-label">{{ form.contact_email.label.text }}</label>
                 {{ form.contact_email(class="form-control", type="email") }}
               </div>
+              <div class="col-12">
+                <label class="form-label">{{ form.welcome_banner.label.text }}</label>
+                {{ form.welcome_banner(class="form-control", rows="2", placeholder="Message affiché sur la page d'accueil (laisser vide pour désactiver)") }}
+                <div class="form-text">Supports le texte brut. Laisser vide pour ne pas afficher de bannière.</div>
+              </div>
             </div>
 
             <hr class="my-3">
@@ -188,10 +193,10 @@
             </p>
             <div class="row g-3 mb-4">
               <div class="col-md-4">
-                <label class="form-label">{{ form.max_file_size_mb.label.text }}</label>
+                <label class="form-label">{{ form.max_file_size_value.label.text }}</label>
                 <div class="input-group">
-                  {{ form.max_file_size_mb(class="form-control") }}
-                  <span class="input-group-text">Mo</span>
+                  {{ form.max_file_size_value(class="form-control") }}
+                  {{ form.max_file_size_unit(class="form-select", style="max-width:90px") }}
                 </div>
               </div>
               <div class="col-md-4">
@@ -238,6 +243,21 @@
                 <label class="form-check-label" for="allowReg">{{ form.allow_registration.label.text }}</label>
               </div>
               <div class="form-text">Si désactivé, seuls les admins peuvent créer de nouveaux comptes.</div>
+            </div>
+
+            <hr class="my-3">
+            <p class="text-uppercase fw-semibold text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em">
+              <i class="fas fa-scroll me-1"></i>Journal d'audit
+            </p>
+            <div class="row g-3 mb-4">
+              <div class="col-md-4">
+                <label class="form-label">{{ form.audit_log_retention_days.label.text }}</label>
+                <div class="input-group">
+                  {{ form.audit_log_retention_days(class="form-control") }}
+                  <span class="input-group-text">jours</span>
+                </div>
+                <div class="form-text">0 = conserver indéfiniment. La purge s'effectue à la sauvegarde et toutes les 24h.</div>
+              </div>
             </div>
 
             <button type="submit" class="btn btn-primary">
