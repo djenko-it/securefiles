@@ -1488,6 +1488,7 @@ def webauthn_delete():
 @app.route('/dashboard')
 @login_required
 def dashboard():
+    settings  = get_settings()
     cur = g.db.execute(
         'SELECT id, original_filename, expiry, views, max_downloads, deposited_by'
         ' FROM files WHERE owner_id = ? ORDER BY expiry DESC',
@@ -1506,9 +1507,42 @@ def dashboard():
             'exhausted': remaining == 0, 'deposited_by': dep_by,
             'views': views, 'max_downloads': max_dl,
         })
+
+    # ── Quota stockage + fichiers ─────────────────────────────────────────────
+    all_ids    = g.db.execute(
+        'SELECT id FROM files WHERE owner_id = ?', (current_user.id,)
+    ).fetchall()
+    used_bytes = sum(
+        os.path.getsize(os.path.join(app.config['UPLOAD_FOLDER'], fid))
+        for (fid,) in all_ids
+        if os.path.exists(os.path.join(app.config['UPLOAD_FOLDER'], fid))
+    )
+    max_storage_mb = int(settings['max_storage_mb'])
+    max_files      = int(settings['max_files_per_user'])
+    file_count     = len(all_ids)
+
+    def _fmt_bytes(b):
+        if b >= 1024 ** 3:
+            return f"{b / 1024 ** 3:.1f} Go"
+        if b >= 1024 ** 2:
+            return f"{b / 1024 ** 2:.1f} Mo"
+        return f"{b / 1024:.0f} Ko"
+
+    quota = {
+        'used_str':       _fmt_bytes(used_bytes),
+        'max_storage_mb': max_storage_mb,
+        'storage_pct':    min(100, round(used_bytes * 100 / (max_storage_mb * 1048576)))
+                          if max_storage_mb > 0 else None,
+        'file_count':     file_count,
+        'max_files':      max_files,
+        'file_pct':       min(100, round(file_count * 100 / max_files))
+                          if max_files > 0 else None,
+    }
+
     drop_url = url_for('drop_zone', drop_token=current_user.drop_token, _external=True)
     return render_template('dashboard.html', files=files, drop_url=drop_url,
-                           drop_enabled=current_user.drop_enabled, settings=get_settings())
+                           drop_enabled=current_user.drop_enabled, settings=settings,
+                           quota=quota)
 
 
 @app.route('/delete/<file_id>', methods=['POST'])

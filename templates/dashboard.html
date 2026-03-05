@@ -73,6 +73,53 @@
       </div>
     </div>
 
+    <!-- Quota -->
+    <div class="card mb-4">
+      <div class="card-body p-3 px-4">
+        <div class="row g-3 align-items-center">
+
+          <div class="col-sm-6">
+            <div class="d-flex justify-content-between mb-1">
+              <small class="text-muted"><i class="fas fa-hard-drive me-1"></i>Stockage</small>
+              <small class="fw-semibold">
+                {{ quota.used_str }}{% if quota.max_storage_mb > 0 %} / {{ quota.max_storage_mb }} Mo{% endif %}
+              </small>
+            </div>
+            {% if quota.storage_pct is not none %}
+              {% set sc = 'bg-danger' if quota.storage_pct >= 90 else ('bg-warning' if quota.storage_pct >= 70 else 'bg-success') %}
+              <div class="progress" style="height:6px;">
+                <div class="progress-bar {{ sc }}" style="width:{{ quota.storage_pct }}%" title="{{ quota.storage_pct }}%"></div>
+              </div>
+            {% else %}
+              <div class="progress" style="height:6px;">
+                <div class="progress-bar bg-secondary opacity-25" style="width:100%"></div>
+              </div>
+            {% endif %}
+          </div>
+
+          <div class="col-sm-6">
+            <div class="d-flex justify-content-between mb-1">
+              <small class="text-muted"><i class="fas fa-file me-1"></i>Fichiers</small>
+              <small class="fw-semibold">
+                {{ quota.file_count }}{% if quota.max_files > 0 %} / {{ quota.max_files }}{% endif %}
+              </small>
+            </div>
+            {% if quota.file_pct is not none %}
+              {% set fc = 'bg-danger' if quota.file_pct >= 90 else ('bg-warning' if quota.file_pct >= 70 else 'bg-success') %}
+              <div class="progress" style="height:6px;">
+                <div class="progress-bar {{ fc }}" style="width:{{ quota.file_pct }}%" title="{{ quota.file_pct }}%"></div>
+              </div>
+            {% else %}
+              <div class="progress" style="height:6px;">
+                <div class="progress-bar bg-secondary opacity-25" style="width:100%"></div>
+              </div>
+            {% endif %}
+          </div>
+
+        </div>
+      </div>
+    </div>
+
     <!-- Fichiers reçus -->
     {% set received = files | selectattr('deposited_by') | list %}
     {% if received %}
