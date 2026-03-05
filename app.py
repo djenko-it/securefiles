@@ -652,6 +652,7 @@ def upload_file():
 
 
 @app.route('/download/<file_id>', methods=['GET', 'POST'])
+@limiter.limit("10 per minute")
 def download_file(file_id):
     form = PasswordForm()
     cur  = g.db.execute(
@@ -1323,6 +1324,7 @@ def dashboard():
             'expiry': exp.strftime('%d/%m/%Y %H:%M'),
             'expired': expired, 'remaining': remaining,
             'exhausted': remaining == 0, 'deposited_by': dep_by,
+            'views': views, 'max_downloads': max_dl,
         })
     drop_url = url_for('drop_zone', drop_token=current_user.drop_token, _external=True)
     return render_template('dashboard.html', files=files, drop_url=drop_url,

@@ -147,7 +147,11 @@
                   {% if f.exhausted and not f.expired %}<span class="badge bg-warning text-dark ms-1" style="font-size:.65rem;">Épuisé</span>{% endif %}
                 </td>
                 <td><small class="text-muted">{{ f.expiry }}</small></td>
-                <td><small>{{ f.remaining }}</small></td>
+                <td title="Téléchargements effectués / maximum">
+                  <small class="{{ 'text-danger fw-semibold' if f.exhausted else 'text-muted' }}">
+                    {{ f.views }} / {{ '∞' if f.max_downloads == 'unlimited' else f.max_downloads }}
+                  </small>
+                </td>
                 <td>
                   {% if not f.expired and not f.exhausted %}
                   <button class="btn btn-link btn-sm p-0 text-muted copy-link-btn"
