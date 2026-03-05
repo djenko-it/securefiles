@@ -295,6 +295,48 @@
               </div>
             </div>
 
+            <hr class="my-3">
+            <p class="text-uppercase fw-semibold text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em">
+              <i class="fas fa-download me-1"></i>Téléchargements
+            </p>
+            <div class="row g-3 mb-4">
+              <div class="col-md-4">
+                <label class="form-label">{{ form.default_max_downloads.label.text }}</label>
+                {{ form.default_max_downloads(class="form-select") }}
+                <div class="form-text">Appliqué à chaque nouveau partage. Peut être remplacé par l'utilisateur lors de l'envoi.</div>
+              </div>
+            </div>
+
+            <hr class="my-3">
+            <p class="text-uppercase fw-semibold text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em">
+              <i class="fas fa-triangle-exclamation me-1"></i>Mode maintenance
+            </p>
+            <div class="mb-3">
+              <div class="form-check form-switch">
+                {{ form.maintenance_mode(class="form-check-input", role="switch", id="maintenanceMode") }}
+                <label class="form-check-label" for="maintenanceMode">{{ form.maintenance_mode.label.text }}</label>
+              </div>
+              <div class="form-text">Affiche une page de maintenance à tous les utilisateurs non-admins. Les routes <code>/login</code>, <code>/logout</code> et SSO restent accessibles.</div>
+            </div>
+            <div class="row g-3 mb-4">
+              <div class="col-md-8">
+                <label class="form-label">{{ form.maintenance_message.label.text }}</label>
+                {{ form.maintenance_message(class="form-control", rows="2", placeholder="Le site est temporairement en maintenance…") }}
+              </div>
+            </div>
+
+            <hr class="my-3">
+            <p class="text-uppercase fw-semibold text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em">
+              <i class="fas fa-shield-halved me-1"></i>Sécurité — 2FA
+            </p>
+            <div class="mb-4">
+              <div class="form-check form-switch">
+                {{ form.mfa_required(class="form-check-input", role="switch", id="mfaRequired") }}
+                <label class="form-check-label" for="mfaRequired">{{ form.mfa_required.label.text }}</label>
+              </div>
+              <div class="form-text">Si activé, tout utilisateur sans 2FA configuré est redirigé vers son profil pour en activer un. Les comptes SSO sont exemptés (authentification déléguée au fournisseur d'identité).</div>
+            </div>
+
             <button type="submit" class="btn btn-primary">
               <i class="fas fa-floppy-disk me-2"></i>{{ form.submit.label.text }}
             </button>

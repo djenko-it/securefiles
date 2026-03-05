@@ -91,6 +91,10 @@ SETTINGS_DEFAULTS = {
     'audit_log_retention_days':  '0',
     'max_file_size_unit':        'mo',
     'e2e_mode':                  'optional',
+    'default_max_downloads':     'unlimited',
+    'maintenance_mode':          '0',
+    'maintenance_message':       'Le site est temporairement en maintenance. Merci de revenir plus tard.',
+    'mfa_required':              '0',
     # SSO / OIDC
     'sso_enabled':        '0',
     'sso_force':          '0',
@@ -309,6 +313,13 @@ class AdminSettingsForm(FlaskForm):
         ('disabled', 'Désactivé — option masquée'),
         ('required', 'Obligatoire — forcé pour tous les partages'),
     ])
+    default_max_downloads    = SelectField('Limite de téléchargements par défaut', choices=[
+        ('unlimited', 'Illimité'), ('1', '1'), ('5', '5'), ('10', '10'), ('25', '25'), ('50', '50'),
+    ])
+    maintenance_mode         = BooleanField('Activer le mode maintenance')
+    maintenance_message      = TextAreaField('Message de maintenance',
+                                             validators=[Optional(), Length(max=512)])
+    mfa_required             = BooleanField('2FA obligatoire pour tous les comptes (hors SSO)')
     submit                   = SubmitField('Sauvegarder')
 
 
@@ -413,6 +424,32 @@ def init_db():
 @app.before_request
 def before_request():
     g.db = get_db()
+    if request.path.startswith('/static'):
+        return
+    settings = get_settings()
+
+    # ── Mode maintenance ──────────────────────────────────────────────────────
+    if settings.get('maintenance_mode') == '1':
+        if not (current_user.is_authenticated and current_user.is_admin):
+            _exempt_maint = ('/admin', '/login', '/logout', '/health',
+                             '/auth/sso', '/mfa')
+            if not any(request.path.startswith(p) for p in _exempt_maint):
+                return render_template(
+                    'maintenance.html',
+                    message=settings.get('maintenance_message', ''),
+                    settings=settings,
+                ), 503
+
+    # ── 2FA obligatoire ───────────────────────────────────────────────────────
+    if (settings.get('mfa_required') == '1'
+            and current_user.is_authenticated
+            and not current_user.sso_user
+            and not current_user.has_mfa):
+        _exempt_mfa = ('/profile', '/mfa', '/logout', '/admin', '/health')
+        if not any(request.path.startswith(p) for p in _exempt_mfa):
+            flash('La double authentification (2FA) est obligatoire. '
+                  'Veuillez l\'activer sur votre profil.', 'warning')
+            return redirect(url_for('profile'))
 
 
 @app.after_request
@@ -623,7 +660,7 @@ def upload_file():
 
     file_id         = str(uuid.uuid4())
     expiry_time     = get_expiry_time(request.form.get('expiry', settings['default_expiry']))
-    max_downloads   = request.form.get('max_downloads', 'unlimited')
+    max_downloads   = request.form.get('max_downloads', settings.get('default_max_downloads', 'unlimited'))
     password        = request.form.get('password', '')
     hashed_password = generate_password_hash(password) if password else None
 
@@ -1456,6 +1493,10 @@ def admin_panel():
         'max_storage_mb':           int(settings['max_storage_mb']),
         'audit_log_retention_days': int(settings.get('audit_log_retention_days', '0')),
         'e2e_mode':                 settings.get('e2e_mode', 'optional'),
+        'default_max_downloads':    settings.get('default_max_downloads', 'unlimited'),
+        'maintenance_mode':         settings.get('maintenance_mode') == '1',
+        'maintenance_message':      settings.get('maintenance_message', ''),
+        'mfa_required':             settings.get('mfa_required') == '1',
     })
     sso_form = SSOSettingsForm(data={
         'sso_enabled':       settings.get('sso_enabled') == '1',
@@ -1490,6 +1531,10 @@ def admin_save_settings():
             'max_storage_mb':           str(form.max_storage_mb.data),
             'audit_log_retention_days': str(form.audit_log_retention_days.data),
             'e2e_mode':                 form.e2e_mode.data,
+            'default_max_downloads':    form.default_max_downloads.data,
+            'maintenance_mode':         '1' if form.maintenance_mode.data else '0',
+            'maintenance_message':      (form.maintenance_message.data or '').strip(),
+            'mfa_required':             '1' if form.mfa_required.data else '0',
         }
         for key, value in values.items():
             g.db.execute('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', (key, value))
