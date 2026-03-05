@@ -430,14 +430,20 @@
             const resp      = await fetch('/bundle/create', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-              body: JSON.stringify({ file_ids: fileIds }),
+              body: JSON.stringify({ file_ids: fileIds, csrf_token: csrfToken }),
             })
-            const data = await resp.json()
-            if (data.success) {
-              renderBundle(container, data.link, results)
-              return
+            if (!resp.ok) {
+              console.warn('bundle/create HTTP', resp.status, await resp.text())
+            } else {
+              const data = await resp.json()
+              if (data.success) {
+                renderBundle(container, data.link, results)
+                return
+              } else {
+                console.warn('bundle/create failed:', data.message)
+              }
             }
-          } catch { /* fallback */ }
+          } catch (err) { console.error('bundle/create exception:', err) }
 
           // Bundle KO → liens individuels
           renderIndividual(container, results)
