@@ -423,7 +423,7 @@ def set_security_headers(response):
         "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com; "
         "font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com data:; "
         "img-src 'self' data: blob:; "
-        "connect-src 'self'; "
+        "connect-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
         "frame-ancestors 'none'; "
         "object-src 'none'; "
         "base-uri 'self';"
