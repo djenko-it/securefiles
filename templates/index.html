@@ -98,8 +98,18 @@
               </div>
             </div>
             <div class="mb-3">
-              <label class="form-label-sm">Téléchargements max</label>
-              {{ form.max_downloads(class="form-select") }}
+              <div class="form-check form-switch d-flex align-items-center gap-2 mb-2">
+                <input class="form-check-input" type="checkbox" id="max-dl-toggle" role="switch">
+                <label class="form-check-label form-label-sm mb-0" for="max-dl-toggle">Limiter les téléchargements</label>
+              </div>
+              <div id="max-dl-zone" style="display:none;">
+                <div class="input-group" style="max-width:180px;">
+                  <input type="number" id="max-dl-count" min="1" max="9999" value="10"
+                         class="form-control form-control-sm text-center">
+                  <span class="input-group-text small">max</span>
+                </div>
+              </div>
+              <input type="hidden" name="max_downloads" id="max-dl-value" value="unlimited">
             </div>
 
             <!-- Chiffrement E2E -->
@@ -325,10 +335,11 @@
         e.preventDefault()
         if (!selectedFiles.length) return
 
+        syncMaxDl()
         const e2e       = {% if settings.e2e_mode == 'required' %}true{% elif settings.e2e_mode == 'disabled' %}false{% else %}document.getElementById('e2e-toggle').checked{% endif %}
         const password  = document.querySelector('#upload-form [name="password"]').value
         const expiry    = document.querySelector('#upload-form [name="expiry"]').value
-        const maxDl     = document.querySelector('#upload-form [name="max_downloads"]').value
+        const maxDl     = document.getElementById('max-dl-value').value
         const csrfToken = document.querySelector('#upload-form [name="csrf_token"]').value
 
         uploadBtn.disabled = true
@@ -581,6 +592,23 @@
         fileInput.value = ''
         updateFileList()
       })
+
+      // Limite téléchargements (toggle + input)
+      const maxDlToggle = document.getElementById('max-dl-toggle')
+      const maxDlZone   = document.getElementById('max-dl-zone')
+      const maxDlCount  = document.getElementById('max-dl-count')
+      const maxDlValue  = document.getElementById('max-dl-value')
+      function syncMaxDl() {
+        if (maxDlToggle.checked) {
+          maxDlZone.style.display = ''
+          maxDlValue.value = Math.max(1, parseInt(maxDlCount.value) || 10)
+        } else {
+          maxDlZone.style.display = 'none'
+          maxDlValue.value = 'unlimited'
+        }
+      }
+      maxDlToggle.addEventListener('change', syncMaxDl)
+      maxDlCount.addEventListener('input', syncMaxDl)
 
       // Expiration personnalisée
       const expirySelect = document.getElementById('expiry-select')

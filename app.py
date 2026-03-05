@@ -92,7 +92,6 @@ SETTINGS_DEFAULTS = {
     'audit_log_retention_days':  '0',
     'max_file_size_unit':        'mo',
     'e2e_mode':                  'optional',
-    'default_max_downloads':     'unlimited',
     'maintenance_mode':          '0',
     'maintenance_message':       'Le site est temporairement en maintenance. Merci de revenir plus tard.',
     'mfa_required':              '0',
@@ -272,16 +271,13 @@ class PasswordForm(FlaskForm):
 
 
 class FileUploadForm(FlaskForm):
-    file          = FileField('Choisissez un fichier', validators=[DataRequired()])
-    expiry        = SelectField('Durée de validité', choices=[
+    file     = FileField('Choisissez un fichier', validators=[DataRequired()])
+    expiry   = SelectField('Durée de validité', choices=[
         ('3h', '3 heures'), ('1d', '1 jour'), ('1w', '1 semaine'), ('1m', '1 mois'),
         ('custom', 'Date personnalisée…'),
     ])
-    max_downloads = SelectField('Nombre maximal de téléchargements', choices=[
-        ('1', '1'), ('5', '5'), ('10', '10'), ('unlimited', 'Illimité'),
-    ], validators=[DataRequired()])
-    password      = PasswordField('Mot de passe (optionnel)')
-    submit        = SubmitField('Téléverser')
+    password = PasswordField('Mot de passe (optionnel)')
+    submit   = SubmitField('Téléverser')
 
 
 class RegisterForm(FlaskForm):
@@ -334,9 +330,6 @@ class AdminSettingsForm(FlaskForm):
         ('optional', 'Optionnel — l\'utilisateur choisit'),
         ('disabled', 'Désactivé — option masquée'),
         ('required', 'Obligatoire — forcé pour tous les partages'),
-    ])
-    default_max_downloads    = SelectField('Limite de téléchargements par défaut', choices=[
-        ('unlimited', 'Illimité'), ('1', '1'), ('5', '5'), ('10', '10'), ('25', '25'), ('50', '50'),
     ])
     maintenance_mode         = BooleanField('Activer le mode maintenance')
     maintenance_message      = TextAreaField('Message de maintenance',
@@ -698,7 +691,15 @@ def upload_file():
             return {'success': False, 'message': 'La date d\'expiration ne peut pas dépasser 1 an.'}
     else:
         expiry_time = get_expiry_time(expiry_str)
-    max_downloads   = request.form.get('max_downloads', settings.get('default_max_downloads', 'unlimited'))
+    max_downloads = request.form.get('max_downloads', 'unlimited')
+    if max_downloads != 'unlimited':
+        try:
+            max_dl_int = int(max_downloads)
+            if max_dl_int < 1:
+                return {'success': False, 'message': 'Le nombre de téléchargements doit être ≥ 1.'}
+            max_downloads = str(max_dl_int)
+        except ValueError:
+            return {'success': False, 'message': 'Nombre de téléchargements invalide.'}
     password        = request.form.get('password', '')
     hashed_password = generate_password_hash(password) if password else None
 
@@ -1684,7 +1685,6 @@ def admin_panel():
         'max_storage_mb':           int(settings['max_storage_mb']),
         'audit_log_retention_days': int(settings.get('audit_log_retention_days', '0')),
         'e2e_mode':                 settings.get('e2e_mode', 'optional'),
-        'default_max_downloads':    settings.get('default_max_downloads', 'unlimited'),
         'maintenance_mode':         settings.get('maintenance_mode') == '1',
         'maintenance_message':      settings.get('maintenance_message', ''),
         'mfa_required':             settings.get('mfa_required') == '1',
@@ -1722,7 +1722,6 @@ def admin_save_settings():
             'max_storage_mb':           str(form.max_storage_mb.data),
             'audit_log_retention_days': str(form.audit_log_retention_days.data),
             'e2e_mode':                 form.e2e_mode.data,
-            'default_max_downloads':    form.default_max_downloads.data,
             'maintenance_mode':         '1' if form.maintenance_mode.data else '0',
             'maintenance_message':      (form.maintenance_message.data or '').strip(),
             'mfa_required':             '1' if form.mfa_required.data else '0',
