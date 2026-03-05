@@ -49,13 +49,16 @@
     <div class="card mb-3">
       <div class="card-body p-4">
         <div class="dropzone" id="dropzone">
-          <div class="dz-icon"><i class="fas fa-cloud-arrow-up"></i></div>
-          <div class="fw-semibold mb-1">Glissez un ou plusieurs fichiers ici ou cliquez pour parcourir</div>
+          <div class="dz-icon"><i class="fas fa-cloud-arrow-up" id="dz-icon-el"></i></div>
+          <div class="fw-semibold mb-1" id="dz-text">Glissez un ou plusieurs fichiers ici ou cliquez pour parcourir</div>
           {% if settings.max_file_size_unit == 'go' %}
             <small class="text-muted">Taille maximale : {{ (settings.max_file_size_mb | int) // 1024 }} Go par fichier</small>
           {% else %}
             <small class="text-muted">Taille maximale : {{ settings.max_file_size_mb }} Mo par fichier</small>
           {% endif %}
+          <div id="dz-drag-hint" class="fw-semibold mt-2" style="display:none;color:var(--accent);">
+            <i class="fas fa-arrow-down me-1"></i><span id="dz-drag-count">Déposez ici</span>
+          </div>
         </div>
       </div>
     </div>
@@ -167,6 +170,15 @@
             <div id="copy-success" class="text-success small mt-2" style="display:none;">
               <i class="fas fa-check me-1"></i>Lien copié dans le presse-papier
             </div>
+            <div class="mt-3 text-center">
+              <button id="qr-toggle-btn" class="btn btn-sm btn-outline-secondary" type="button">
+                <i class="fas fa-qrcode me-1"></i>QR Code
+              </button>
+              <div id="qr-wrapper" style="display:none; margin-top:.75rem;">
+                <canvas id="qr-canvas" style="border-radius:8px; max-width:100%;"></canvas>
+                <p class="text-muted mb-0 mt-1" style="font-size:.7rem;">Scannez pour ouvrir le lien sur mobile</p>
+              </div>
+            </div>
           </div>
           <!-- Résultats multi-fichiers -->
           <div id="multi-result" style="display:none;">
@@ -192,6 +204,7 @@
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function () {
       const dropzone     = document.getElementById('dropzone')
@@ -237,12 +250,39 @@
           ).join('') + '</div>'
       }
 
-      // Drag & drop
-      dropzone.addEventListener('dragover',  e => { e.preventDefault(); dropzone.classList.add('dragover') })
-      dropzone.addEventListener('dragleave', ()  => dropzone.classList.remove('dragover'))
+      // Drag & drop — compteur pour éviter le flickering sur les éléments enfants
+      const dzIcon  = document.getElementById('dz-icon-el')
+      const dzHint  = document.getElementById('dz-drag-hint')
+      const dzCount = document.getElementById('dz-drag-count')
+      let dragCounter = 0
+
+      function dzEnterState(n) {
+        dropzone.classList.add('dragover')
+        dzIcon.className = 'fas fa-file-arrow-down'
+        dzHint.style.display = 'block'
+        dzCount.textContent = n > 1 ? 'Déposez ' + n + ' fichiers ici' : 'Déposez ici'
+      }
+      function dzLeaveState() {
+        dropzone.classList.remove('dragover')
+        dzIcon.className = 'fas fa-cloud-arrow-up'
+        dzHint.style.display = 'none'
+      }
+
+      dropzone.addEventListener('dragover',  e => e.preventDefault())
+      dropzone.addEventListener('dragenter', function (e) {
+        e.preventDefault()
+        dragCounter++
+        const n = (e.dataTransfer && e.dataTransfer.items) ? e.dataTransfer.items.length : 0
+        dzEnterState(n)
+      })
+      dropzone.addEventListener('dragleave', function () {
+        dragCounter--
+        if (dragCounter <= 0) { dragCounter = 0; dzLeaveState() }
+      })
       dropzone.addEventListener('drop', function (e) {
         e.preventDefault()
-        dropzone.classList.remove('dragover')
+        dragCounter = 0
+        dzLeaveState()
         const files = Array.from(e.dataTransfer.files).filter(sizeOk)
         if (!files.length) return
         selectedFiles = files
@@ -343,6 +383,16 @@
         }, 350)
       })
 
+      // ── QR Code ───────────────────────────────────────────────────────────────
+      document.getElementById('qr-toggle-btn').addEventListener('click', function () {
+        const wrapper = document.getElementById('qr-wrapper')
+        const visible = wrapper.style.display !== 'none'
+        wrapper.style.display = visible ? 'none' : 'block'
+        this.innerHTML = visible
+          ? '<i class="fas fa-qrcode me-1"></i>QR Code'
+          : '<i class="fas fa-eye-slash me-1"></i>Masquer le QR'
+      })
+
       // ── Affichage des résultats ───────────────────────────────────────────────
       async function showResults(results) {
         const single = document.getElementById('single-result')
@@ -353,6 +403,11 @@
           single.style.display = 'block'
           multi.style.display  = 'none'
           dlLink.value = results[0].link
+          // Réinitialise le QR
+          const qrWrapper = document.getElementById('qr-wrapper')
+          qrWrapper.style.display = 'none'
+          document.getElementById('qr-toggle-btn').innerHTML = '<i class="fas fa-qrcode me-1"></i>QR Code'
+          QRCode.toCanvas(document.getElementById('qr-canvas'), results[0].link, { width: 180, margin: 2 })
           linkModal.show()
           return
         }
@@ -406,13 +461,29 @@
           '<div class="input-group">' +
           '<input type="text" class="form-control font-monospace small" id="bundle-link-input" value="' + safe + '" readonly>' +
           '<button class="btn btn-outline-primary" id="copy-bundle-btn" type="button" title="Copier"><i class="fas fa-copy"></i></button>' +
-          '</div></div>' +
+          '</div>' +
+          '<div class="mt-2 text-center">' +
+          '<button id="bundle-qr-btn" class="btn btn-sm btn-outline-secondary" type="button">' +
+          '<i class="fas fa-qrcode me-1"></i>QR Code</button>' +
+          '<div id="bundle-qr-wrapper" style="display:none;margin-top:.6rem;">' +
+          '<canvas id="bundle-qr-canvas" style="border-radius:8px;max-width:100%;"></canvas>' +
+          '<p class="text-muted mb-0 mt-1" style="font-size:.7rem;">Scannez pour ouvrir l\'archive sur mobile</p>' +
+          '</div></div></div>' +
           '<details>' +
           '<summary class="text-muted small" style="cursor:pointer;user-select:none;list-style:none;">' +
           '<i class="fas fa-list me-1"></i>Liens individuels (' + results.length + ' fichiers)' +
           '</summary>' +
           '<div class="mt-2">' + linksHtml(results) + '</div>' +
           '</details>'
+        QRCode.toCanvas(document.getElementById('bundle-qr-canvas'), bundleLink, { width: 180, margin: 2 })
+        document.getElementById('bundle-qr-btn').addEventListener('click', function () {
+          const w = document.getElementById('bundle-qr-wrapper')
+          const visible = w.style.display !== 'none'
+          w.style.display = visible ? 'none' : 'block'
+          this.innerHTML = visible
+            ? '<i class="fas fa-qrcode me-1"></i>QR Code'
+            : '<i class="fas fa-eye-slash me-1"></i>Masquer le QR'
+        })
         document.getElementById('copy-bundle-btn').addEventListener('click', function () {
           navigator.clipboard.writeText(bundleLink).then(() => {
             this.innerHTML = '<i class="fas fa-check"></i>'
@@ -481,6 +552,12 @@
             this.innerHTML = '<i class="fas fa-copy me-1"></i>Copier tout'
           }, 2500)
         })
+      })
+
+      // Réinitialiser le QR à la fermeture du modal résultat
+      document.getElementById('linkModal').addEventListener('hidden.bs.modal', function () {
+        document.getElementById('qr-wrapper').style.display = 'none'
+        document.getElementById('qr-toggle-btn').innerHTML = '<i class="fas fa-qrcode me-1"></i>QR Code'
       })
 
       // Réinitialiser à la fermeture de la modale

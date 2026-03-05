@@ -415,6 +415,27 @@ def before_request():
     g.db = get_db()
 
 
+@app.after_request
+def set_security_headers(response):
+    csp = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com; "
+        "font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com data:; "
+        "img-src 'self' data: blob:; "
+        "connect-src 'self'; "
+        "frame-ancestors 'none'; "
+        "object-src 'none'; "
+        "base-uri 'self';"
+    )
+    response.headers['Content-Security-Policy'] = csp
+    response.headers['X-Frame-Options']         = 'DENY'
+    response.headers['X-Content-Type-Options']  = 'nosniff'
+    response.headers['Referrer-Policy']         = 'strict-origin-when-cross-origin'
+    response.headers['Permissions-Policy']      = 'camera=(), microphone=(), geolocation=()'
+    return response
+
+
 @app.teardown_appcontext
 def close_connection(exception):
     db = getattr(g, 'db', None)
