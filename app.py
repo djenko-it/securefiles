@@ -275,6 +275,7 @@ class FileUploadForm(FlaskForm):
     file          = FileField('Choisissez un fichier', validators=[DataRequired()])
     expiry        = SelectField('Durée de validité', choices=[
         ('3h', '3 heures'), ('1d', '1 jour'), ('1w', '1 semaine'), ('1m', '1 mois'),
+        ('custom', 'Date personnalisée…'),
     ])
     max_downloads = SelectField('Nombre maximal de téléchargements', choices=[
         ('1', '1'), ('5', '5'), ('10', '10'), ('unlimited', 'Illimité'),
@@ -494,6 +495,7 @@ def set_security_headers(response):
     response.headers['X-Content-Type-Options']  = 'nosniff'
     response.headers['Referrer-Policy']         = 'strict-origin-when-cross-origin'
     response.headers['Permissions-Policy']      = 'camera=(), microphone=(), geolocation=()'
+    response.headers['Strict-Transport-Security'] = 'max-age=63072000; includeSubDomains; preload'
     return response
 
 
@@ -682,8 +684,20 @@ def upload_file():
             return {'success': False,
                     'message': f"Quota de stockage dépassé ({max_storage} Mo maximum)."}
 
-    file_id         = str(uuid.uuid4())
-    expiry_time     = get_expiry_time(request.form.get('expiry', settings['default_expiry']))
+    file_id      = str(uuid.uuid4())
+    expiry_str   = request.form.get('expiry', settings['default_expiry'])
+    if expiry_str == 'custom':
+        custom_val = request.form.get('expiry_custom', '').strip()
+        try:
+            expiry_time = datetime.strptime(custom_val, '%Y-%m-%dT%H:%M')
+        except ValueError:
+            return {'success': False, 'message': 'Format de date personnalisée invalide.'}
+        if expiry_time <= datetime.now():
+            return {'success': False, 'message': 'La date d\'expiration doit être dans le futur.'}
+        if expiry_time > datetime.now() + timedelta(days=365):
+            return {'success': False, 'message': 'La date d\'expiration ne peut pas dépasser 1 an.'}
+    else:
+        expiry_time = get_expiry_time(expiry_str)
     max_downloads   = request.form.get('max_downloads', settings.get('default_max_downloads', 'unlimited'))
     password        = request.form.get('password', '')
     hashed_password = generate_password_hash(password) if password else None

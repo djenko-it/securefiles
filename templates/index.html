@@ -91,7 +91,11 @@
             </div>
             <div class="mb-3">
               <label class="form-label-sm">Durée de validité</label>
-              {{ form.expiry(class="form-select") }}
+              {{ form.expiry(class="form-select", id="expiry-select") }}
+              <div id="expiry-custom-zone" class="mt-2" style="display:none;">
+                <input type="datetime-local" name="expiry_custom" id="expiry-custom-input"
+                       class="form-control form-control-sm">
+              </div>
             </div>
             <div class="mb-3">
               <label class="form-label-sm">Téléchargements max</label>
@@ -343,6 +347,9 @@
           fd.append('csrf_token', csrfToken)
           fd.append('password', password)
           fd.append('expiry', expiry)
+          if (expiry === 'custom') {
+            fd.append('expiry_custom', document.getElementById('expiry-custom-input').value)
+          }
           fd.append('max_downloads', maxDl)
 
           let e2eKey = null
@@ -574,6 +581,29 @@
         fileInput.value = ''
         updateFileList()
       })
+
+      // Expiration personnalisée
+      const expirySelect = document.getElementById('expiry-select')
+      const expiryCustomZone = document.getElementById('expiry-custom-zone')
+      const expiryCustomInput = document.getElementById('expiry-custom-input')
+      function updateExpiryCustom() {
+        const isCustom = expirySelect.value === 'custom'
+        expiryCustomZone.style.display = isCustom ? '' : 'none'
+        expiryCustomInput.required = isCustom
+        if (isCustom && !expiryCustomInput.value) {
+          // Pré-remplir avec demain à la même heure
+          const d = new Date(Date.now() + 86400000)
+          d.setSeconds(0, 0)
+          expiryCustomInput.value = d.toISOString().slice(0, 16)
+        }
+        // Bornes : maintenant + 1 min → maintenant + 1 an
+        const now = new Date(Date.now() + 60000)
+        const max = new Date(Date.now() + 365 * 86400000)
+        expiryCustomInput.min = now.toISOString().slice(0, 16)
+        expiryCustomInput.max = max.toISOString().slice(0, 16)
+      }
+      expirySelect.addEventListener('change', updateExpiryCustom)
+      updateExpiryCustom()
     })
   </script>
 </body>
