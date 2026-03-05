@@ -1378,13 +1378,13 @@ def drop_zone(drop_token):
 @admin_required
 def admin_panel():
     rows = g.db.execute('''
-        SELECT u.id, u.username, u.created_at, u.is_admin, COUNT(f.id) AS file_count
+        SELECT u.id, u.username, u.created_at, u.is_admin, u.sso_user, COUNT(f.id) AS file_count
         FROM users u LEFT JOIN files f ON f.owner_id = u.id
         GROUP BY u.id ORDER BY u.created_at
     ''').fetchall()
 
     users = []
-    for uid, username, created_at, is_admin, file_count in rows:
+    for uid, username, created_at, is_admin, sso_user, file_count in rows:
         file_ids = g.db.execute('SELECT id FROM files WHERE owner_id = ?', (uid,)).fetchall()
         used = 0
         for (fid,) in file_ids:
@@ -1395,7 +1395,8 @@ def admin_panel():
                 pass
         users.append({
             'id': uid, 'username': username, 'created_at': created_at,
-            'is_admin': bool(is_admin), 'file_count': file_count,
+            'is_admin': bool(is_admin), 'sso_user': bool(sso_user),
+            'file_count': file_count,
             'storage_mb': round(used / (1024 * 1024), 2),
         })
 
@@ -1507,6 +1508,27 @@ def admin_toggle_admin(user_id):
         g.db.commit()
         audit_log('admin_toggle_admin', target=row[0],
                   details='Promu administrateur' if new_val else 'Droits admin retirés')
+    return redirect(url_for('admin_panel'))
+
+
+@app.route('/admin/users/<int:user_id>/reset-password', methods=['POST'])
+@login_required
+@admin_required
+def admin_reset_password(user_id):
+    row = g.db.execute('SELECT username, sso_user FROM users WHERE id = ?', (user_id,)).fetchone()
+    if not row:
+        flash("Utilisateur introuvable.", 'danger')
+        return redirect(url_for('admin_panel'))
+    username, is_sso = row[0], bool(row[1])
+    if is_sso:
+        flash(f"Impossible de réinitialiser le mot de passe d'un compte SSO.", 'danger')
+        return redirect(url_for('admin_panel'))
+    tmp_pw = secrets.token_urlsafe(12)
+    g.db.execute('UPDATE users SET password = ? WHERE id = ?',
+                 (generate_password_hash(tmp_pw), user_id))
+    g.db.commit()
+    audit_log('admin_reset_password', target=username, details='Mot de passe réinitialisé')
+    flash(f"Mot de passe de « {username} » réinitialisé. Mot de passe temporaire : {tmp_pw}", 'warning')
     return redirect(url_for('admin_panel'))
 
 

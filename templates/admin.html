@@ -98,6 +98,7 @@
               <thead class="table-light">
                 <tr>
                   <th class="ps-4">Utilisateur</th>
+                  <th>Type</th>
                   <th>Inscription</th>
                   <th class="text-center">Fichiers</th>
                   <th class="text-center">Stockage</th>
@@ -114,6 +115,13 @@
                     {{ u.username }}
                     {% if u.id == current_user.id %}
                       <span class="badge bg-primary ms-1" style="font-size:.7rem">vous</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if u.sso_user %}
+                      <span class="badge bg-info text-dark" style="font-size:.7rem"><i class="fas fa-key me-1"></i>SSO</span>
+                    {% else %}
+                      <span class="badge bg-secondary" style="font-size:.7rem"><i class="fas fa-user me-1"></i>Local</span>
                     {% endif %}
                   </td>
                   <td class="text-muted small">{{ u.created_at[:10] if u.created_at else '—' }}</td>
@@ -135,6 +143,17 @@
                           <i class="fas fa-crown"></i>
                         </button>
                       </form>
+                      {% if not u.sso_user %}
+                      <form method="post"
+                            action="{{ url_for('admin_reset_password', user_id=u.id) }}"
+                            class="d-inline"
+                            onsubmit="return confirm('Réinitialiser le mot de passe de {{ u.username }} ? Un mot de passe temporaire sera affiché.')">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="btn btn-sm btn-outline-warning ms-1" title="Réinitialiser le mot de passe">
+                          <i class="fas fa-key"></i>
+                        </button>
+                      </form>
+                      {% endif %}
                       <form method="post"
                             action="{{ url_for('admin_delete_user', user_id=u.id) }}"
                             class="d-inline"
@@ -151,7 +170,7 @@
                 </tr>
                 {% else %}
                 <tr>
-                  <td colspan="5" class="text-center text-muted py-4">Aucun utilisateur.</td>
+                  <td colspan="6" class="text-center text-muted py-4">Aucun utilisateur.</td>
                 </tr>
                 {% endfor %}
               </tbody>
