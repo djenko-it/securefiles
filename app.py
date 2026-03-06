@@ -424,6 +424,17 @@ def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS drop_tokens (
+                id              TEXT PRIMARY KEY,
+                owner_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                label           TEXT    DEFAULT '',
+                expiry          TIMESTAMP NOT NULL,
+                max_files       INTEGER DEFAULT 1,
+                files_deposited INTEGER DEFAULT 0,
+                created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
 
         # ── Migrations ────────────────────────────────────────────────────────
         existing_files = {r[1] for r in conn.execute('PRAGMA table_info(files)')}
@@ -1603,10 +1614,32 @@ def dashboard():
                           if max_files > 0 else None,
     }
 
-    drop_url = url_for('drop_zone', drop_token=current_user.drop_token, _external=True)
-    return render_template('dashboard.html', files=files, drop_url=drop_url,
-                           drop_enabled=current_user.drop_enabled, settings=settings,
-                           quota=quota)
+    # ── Liens de dépôt temporaires ────────────────────────────────────────────
+    rows = g.db.execute(
+        'SELECT id, label, expiry, max_files, files_deposited '
+        'FROM drop_tokens WHERE owner_id = ? ORDER BY created_at DESC',
+        (current_user.id,)
+    ).fetchall()
+    now_dt = datetime.now()
+    drop_tokens = []
+    for tid, label, expiry_str, max_files, files_dep in rows:
+        expiry_dt = _parse_expiry(expiry_str)
+        is_expired   = now_dt > expiry_dt
+        is_exhausted = (max_files > 0 and files_dep >= max_files)
+        drop_tokens.append({
+            'id':              tid,
+            'label':           label or '(sans nom)',
+            'expiry':          expiry_dt.strftime('%d/%m/%Y %H:%M'),
+            'expired':         is_expired,
+            'exhausted':       is_exhausted,
+            'active':          not is_expired and not is_exhausted,
+            'max_files':       max_files,
+            'files_deposited': files_dep,
+            'url':             url_for('drop_zone', drop_token=tid, _external=True),
+        })
+
+    return render_template('dashboard.html', files=files, drop_tokens=drop_tokens,
+                           settings=settings, quota=quota)
 
 
 @app.route('/delete/<file_id>', methods=['POST'])
@@ -1623,13 +1656,49 @@ def delete_file(file_id):
     return redirect(url_for('dashboard'))
 
 
-@app.route('/profile/drop-toggle', methods=['POST'])
+# ── Liens de dépôt temporaires ────────────────────────────────────────────────
+@app.route('/profile/drop-create', methods=['POST'])
 @login_required
-def profile_drop_toggle():
-    new_val = 0 if current_user.drop_enabled else 1
-    g.db.execute('UPDATE users SET drop_enabled = ? WHERE id = ?', (new_val, current_user.id))
+def drop_create():
+    label     = request.form.get('label', '').strip()[:64]
+    duration  = request.form.get('duration', '24h')
+    max_files = request.form.get('max_files', '1')
+
+    duration_map = {
+        '1h':  timedelta(hours=1),
+        '24h': timedelta(hours=24),
+        '7d':  timedelta(days=7),
+        '30d': timedelta(days=30),
+    }
+    delta  = duration_map.get(duration, timedelta(hours=24))
+    expiry = datetime.now() + delta
+
+    try:
+        max_files_int = int(max_files)
+        if max_files_int not in (1, 3, 5, 10, 0):
+            max_files_int = 1
+    except ValueError:
+        max_files_int = 1
+
+    token_id = str(uuid.uuid4())
+    g.db.execute(
+        'INSERT INTO drop_tokens (id, owner_id, label, expiry, max_files) VALUES (?, ?, ?, ?, ?)',
+        (token_id, current_user.id, label, expiry.strftime('%Y-%m-%d %H:%M:%S'), max_files_int),
+    )
     g.db.commit()
-    audit_log('drop_toggle', details='activé' if new_val else 'désactivé')
+    audit_log('drop_create', target=token_id,
+              details=f"label={label} expiry={expiry.strftime('%Y-%m-%d %H:%M')} max={max_files_int}")
+    return redirect(url_for('dashboard'))
+
+
+@app.route('/profile/drop-delete/<token_id>', methods=['POST'])
+@login_required
+def drop_delete(token_id):
+    _require_uuid(token_id)
+    g.db.execute('DELETE FROM drop_tokens WHERE id = ? AND owner_id = ?',
+                 (token_id, current_user.id))
+    g.db.commit()
+    audit_log('drop_delete', target=token_id)
     return redirect(url_for('dashboard'))
 
 
@@ -1637,47 +1706,107 @@ def profile_drop_toggle():
 @app.route('/drop/<drop_token>', methods=['GET', 'POST'])
 @limiter.limit("20 per hour")
 def drop_zone(drop_token):
-    cur      = g.db.execute('SELECT id, username, drop_enabled FROM users WHERE drop_token = ?', (drop_token,))
-    user_row = cur.fetchone()
-    if not user_row or not user_row[2]:
+    now = datetime.now()
+    cur = g.db.execute(
+        'SELECT dt.id, dt.owner_id, dt.expiry, dt.max_files, dt.files_deposited, u.username '
+        'FROM drop_tokens dt JOIN users u ON u.id = dt.owner_id '
+        'WHERE dt.id = ?', (drop_token,)
+    )
+    row = cur.fetchone()
+    if not row:
         return redirect(url_for('file_not_found'))
-    recipient_id, recipient_name, _ = user_row
 
-    success = False
+    token_id, recipient_id, expiry_str, max_files, files_deposited, recipient_name = row
+    expiry    = _parse_expiry(expiry_str)
+    settings  = get_settings()
+
+    if now > expiry:
+        return render_template('drop.html', recipient=recipient_name, drop_token=drop_token,
+                               success=False, expired=True, exhausted=False,
+                               remaining=None, settings=settings)
+
+    if max_files > 0 and files_deposited >= max_files:
+        return render_template('drop.html', recipient=recipient_name, drop_token=drop_token,
+                               success=False, expired=False, exhausted=True,
+                               remaining=0, settings=settings)
+
+    remaining = (max_files - files_deposited) if max_files > 0 else None
+    success   = False
+
     if request.method == 'POST':
         file        = request.files.get('file')
         sender_name = request.form.get('sender_name', '').strip()[:64] or 'Anonyme'
-        # Nettoyage XSS : conserver uniquement caractères sûrs
         sender_name = ''.join(c for c in sender_name if c.isprintable() and c not in '<>"&\'')
+
         if file and allowed_file(file.filename):
+            raw_data = file.read()
+
+            # Vérification quota stockage du destinataire
+            max_storage_mb = int(settings['max_storage_mb'])
+            if max_storage_mb > 0:
+                all_ids    = g.db.execute('SELECT id FROM files WHERE owner_id = ?',
+                                          (recipient_id,)).fetchall()
+                used_bytes = sum(
+                    os.path.getsize(os.path.join(app.config['UPLOAD_FOLDER'], fid))
+                    for (fid,) in all_ids
+                    if os.path.exists(os.path.join(app.config['UPLOAD_FOLDER'], fid))
+                )
+                if used_bytes + len(raw_data) > max_storage_mb * 1048576:
+                    flash("Le destinataire n'a plus d'espace de stockage disponible.", 'danger')
+                    return render_template('drop.html', recipient=recipient_name,
+                                           drop_token=drop_token, success=False,
+                                           expired=False, exhausted=False,
+                                           remaining=remaining, settings=settings)
+
+            # Vérification quota fichiers du destinataire
+            max_files_user = int(settings['max_files_per_user'])
+            if max_files_user > 0:
+                file_count = g.db.execute(
+                    'SELECT COUNT(*) FROM files WHERE owner_id = ?', (recipient_id,)
+                ).fetchone()[0]
+                if file_count >= max_files_user:
+                    flash("Le destinataire a atteint son quota de fichiers.", 'danger')
+                    return render_template('drop.html', recipient=recipient_name,
+                                           drop_token=drop_token, success=False,
+                                           expired=False, exhausted=False,
+                                           remaining=remaining, settings=settings)
+
             file_id     = str(uuid.uuid4())
-            settings    = get_settings()
             expiry_time = get_expiry_time(settings['default_expiry'])
             dest        = os.path.join(app.config['UPLOAD_FOLDER'], file_id)
             os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
             try:
-                raw_data = file.read()
                 with open(dest, 'wb') as fh:
                     fh.write(_encrypt(raw_data))
             except OSError:
                 flash("Erreur interne lors de l'enregistrement.", 'danger')
                 return render_template('drop.html', recipient=recipient_name,
                                        drop_token=drop_token, success=False,
-                                       settings=get_settings())
+                                       expired=False, exhausted=False,
+                                       remaining=remaining, settings=settings)
+
             g.db.execute(
                 'INSERT INTO files (id, filename, original_filename, expiry, max_downloads, owner_id, deposited_by)'
                 ' VALUES (?, ?, ?, ?, ?, ?, ?)',
-                (file_id, file_id, secure_filename(file.filename), expiry_time, 'unlimited', recipient_id, sender_name),
+                (file_id, file_id, secure_filename(file.filename), expiry_time,
+                 'unlimited', recipient_id, sender_name),
+            )
+            g.db.execute(
+                'UPDATE drop_tokens SET files_deposited = files_deposited + 1 WHERE id = ?',
+                (token_id,)
             )
             g.db.commit()
             audit_log('drop_upload', target=file_id,
                       details=f"{file.filename} pour {recipient_name} par {sender_name}")
-            success = True
+            success   = True
+            remaining = max(0, remaining - 1) if remaining is not None else None
         else:
             flash('Type de fichier non autorisé.', 'danger')
 
-    return render_template('drop.html', recipient=recipient_name,
-                           drop_token=drop_token, success=success, settings=get_settings())
+    return render_template('drop.html', recipient=recipient_name, drop_token=drop_token,
+                           success=success, expired=False, exhausted=False,
+                           remaining=remaining, expiry=expiry.strftime('%d/%m/%Y à %H:%M'),
+                           settings=settings)
 
 
 # ── Administration ────────────────────────────────────────────────────────────

@@ -61,40 +61,119 @@
     </div>
     {% endif %}
 
-    <!-- Lien de dépôt -->
+    <!-- Liens de dépôt temporaires -->
     <div class="card mb-4">
       <div class="card-body p-4">
-        <div class="d-flex justify-content-between align-items-center mb-2">
+        <div class="d-flex justify-content-between align-items-center mb-3">
           <p class="fw-semibold mb-0" style="font-size:.8rem; letter-spacing:.05em; text-transform:uppercase; color:#6c757d;">
-            <i class="fas fa-inbox me-2"></i>Mon lien de dépôt
+            <i class="fas fa-inbox me-2"></i>Liens de dépôt
           </p>
-          <form method="post" action="{{ url_for('profile_drop_toggle') }}" id="drop-toggle-form">
+          <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#newDropModal">
+            <i class="fas fa-plus me-1"></i>Nouveau lien
+          </button>
+        </div>
+
+        {% set active_drops = drop_tokens | selectattr('active') | list %}
+        {% set inactive_drops = drop_tokens | rejectattr('active') | list %}
+
+        {% if drop_tokens %}
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead style="font-size:.8rem; color:#6c757d;">
+              <tr><th>Nom</th><th>Expire le</th><th>Utilisations</th><th>Lien</th><th></th></tr>
+            </thead>
+            <tbody>
+              {% for dt in drop_tokens %}
+              <tr class="{{ 'text-muted opacity-50' if not dt.active }}">
+                <td>
+                  <span class="fw-medium">{{ dt.label }}</span>
+                  {% if dt.expired %}
+                    <span class="badge bg-secondary ms-1" style="font-size:.65rem;">Expiré</span>
+                  {% elif dt.exhausted %}
+                    <span class="badge bg-warning text-dark ms-1" style="font-size:.65rem;">Épuisé</span>
+                  {% else %}
+                    <span class="badge bg-success ms-1" style="font-size:.65rem;">Actif</span>
+                  {% endif %}
+                </td>
+                <td><small>{{ dt.expiry }}</small></td>
+                <td>
+                  <small>
+                    {{ dt.files_deposited }} /
+                    {% if dt.max_files == 0 %}∞{% else %}{{ dt.max_files }}{% endif %}
+                  </small>
+                </td>
+                <td>
+                  {% if dt.active %}
+                  <button class="btn btn-link btn-sm p-0 text-muted copy-drop-link-btn"
+                          data-url="{{ dt.url }}" title="Copier le lien">
+                    <i class="fas fa-copy"></i>
+                  </button>
+                  {% endif %}
+                </td>
+                <td class="text-end">
+                  <form method="post" action="{{ url_for('drop_delete', token_id=dt.id) }}"
+                        onsubmit="return confirm('Supprimer ce lien de dépôt ?')">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="btn btn-sm btn-link text-danger p-0" type="submit" title="Supprimer">
+                      <i class="fas fa-trash-can"></i>
+                    </button>
+                  </form>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="text-muted small mb-0">
+          Aucun lien de dépôt. Créez-en un pour permettre à quelqu'un de vous envoyer des fichiers sans compte.
+        </p>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Modal nouveau lien de dépôt -->
+    <div class="modal fade" id="newDropModal" tabindex="-1" aria-labelledby="newDropModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <form method="post" action="{{ url_for('drop_create') }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <div class="form-check form-switch mb-0 d-flex align-items-center gap-2">
-              <input class="form-check-input" type="checkbox" id="drop-toggle-switch" role="switch"
-                     style="width:2.2em; height:1.2em; cursor:pointer;"
-                     {{ 'checked' if drop_enabled else '' }}>
-              <label class="form-check-label small text-muted" for="drop-toggle-switch" style="cursor:pointer;">
-                {{ 'Activé' if drop_enabled else 'Désactivé' }}
-              </label>
+            <div class="modal-header">
+              <h5 class="modal-title" id="newDropModalLabel"><i class="fas fa-inbox me-2"></i>Nouveau lien de dépôt</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+              <div class="mb-3">
+                <label class="form-label small fw-semibold">Nom (optionnel)</label>
+                <input type="text" name="label" class="form-control" maxlength="64"
+                       placeholder="ex. Factures client, Candidatures…">
+              </div>
+              <div class="mb-3">
+                <label class="form-label small fw-semibold">Expire dans</label>
+                <select name="duration" class="form-select">
+                  <option value="1h">1 heure</option>
+                  <option value="24h" selected>24 heures</option>
+                  <option value="7d">7 jours</option>
+                  <option value="30d">30 jours</option>
+                </select>
+              </div>
+              <div class="mb-0">
+                <label class="form-label small fw-semibold">Nombre max de fichiers acceptés</label>
+                <select name="max_files" class="form-select">
+                  <option value="1" selected>1 fichier</option>
+                  <option value="3">3 fichiers</option>
+                  <option value="5">5 fichiers</option>
+                  <option value="10">10 fichiers</option>
+                  <option value="0">Illimité</option>
+                </select>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+              <button type="submit" class="btn btn-primary"><i class="fas fa-plus me-1"></i>Créer le lien</button>
             </div>
           </form>
         </div>
-
-        {% if drop_enabled %}
-          <p class="text-muted small mb-2">Partagez ce lien pour recevoir des fichiers sans que l'expéditeur ait besoin d'un compte :</p>
-          <div class="input-group" style="max-width:600px;">
-            <input id="drop-url" type="text" class="form-control font-monospace small" value="{{ drop_url }}" readonly>
-            <button id="copy-drop-btn" class="btn btn-outline-primary" type="button"><i class="fas fa-copy"></i></button>
-          </div>
-          <div id="copy-drop-ok" class="text-success small mt-1" style="display:none;">
-            <i class="fas fa-check me-1"></i>Lien copié !
-          </div>
-        {% else %}
-          <p class="text-muted small mb-0 opacity-75">
-            Activez ce lien pour permettre à n'importe qui de vous envoyer des fichiers sans compte.
-          </p>
-        {% endif %}
       </div>
     </div>
 
@@ -264,28 +343,15 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
-    const dropSwitch = document.getElementById('drop-toggle-switch')
-    if (dropSwitch) {
-      dropSwitch.addEventListener('change', function () {
-        if (!this.checked && !confirm('Désactiver le lien de dépôt ? Les personnes ayant votre lien ne pourront plus vous envoyer de fichiers.')) {
-          this.checked = true
-          return
-        }
-        document.getElementById('drop-toggle-form').submit()
-      })
-    }
-
-    const copyDropBtn = document.getElementById('copy-drop-btn')
-    if (copyDropBtn) {
-      copyDropBtn.addEventListener('click', function () {
-        navigator.clipboard.writeText(document.getElementById('drop-url').value).then(() => {
-          const ok = document.getElementById('copy-drop-ok')
-          ok.style.display = 'block'
-          this.innerHTML = '<i class="fas fa-check"></i>'
-          setTimeout(() => { ok.style.display = 'none'; this.innerHTML = '<i class="fas fa-copy"></i>' }, 2500)
+    document.querySelectorAll('.copy-drop-link-btn').forEach(btn => {
+      btn.addEventListener('click', function () {
+        navigator.clipboard.writeText(this.dataset.url).then(() => {
+          const icon = this.querySelector('i')
+          icon.className = 'fas fa-check text-success'
+          setTimeout(() => icon.className = 'fas fa-copy', 2000)
         })
       })
-    }
+    })
 
     document.querySelectorAll('.copy-link-btn').forEach(btn => {
       btn.addEventListener('click', function () {
