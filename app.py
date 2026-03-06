@@ -28,6 +28,7 @@ from flask_wtf import FlaskForm
 from flask_wtf.csrf import CSRFProtect
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.utils import secure_filename
 from wtforms import (BooleanField, FileField, IntegerField, PasswordField,
                      SelectField, StringField, SubmitField, TextAreaField)
 from wtforms.validators import DataRequired, EqualTo, Length, NumberRange, Optional
@@ -726,7 +727,7 @@ def upload_file():
     g.db.execute(
         'INSERT INTO files (id, filename, original_filename, expiry, max_downloads, password, owner_id)'
         ' VALUES (?, ?, ?, ?, ?, ?, ?)',
-        (file_id, file_id, file.filename, expiry_time, max_downloads, hashed_password, current_user.id),
+        (file_id, file_id, secure_filename(file.filename), expiry_time, max_downloads, hashed_password, current_user.id),
     )
     g.db.commit()
 
@@ -924,6 +925,7 @@ def bundle_create():
 
 @app.route('/bundle/<bundle_id>', methods=['GET', 'POST'])
 def bundle_download(bundle_id):
+    _require_uuid(bundle_id)
     row = g.db.execute(
         'SELECT file_ids, password FROM bundles WHERE id = ?', (bundle_id,)
     ).fetchone()
@@ -986,6 +988,7 @@ def bundle_download(bundle_id):
 
 @app.route('/bundle/<bundle_id>/zip')
 def bundle_zip(bundle_id):
+    _require_uuid(bundle_id)
     row = g.db.execute(
         'SELECT file_ids, password FROM bundles WHERE id = ?', (bundle_id,)
     ).fetchone()
@@ -1020,9 +1023,9 @@ def bundle_zip(bundle_id):
             try:
                 with open(path, 'rb') as fh:
                     raw = fh.read()
-            except OSError:
+                zf.writestr(fname, _decrypt(raw))
+            except (OSError, InvalidToken):
                 continue
-            zf.writestr(fname, _decrypt(raw))
             g.db.execute('UPDATE files SET views = views + 1 WHERE id = ?', (fid,))
             added += 1
 
@@ -1120,7 +1123,7 @@ def login():
             login_user(user)
             audit_log('login')
             next_url = request.args.get('next', '')
-            return redirect(next_url if next_url and not urlparse(next_url).netloc else url_for('dashboard'))
+            return redirect(next_url if next_url and next_url.startswith('/') else url_for('dashboard'))
 
         # ── Échec : incrémenter le compteur ──────────────────────────────────
         if user:
@@ -1181,7 +1184,12 @@ def mfa_totp_verify():
     if not user:
         return redirect(url_for('login'))
     code = request.form.get('totp_code', '').strip()
-    secret = _decrypt_secret(user.totp_secret)
+    try:
+        secret = _decrypt_secret(user.totp_secret)
+    except Exception:
+        app.logger.error("Impossible de déchiffrer le secret TOTP pour user %s", user.id)
+        flash('Erreur interne MFA. Contactez l\'administrateur.', 'danger')
+        return redirect(url_for('mfa_verify'))
     if secret and pyotp.TOTP(secret).verify(code, valid_window=1):
         session.clear()
         login_user(user)
@@ -1632,7 +1640,7 @@ def drop_zone(drop_token):
             g.db.execute(
                 'INSERT INTO files (id, filename, original_filename, expiry, max_downloads, owner_id, deposited_by)'
                 ' VALUES (?, ?, ?, ?, ?, ?, ?)',
-                (file_id, file_id, file.filename, expiry_time, 'unlimited', recipient_id, sender_name),
+                (file_id, file_id, secure_filename(file.filename), expiry_time, 'unlimited', recipient_id, sender_name),
             )
             g.db.commit()
             audit_log('drop_upload', target=file_id,
