@@ -202,19 +202,33 @@
       </div>
 
       {% if current_user.has_webauthn %}
-        <p class="text-muted small mb-2">Une clé de sécurité est enregistrée.</p>
-        <form method="post" action="{{ url_for('webauthn_delete') }}"
-              onsubmit="return confirm('Supprimer cette clé de sécurité ?')">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button class="btn btn-sm btn-outline-danger">
-            <i class="fas fa-trash me-1"></i>Supprimer
-          </button>
-        </form>
+        <div class="d-flex align-items-start gap-3 mb-3 p-3 rounded border">
+          <div class="text-primary mt-1"><i class="fas fa-usb fa-lg"></i></div>
+          <div class="flex-grow-1">
+            <div class="fw-medium">
+              {{ current_user.webauthn_label or 'Clé de sécurité' }}
+            </div>
+            <div class="text-muted small">
+              <i class="fas fa-clock-rotate-left me-1"></i>Utilisée {{ current_user.webauthn_sign_count }} fois
+            </div>
+          </div>
+          <form method="post" action="{{ url_for('webauthn_delete') }}"
+                onsubmit="return confirm('Supprimer cette clé de sécurité ?')">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-sm btn-outline-danger" title="Supprimer">
+              <i class="fas fa-trash"></i>
+            </button>
+          </form>
+        </div>
       {% else %}
         <p class="text-muted small mb-2">Utilisez une clé USB, Touch ID ou Windows Hello comme second facteur.</p>
-        <button id="webauthn-register-btn" class="btn btn-sm btn-primary">
-          <i class="fas fa-plus me-1"></i>Enregistrer une clé
-        </button>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <input id="webauthn-label-input" type="text" class="form-control form-control-sm"
+                 placeholder="Nom de la clé (optionnel)" style="max-width:220px;">
+          <button id="webauthn-register-btn" class="btn btn-sm btn-primary">
+            <i class="fas fa-plus me-1"></i>Enregistrer
+          </button>
+        </div>
         <div id="webauthn-status" class="small mt-2" style="display:none"></div>
       {% endif %}
     </div>
@@ -292,10 +306,12 @@ if (waBtn) {
       const cred = await navigator.credentials.create({publicKey: options});
 
       // 4. Send
+      const labelInput = document.getElementById('webauthn-label-input');
       const body = JSON.stringify({
         id: cred.id,
         rawId: bufferToB64url(cred.rawId),
         type: cred.type,
+        label: labelInput ? labelInput.value.trim() : '',
         response: {
           attestationObject: bufferToB64url(cred.response.attestationObject),
           clientDataJSON:    bufferToB64url(cred.response.clientDataJSON),

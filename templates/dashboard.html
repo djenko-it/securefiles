@@ -36,6 +36,31 @@
 
   <main class="container pb-5" style="max-width: 900px;">
 
+    <!-- Alerte quota critique -->
+    {% if quota.storage_pct is not none and quota.storage_pct >= 90 %}
+    <div class="alert alert-danger d-flex align-items-center gap-2 mb-4" role="alert">
+      <i class="fas fa-triangle-exclamation flex-shrink-0"></i>
+      <span>
+        {% if quota.storage_pct >= 100 %}
+          Espace de stockage <strong>plein</strong> — vous ne pouvez plus envoyer de fichiers.
+        {% else %}
+          Espace de stockage presque plein (<strong>{{ quota.storage_pct }} %</strong> utilisé). Supprimez des fichiers ou contactez l'administrateur.
+        {% endif %}
+      </span>
+    </div>
+    {% elif quota.file_pct is not none and quota.file_pct >= 90 %}
+    <div class="alert alert-warning d-flex align-items-center gap-2 mb-4" role="alert">
+      <i class="fas fa-triangle-exclamation flex-shrink-0"></i>
+      <span>
+        {% if quota.file_pct >= 100 %}
+          Nombre de fichiers <strong>maximum atteint</strong> — vous ne pouvez plus envoyer de fichiers.
+        {% else %}
+          Nombre de fichiers presque atteint (<strong>{{ quota.file_pct }} %</strong>). Supprimez des fichiers ou contactez l'administrateur.
+        {% endif %}
+      </span>
+    </div>
+    {% endif %}
+
     <!-- Lien de dépôt -->
     <div class="card mb-4">
       <div class="card-body p-4">

@@ -195,6 +195,7 @@ class User(UserMixin):
     def __init__(self, id, username, password, drop_token, is_admin=False,
                  totp_secret=None, webauthn_credential_id=None,
                  webauthn_public_key=None, webauthn_sign_count=0,
+                 webauthn_label=None,
                  theme='light', avatar_color='#4361ee', drop_enabled=True,
                  sso_user=False):
         self.id                     = id
@@ -206,6 +207,7 @@ class User(UserMixin):
         self.webauthn_credential_id = webauthn_credential_id
         self.webauthn_public_key    = webauthn_public_key
         self.webauthn_sign_count    = webauthn_sign_count or 0
+        self.webauthn_label         = webauthn_label
         self.theme                  = theme or 'light'
         self.avatar_color           = avatar_color or '#4361ee'
         self.drop_enabled           = bool(drop_enabled) if drop_enabled is not None else True
@@ -230,7 +232,7 @@ class User(UserMixin):
 
 _USER_COLS = ('id, username, password, drop_token, is_admin, '
               'totp_secret, webauthn_credential_id, webauthn_public_key, '
-              'webauthn_sign_count, theme, avatar_color, drop_enabled, sso_user')
+              'webauthn_sign_count, webauthn_label, theme, avatar_color, drop_enabled, sso_user')
 
 
 def _load_user_by(column, value):
@@ -428,6 +430,7 @@ def init_db():
             ('webauthn_credential_id', 'TEXT'),
             ('webauthn_public_key',    'TEXT'),
             ('webauthn_sign_count',    'INTEGER DEFAULT 0'),
+            ('webauthn_label',         'TEXT'),
             ('theme',                  "TEXT DEFAULT 'light'"),
             ('avatar_color',           "TEXT DEFAULT '#4361ee'"),
             ('drop_enabled',           'INTEGER DEFAULT 1'),
@@ -1513,9 +1516,10 @@ def webauthn_register_complete():
 
     cred_id = base64.b64encode(verification.credential_id).decode()
     pub_key = base64.b64encode(verification.credential_public_key).decode()
+    label = (request.json.get('label') or '').strip()[:64] or None
     g.db.execute(
-        'UPDATE users SET webauthn_credential_id=?, webauthn_public_key=?, webauthn_sign_count=? WHERE id=?',
-        (cred_id, pub_key, verification.sign_count, current_user.id),
+        'UPDATE users SET webauthn_credential_id=?, webauthn_public_key=?, webauthn_sign_count=?, webauthn_label=? WHERE id=?',
+        (cred_id, pub_key, verification.sign_count, label, current_user.id),
     )
     g.db.commit()
     audit_log('webauthn_register', details='Clé de sécurité enregistrée')
@@ -1526,7 +1530,7 @@ def webauthn_register_complete():
 @login_required
 def webauthn_delete():
     g.db.execute(
-        'UPDATE users SET webauthn_credential_id=NULL, webauthn_public_key=NULL, webauthn_sign_count=0 WHERE id=?',
+        'UPDATE users SET webauthn_credential_id=NULL, webauthn_public_key=NULL, webauthn_sign_count=0, webauthn_label=NULL WHERE id=?',
         (current_user.id,),
     )
     g.db.commit()
@@ -1983,6 +1987,26 @@ def file_not_found():
 @app.route('/file_expired')
 def file_expired():
     return render_template('file_expired.html', settings=get_settings())
+
+
+# ── Gestionnaires d'erreurs HTTP ─────────────────────────────────────────────
+def _error_theme():
+    return current_user.theme if current_user.is_authenticated else 'light'
+
+
+@app.errorhandler(404)
+def page_not_found(e):
+    return render_template('404.html', settings=get_settings(), user_theme=_error_theme()), 404
+
+
+@app.errorhandler(403)
+def forbidden(e):
+    return render_template('403.html', settings=get_settings(), user_theme=_error_theme()), 403
+
+
+@app.errorhandler(500)
+def internal_error(e):
+    return render_template('500.html', settings=get_settings(), user_theme=_error_theme()), 500
 
 
 if __name__ == '__main__':
