@@ -648,6 +648,7 @@ def index():
 
 @app.route('/upload', methods=['POST'])
 @login_required
+@limiter.limit("30 per hour")
 def upload_file():
     file = request.files.get('file')
     if not file or not allowed_file(file.filename):
@@ -841,7 +842,10 @@ def download_direct(file_id):
     except OSError:
         return redirect(url_for('file_not_found'))
 
-    data = _decrypt(raw)
+    try:
+        data = _decrypt(raw)
+    except InvalidToken:
+        return redirect(url_for('file_not_found'))
     return send_file(io.BytesIO(data), as_attachment=True, download_name=original_filename)
 
 
@@ -883,7 +887,10 @@ def preview_file(file_id):
     except OSError:
         abort(404)
 
-    data = _decrypt(raw)
+    try:
+        data = _decrypt(raw)
+    except InvalidToken:
+        abort(404)
     mime_type, _ = mimetypes.guess_type(original_filename)
     return send_file(
         io.BytesIO(data),
@@ -896,6 +903,7 @@ def preview_file(file_id):
 # ── Bundles (archives ZIP multi-fichiers) ─────────────────────────────────────
 @app.route('/bundle/create', methods=['POST'])
 @login_required
+@limiter.limit("20 per hour")
 def bundle_create():
     data = request.get_json(silent=True) or {}
     file_ids = data.get('file_ids', [])
@@ -933,7 +941,10 @@ def bundle_download(bundle_id):
         return redirect(url_for('file_not_found'))
 
     file_ids_json, hashed_password = row
-    file_ids = json.loads(file_ids_json)
+    try:
+        file_ids = json.loads(file_ids_json)
+    except (ValueError, TypeError):
+        return redirect(url_for('file_not_found'))
 
     valid_files = []
     earliest_expiry = None
@@ -996,7 +1007,10 @@ def bundle_zip(bundle_id):
         return redirect(url_for('file_not_found'))
 
     file_ids_json, hashed_password = row
-    file_ids = json.loads(file_ids_json)
+    try:
+        file_ids = json.loads(file_ids_json)
+    except (ValueError, TypeError):
+        return redirect(url_for('file_not_found'))
 
     if hashed_password:
         auth_ts = session.get(f'auth_bundle_{bundle_id}')
@@ -1123,7 +1137,7 @@ def login():
             login_user(user)
             audit_log('login')
             next_url = request.args.get('next', '')
-            return redirect(next_url if next_url and next_url.startswith('/') else url_for('dashboard'))
+            return redirect(next_url if next_url and next_url.startswith('/') and not next_url.startswith('//') else url_for('dashboard'))
 
         # ── Échec : incrémenter le compteur ──────────────────────────────────
         if user:
@@ -1317,7 +1331,7 @@ def profile_change_theme():
         theme = 'light'
     g.db.execute('UPDATE users SET theme = ? WHERE id = ?', (theme, current_user.id))
     g.db.commit()
-    return redirect(request.referrer or url_for('profile'))
+    return redirect(url_for('profile'))
 
 
 @app.route('/profile/avatar-color', methods=['POST'])
@@ -1603,7 +1617,7 @@ def profile_drop_toggle():
     g.db.execute('UPDATE users SET drop_enabled = ? WHERE id = ?', (new_val, current_user.id))
     g.db.commit()
     audit_log('drop_toggle', details='activé' if new_val else 'désactivé')
-    return redirect(request.referrer or url_for('dashboard'))
+    return redirect(url_for('dashboard'))
 
 
 # ── Zone de dépôt ─────────────────────────────────────────────────────────────
