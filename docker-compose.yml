@@ -4,8 +4,12 @@ services:
   web:
     build: .
     ports:
-      - "5000:5000"
+      - "127.0.0.1:5000:5000"   # accessible uniquement depuis localhost (proxy HTTPS en frontal)
     env_file:
       - .env
     volumes:
-      - .:/app
+      - app_data:/app/data       # DB SQLite + fichiers uploadés (persistants)
+    restart: unless-stopped
+
+volumes:
+  app_data:

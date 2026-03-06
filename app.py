@@ -62,6 +62,13 @@ if not _secret_key or _secret_key == 'supersecretkey':
         "par exemple : python -c \"import secrets; print(secrets.token_hex(32))\""
     )
 app.secret_key = _secret_key
+app.config.update(
+    SESSION_COOKIE_SECURE=True,    # cookie uniquement sur HTTPS
+    SESSION_COOKIE_HTTPONLY=True,  # inaccessible au JS
+    SESSION_COOKIE_SAMESITE='Lax', # protection CSRF de base
+    REMEMBER_COOKIE_SECURE=True,
+    REMEMBER_COOKIE_HTTPONLY=True,
+)
 csrf = CSRFProtect(app)
 logging.basicConfig(level=logging.INFO)
 
@@ -77,8 +84,8 @@ login_manager.login_view = 'login'
 login_manager.login_message = 'Veuillez vous connecter pour accéder à cette page.'
 login_manager.login_message_category = 'warning'
 
-DATABASE      = '/app/messages.db'
-UPLOAD_FOLDER = '/app/data'
+DATABASE      = '/app/data/messages.db'
+UPLOAD_FOLDER = '/app/data/uploads'
 
 SETTINGS_DEFAULTS = {
     'app_name':           'FileShareApp',
@@ -364,6 +371,8 @@ def get_db():
 
 
 def init_db():
+    os.makedirs(os.path.dirname(DATABASE), exist_ok=True)
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
     with sqlite3.connect(DATABASE) as conn:
         conn.execute('PRAGMA journal_mode=WAL')
         conn.execute('''
@@ -2011,4 +2020,4 @@ def internal_error(e):
 
 if __name__ == '__main__':
     init_db()
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=False)
