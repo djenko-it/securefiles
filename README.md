@@ -1,247 +1,122 @@
 # SecureFiles
 
-Application web de **partage sécurisé de fichiers** auto-hébergée. Déposez un fichier, obtenez un lien unique, configurez une expiration et un mot de passe — rien de plus.
+**Alternative self-hostée à WeTransfer.** Partagez des fichiers de façon éphémère, chiffrée et maîtrisée — sans dépendre d'un tiers.
+
+---
+
+## Pourquoi SecureFiles ?
+
+Les services de partage grand public (WeTransfer, Smash, Filemail…) traitent vos fichiers sur leurs infrastructures. SecureFiles vous rend le contrôle : vous choisissez le serveur, les règles d'accès et la durée de vie des données.
+
+- **Vos données restent chez vous** — aucun tiers n'a accès à vos fichiers
+- **Chiffrement au repos** — les fichiers sont chiffrés sur le disque (AES-128)
+- **Éphémère par nature** — expiration automatique, suppression après téléchargement
+- **Déploiement simple** — un `docker compose up` suffit
+
+---
 
 ## Fonctionnalités
 
 ### Partage de fichiers
 
-#### Glisser-déposer
-Interface drag & drop intuitive pour déposer des fichiers sans formulaire.
-
-#### Lien unique
-Chaque fichier reçoit un identifiant UUID non devinable, non listé.
-
-#### Expiration configurable
-Choisissez la durée de validité du lien : 3 heures · 1 jour · 1 semaine · 1 mois.
-
-#### Limite de téléchargements
-Définissez un quota de téléchargements : 1 / 5 / 10 / illimité.
-
-#### Protection par mot de passe
-Protégez l'accès au fichier par un mot de passe haché en PBKDF2-SHA256 via Werkzeug.
-
-#### Suppression à la lecture
-Option pour autodétruire le fichier dès le premier téléchargement.
-
-#### Lien de dépôt personnel
-Token unique par utilisateur permettant à n'importe qui de lui envoyer un fichier sans créer de compte.
-
-### Sécurité
-
-#### Chiffrement Fernet
-Fichiers chiffrés au repos avec Fernet (AES-128-CBC).
-
-#### Protection CSRF
-Flask-WTF actif sur tous les formulaires POST.
-
-#### Rate limiting
-Flask-Limiter + Redis : 200 requêtes/jour · 50 requêtes/heure par IP.
-
-#### Extensions bloquées
-`exe` `bat` `cmd` `sh` `msi` `dll` `com` `scr` `vbs` `ps1` — liste configurable depuis le panel admin.
-
-#### Taille maximale
-Limite configurable via le panel d'administration (défaut : 16 Mo).
+| Fonctionnalité | Détail |
+|---|---|
+| Drag & drop | Dépôt par glisser-lâcher ou clic |
+| Lien unique | Identifiant UUID non devinable, non listé |
+| Expiration | 3 h · 1 j · 1 sem · 1 mois — ou valeur par défaut admin |
+| Limite de téléchargements | 1 / 5 / 10 / illimité |
+| Protection par mot de passe | Accès conditionné à un mot de passe |
+| Autodestruction | Suppression dès le premier téléchargement |
+| Lien de dépôt | Recevez des fichiers sans que l'expéditeur ait un compte |
 
 ### Authentification & Comptes
 
-#### Inscription / Connexion
-Système de comptes utilisateurs avec mot de passe (10 caractères minimum).
-
-#### MFA TOTP
-Authentification à deux facteurs via application (Google Authenticator, Authy…).
-
-#### MFA WebAuthn
-Clé de sécurité matérielle (YubiKey) ou passkey en option.
-
-#### Profil utilisateur
-Changement de mot de passe, avatar par initiale, couleur d'avatar personnalisable.
-
-#### Thème sombre
-Bascule clair/sombre persistée par compte.
-
-#### Dashboard
-Liste de tous ses fichiers avec statut (actif, expiré, épuisé) et actions rapides.
+| Fonctionnalité | Détail |
+|---|---|
+| SSO OIDC | Connexion via votre fournisseur d'identité (Keycloak, Authentik, Azure AD…) |
+| MFA TOTP | Google Authenticator, Authy ou compatible RFC 6238 |
+| MFA WebAuthn | Clé matérielle (YubiKey), Touch ID, Windows Hello |
+| Codes de récupération | Codes de secours en cas de perte du second facteur |
+| Verrouillage de compte | Blocage temporaire après tentatives échouées |
+| Thème clair / sombre | Préférence persistée par compte |
 
 ### Administration
 
-#### Panel d'administration
-Accessible aux comptes marqués administrateur via `/admin`.
-
-#### Gestion des utilisateurs
-Liste, suppression, promotion/rétrogradation au rôle administrateur.
-
-#### Paramètres globaux
-Nom de l'application, e-mail de contact, quotas, extensions bloquées, autorisation des inscriptions.
-
-#### Journal d'audit
-Traçabilité des actions sensibles : upload, téléchargement, suppression, connexion…
-
-#### Nettoyage automatique
-Purge planifiée des fichiers expirés ou dont le quota de téléchargements est épuisé.
-
-## Stack technique
-
-| Couche | Technologie |
+| Fonctionnalité | Détail |
 |---|---|
-| Backend | Python 3.9, Flask 2.0, Gunicorn |
-| Authentification | Flask-Login, Flask-WTF (CSRF) |
-| MFA | pyotp (TOTP), py_webauthn (WebAuthn) |
-| Base de données | SQLite (métadonnées fichiers et utilisateurs) |
-| Chiffrement | cryptography (Fernet / AES-128) |
-| Cache / Rate limit | Redis, Flask-Limiter |
-| Tâches planifiées | APScheduler |
-| Frontend | Jinja2, Bootstrap 4.5, Tailwind CSS 3, Font Awesome 5 |
-| Conteneurisation | Docker, Docker Compose |
+| Panel d'administration | Gestion centralisée depuis `/admin` |
+| Gestion des utilisateurs | Création, suppression, promotion admin |
+| Quotas | Limite de stockage et de fichiers par compte |
+| Extensions bloquées | Liste configurable (exe, bat, sh…) |
+| Inscriptions publiques | Activation / désactivation |
+| Journal d'audit | Traçabilité de toutes les actions sensibles |
+| Nettoyage automatique | Purge planifiée des fichiers expirés |
 
-## Prérequis
+---
+
+## Déploiement
+
+### Prérequis
 
 - [Docker](https://docs.docker.com/get-docker/) ≥ 20
-- [Docker Compose](https://docs.docker.com/compose/) ≥ 1.29
+- [Docker Compose](https://docs.docker.com/compose/) ≥ 2
 
-## Installation
-
-```bash
-git clone <url-du-dépôt>
-cd securefiles
-```
-
-Copiez le fichier d'environnement et adaptez les valeurs :
+### Démarrage rapide
 
 ```bash
-cp .env .env.local
+git clone <url-du-dépôt> && cd securefiles
+cp .env.example .env
 ```
 
-Démarrez l'application :
+Éditez `.env` et renseignez au minimum :
+
+```env
+# Générer avec : python -c "import secrets; print(secrets.token_hex(32))"
+SECRET_KEY=<clé aléatoire>
+
+# Générer avec : python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+ENCRYPTION_KEY=<clé Fernet>
+```
+
+Puis :
 
 ```bash
-docker compose up --build
+docker compose up -d --build
 ```
 
-L'application est accessible sur `http://localhost:5000`.
+L'application écoute sur `http://127.0.0.1:5000`. Placez un proxy HTTPS (nginx, Caddy…) devant.
 
-## Configuration
+### Variables d'environnement
 
-### Variables d'environnement (`.env`)
+| Variable | Description |
+|---|---|
+| `SECRET_KEY` | Clé secrète Flask — **obligatoire** |
+| `ENCRYPTION_KEY` | Clé Fernet pour le chiffrement des fichiers — **obligatoire** |
+| `WEBAUTHN_RP_ID` | Domaine de l'app (ex. `share.example.com`) — requis si WebAuthn |
+| `WEBAUTHN_RP_ORIGIN` | Origine complète (ex. `https://share.example.com`) — requis si WebAuthn |
+| `SSO_CLIENT_ID` | Client ID OIDC |
+| `SSO_CLIENT_SECRET` | Secret OIDC |
+| `SSO_DISCOVERY_URL` | URL de découverte OIDC (`.well-known/openid-configuration`) |
 
-| Variable | Défaut | Description |
-|---|---|---|
-| `SECRET_KEY` | `supersecretkey` | Clé secrète Flask — **à changer en production** |
-| `ENCRYPTION_KEY` | — | Clé Fernet — **générer une nouvelle clé en production** |
-| `REDIS_URL` | `redis://redis:6379/0` | URL de connexion Redis |
-| `FLASK_ENV` | `development` | Environnement Flask (`development` / `production`) |
-| `WEBAUTHN_RP_ID` | `localhost` | Domaine de l'application pour WebAuthn |
-| `WEBAUTHN_RP_ORIGIN` | `http://localhost:5000` | Origine complète pour WebAuthn |
+### Proxy HTTPS (exemple nginx)
 
-> **Important** — Ne commitez jamais votre `.env` avec des secrets réels. Ajoutez-le à `.gitignore` en production.
-
-### Paramètres d'application (panel admin)
-
-Les paramètres suivants sont modifiables depuis le panel d'administration (`/admin`) :
-
-| Paramètre | Défaut | Description |
-|---|---|---|
-| Nom de l'application | `FileShareApp` | Nom affiché dans l'interface |
-| E-mail de contact | — | Adresse affichée dans la modal Contact |
-| Taille max des fichiers | `16 Mo` | Taille maximale d'un fichier |
-| Extensions bloquées | `exe,bat,cmd…` | Liste des extensions interdites |
-| Autoriser les inscriptions | `oui` | Activer/désactiver l'inscription publique |
-| Expiration par défaut | `1 jour` | Durée d'expiration pré-sélectionnée |
-| Quota fichiers / utilisateur | `0` (illimité) | Nombre max de fichiers par compte |
-| Quota stockage / utilisateur | `0` (illimité) | Espace max par compte en Mo |
-
-### Générer une clé de chiffrement
-
-```python
-from cryptography.fernet import Fernet
-print(Fernet.generate_key().decode())
+```nginx
+location / {
+    proxy_pass http://127.0.0.1:5000;
+    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Host  $host;
+    proxy_set_header Host              $host;
+}
 ```
 
-## Utilisation
+---
 
-### Envoyer un fichier
+## Stack
 
-1. Ouvrez `http://localhost:5000`
-2. Glissez un fichier dans la zone de dépôt (ou cliquez pour parcourir)
-3. Dans la modale, définissez :
-   - Un mot de passe optionnel
-   - La durée de validité
-   - Le nombre maximal de téléchargements
-4. Cliquez sur **Téléverser** — un lien unique est généré
-5. Copiez et partagez le lien
+Python · Flask · Gunicorn · SQLite · Docker
 
-Le destinataire accède au fichier via le lien. Si un mot de passe a été défini, il lui sera demandé avant le téléchargement.
-
-### Créer un compte
-
-1. Rendez-vous sur `/register`
-2. Renseignez un nom d'utilisateur et un mot de passe (10 caractères minimum)
-3. Une fois connecté, accédez à votre **dashboard** pour gérer vos fichiers
-
-### Activer le MFA
-
-Depuis votre profil (`/profile`) :
-- **TOTP** : scannez le QR code avec une application d'authentification, saisissez le code pour confirmer
-- **WebAuthn** : enregistrez une clé de sécurité matérielle ou une passkey
-
-## Structure du projet
-
-```
-securefiles/
-├── app.py                      # Application Flask (routes, logique métier)
-├── requirements.txt            # Dépendances Python
-├── package.json                # Dépendances Node.js (Tailwind)
-├── tailwind.config.js          # Configuration Tailwind CSS
-├── src/tailwind.css            # CSS source Tailwind
-├── Dockerfile                  # Image Docker de l'application
-├── docker-compose.yml          # Orchestration (app + Redis)
-├── entrypoint.sh               # Script d'entrée du conteneur
-├── .env                        # Variables d'environnement
-├── static/css/                 # CSS compilé
-└── templates/
-    ├── index.html              # Page principale (upload / drag & drop)
-    ├── upload.html             # Formulaire d'envoi alternatif
-    ├── download.html           # Page de téléchargement
-    ├── password_required.html  # Saisie du mot de passe
-    ├── file_not_found.html     # Fichier introuvable
-    ├── file_expired.html       # Fichier expiré
-    ├── drop.html               # Page de dépôt via token personnel
-    ├── login.html              # Connexion
-    ├── register.html           # Inscription
-    ├── mfa.html                # Vérification MFA (TOTP / WebAuthn)
-    ├── dashboard.html          # Tableau de bord utilisateur
-    ├── profile.html            # Profil (mot de passe, avatar, MFA, thème)
-    └── admin.html              # Panel d'administration
-```
-
-## Développement local (sans Docker)
-
-```bash
-# Dépendances Python
-pip install -r requirements.txt
-
-# Dépendances Node.js et build CSS
-npm install
-npm run build:css
-
-# Démarrer Redis (nécessaire pour le rate limiting)
-redis-server &
-
-# Initialiser la base de données et lancer Flask
-python app.py
-```
-
-## Sécurité
-
-- Les fichiers sont **chiffrés au repos** avec Fernet (AES-128-CBC)
-- Les mots de passe sont hachés avec **PBKDF2-SHA256** (Werkzeug)
-- Les secrets TOTP sont chiffrés en base avec Fernet
-- Protection **CSRF** active sur tous les formulaires POST
-- **Rate limiting** par IP via Redis
-- Les noms de fichiers sont assainis avec `werkzeug.utils.secure_filename`
-- Les fichiers expirés ou épuisés sont **supprimés automatiquement** (tâche planifiée)
-- **WebAuthn** : authentification sans mot de passe par clé matérielle ou passkey
+---
 
 ## Licence
 
