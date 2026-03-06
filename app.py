@@ -11,7 +11,7 @@ import uuid
 import zipfile
 from datetime import datetime, timedelta
 from functools import wraps
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 
 import requests
 
@@ -155,7 +155,7 @@ def _decrypt(data: bytes) -> bytes:
     try:
         return fernet.decrypt(data)
     except InvalidToken:
-        return data
+        raise
 
 
 def _encrypt_secret(secret: str) -> str:
@@ -170,7 +170,7 @@ def _decrypt_secret(encrypted: str) -> str:
     try:
         return fernet.decrypt(encrypted.encode()).decode()
     except (InvalidToken, Exception):
-        return encrypted
+        raise
 
 
 # ── Backup codes (TOTP recovery) ──────────────────────────────────────────────
@@ -615,6 +615,13 @@ def _parse_expiry(expiry_str):
     raise ValueError(f"Format d'expiration inconnu : {expiry_str}")
 
 
+def _require_uuid(file_id: str) -> None:
+    try:
+        uuid.UUID(file_id)
+    except ValueError:
+        abort(400)
+
+
 def _remove_file(file_id: str) -> bool:
     path = os.path.join(app.config['UPLOAD_FOLDER'], file_id)
     try:
@@ -733,6 +740,7 @@ def upload_file():
 @app.route('/download/<file_id>', methods=['GET', 'POST'])
 @limiter.limit("10 per minute")
 def download_file(file_id):
+    _require_uuid(file_id)
     form = PasswordForm()
     cur  = g.db.execute(
         'SELECT filename, original_filename, expiry, views, max_downloads, password FROM files WHERE id = ?',
@@ -786,6 +794,7 @@ def download_file(file_id):
 
 @app.route('/download_direct/<file_id>')
 def download_direct(file_id):
+    _require_uuid(file_id)
     cur = g.db.execute(
         'SELECT original_filename, expiry, views, max_downloads, password, owner_id FROM files WHERE id = ?',
         (file_id,),
@@ -838,6 +847,7 @@ def download_direct(file_id):
 @app.route('/preview/<file_id>')
 def preview_file(file_id):
     """Sert le fichier inline pour l'aperçu (ne compte pas comme téléchargement)."""
+    _require_uuid(file_id)
     cur = g.db.execute(
         'SELECT original_filename, expiry, views, max_downloads, password, owner_id FROM files WHERE id = ?',
         (file_id,),
@@ -1109,7 +1119,8 @@ def login():
             session.clear()
             login_user(user)
             audit_log('login')
-            return redirect(request.args.get('next') or url_for('dashboard'))
+            next_url = request.args.get('next', '')
+            return redirect(next_url if next_url and not urlparse(next_url).netloc else url_for('dashboard'))
 
         # ── Échec : incrémenter le compteur ──────────────────────────────────
         if user:
@@ -1566,6 +1577,7 @@ def dashboard():
 @app.route('/delete/<file_id>', methods=['POST'])
 @login_required
 def delete_file(file_id):
+    _require_uuid(file_id)
     cur = g.db.execute('SELECT owner_id, original_filename FROM files WHERE id = ?', (file_id,))
     row = cur.fetchone()
     if row and row[0] == current_user.id:
