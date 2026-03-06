@@ -5,35 +5,81 @@ Application web de **partage sécurisé de fichiers** auto-hébergée. Déposez 
 ## Fonctionnalités
 
 ### Partage de fichiers
-- **Glisser-déposer** — interface drag & drop intuitive
-- **Lien unique** — chaque fichier reçoit un identifiant UUID non devinable
-- **Expiration configurable** — 3 heures · 1 jour · 1 semaine · 1 mois
-- **Limite de téléchargements** — 1 / 5 / 10 / illimité
-- **Protection par mot de passe** — hachage PBKDF2-SHA256 via Werkzeug
-- **Suppression à la lecture** — option pour autodétruire le fichier après le premier téléchargement
-- **Lien de dépôt personnel** — token unique par utilisateur pour recevoir des fichiers sans compte
+
+#### Glisser-déposer
+Interface drag & drop intuitive pour déposer des fichiers sans formulaire.
+
+#### Lien unique
+Chaque fichier reçoit un identifiant UUID non devinable, non listé.
+
+#### Expiration configurable
+Choisissez la durée de validité du lien : 3 heures · 1 jour · 1 semaine · 1 mois.
+
+#### Limite de téléchargements
+Définissez un quota de téléchargements : 1 / 5 / 10 / illimité.
+
+#### Protection par mot de passe
+Protégez l'accès au fichier par un mot de passe haché en PBKDF2-SHA256 via Werkzeug.
+
+#### Suppression à la lecture
+Option pour autodétruire le fichier dès le premier téléchargement.
+
+#### Lien de dépôt personnel
+Token unique par utilisateur permettant à n'importe qui de lui envoyer un fichier sans créer de compte.
 
 ### Sécurité
-- **Chiffrement Fernet** — fichiers chiffrés au repos (AES-128-CBC)
-- **Protection CSRF** — Flask-WTF sur tous les formulaires
-- **Rate limiting** — Flask-Limiter + Redis (200/jour · 50/heure par IP)
-- **Extensions bloquées** — `exe` `bat` `cmd` `sh` `msi` `dll` `com` `scr` `vbs` `ps1` (configurable)
-- **Taille maximale** — configurable via le panel d'administration (défaut : 16 Mo)
+
+#### Chiffrement Fernet
+Fichiers chiffrés au repos avec Fernet (AES-128-CBC).
+
+#### Protection CSRF
+Flask-WTF actif sur tous les formulaires POST.
+
+#### Rate limiting
+Flask-Limiter + Redis : 200 requêtes/jour · 50 requêtes/heure par IP.
+
+#### Extensions bloquées
+`exe` `bat` `cmd` `sh` `msi` `dll` `com` `scr` `vbs` `ps1` — liste configurable depuis le panel admin.
+
+#### Taille maximale
+Limite configurable via le panel d'administration (défaut : 16 Mo).
 
 ### Authentification & Comptes
-- **Inscription / Connexion** — système de comptes utilisateurs
-- **MFA TOTP** — authentification à deux facteurs via application (Google Authenticator, Authy…)
-- **MFA WebAuthn** — clé de sécurité matérielle (YubiKey, passkey) optionnelle
-- **Profil utilisateur** — changement de mot de passe, avatar initiale, couleur d'avatar
-- **Thème sombre** — bascule clair/sombre persistée par compte
-- **Dashboard** — liste de tous ses fichiers avec statut et actions
+
+#### Inscription / Connexion
+Système de comptes utilisateurs avec mot de passe (10 caractères minimum).
+
+#### MFA TOTP
+Authentification à deux facteurs via application (Google Authenticator, Authy…).
+
+#### MFA WebAuthn
+Clé de sécurité matérielle (YubiKey) ou passkey en option.
+
+#### Profil utilisateur
+Changement de mot de passe, avatar par initiale, couleur d'avatar personnalisable.
+
+#### Thème sombre
+Bascule clair/sombre persistée par compte.
+
+#### Dashboard
+Liste de tous ses fichiers avec statut (actif, expiré, épuisé) et actions rapides.
 
 ### Administration
-- **Panel d'administration** — accessible aux comptes marqués administrateur
-- **Gestion des utilisateurs** — liste, suppression, promotion/rétrogradation admin
-- **Paramètres globaux** — nom de l'application, e-mail de contact, quotas, extensions bloquées, autorisation des inscriptions
-- **Journal d'audit** — traçabilité des actions sensibles (upload, téléchargement, suppression, connexion…)
-- **Nettoyage automatique** — purge planifiée des fichiers expirés ou épuisés
+
+#### Panel d'administration
+Accessible aux comptes marqués administrateur via `/admin`.
+
+#### Gestion des utilisateurs
+Liste, suppression, promotion/rétrogradation au rôle administrateur.
+
+#### Paramètres globaux
+Nom de l'application, e-mail de contact, quotas, extensions bloquées, autorisation des inscriptions.
+
+#### Journal d'audit
+Traçabilité des actions sensibles : upload, téléchargement, suppression, connexion…
+
+#### Nettoyage automatique
+Purge planifiée des fichiers expirés ou dont le quota de téléchargements est épuisé.
 
 ## Stack technique
 
