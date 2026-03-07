@@ -7,11 +7,12 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <link href="/static/css/custom.css" rel="stylesheet">
+  <link href="/branding.css" rel="stylesheet">
 </head>
 <body>
   <nav class="navbar navbar-dark mb-4">
     <div class="container">
-      <a class="navbar-brand" href="/"><i class="fas fa-shield-halved me-2"></i>{{ settings.app_name }}</a>
+      <a class="navbar-brand" href="/">{% if has_logo %}<img src="/logo" height="32" class="me-2 align-middle" alt="{{ settings.app_name }}">{% else %}<i class="fas fa-shield-halved me-2"></i>{% endif %}{{ settings.app_name }}</a>
       <div class="d-flex align-items-center gap-2">
         {% if current_user.is_admin %}
         <a href="{{ url_for('admin_panel') }}" class="btn btn-sm btn-outline-warning">

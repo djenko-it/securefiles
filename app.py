@@ -84,8 +84,25 @@ login_manager.login_view = 'login'
 login_manager.login_message = 'Veuillez vous connecter pour accéder à cette page.'
 login_manager.login_message_category = 'warning'
 
+
+@app.context_processor
+def inject_branding():
+    return {'has_logo': os.path.exists(LOGO_PATH)}
+
+
 DATABASE      = '/app/data/messages.db'
 UPLOAD_FOLDER = '/app/data/uploads'
+LOGO_PATH     = '/app/data/logo'
+
+
+def _darken_hex(h: str, amount: float = 0.15) -> str:
+    h = h.lstrip('#')
+    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+    r = max(0, int(r * (1 - amount)))
+    g = max(0, int(g * (1 - amount)))
+    b = max(0, int(b * (1 - amount)))
+    return f'#{r:02x}{g:02x}{b:02x}'
+
 
 # ── Contenus légaux par défaut (modifiables en administration) ─────────────────
 _DEFAULT_LEGAL_MENTIONS = """\
@@ -221,6 +238,8 @@ SETTINGS_DEFAULTS = {
     'maintenance_message':       'Le site est temporairement en maintenance. Merci de revenir plus tard.',
     'mfa_required':              '0',
     'allow_account_deletion':    '0',
+    'accent_color':              '#4361ee',
+    'logo_content_type':         '',
     # SSO / OIDC
     'sso_enabled':        '0',
     'sso_force':          '0',
@@ -470,6 +489,7 @@ class AdminSettingsForm(FlaskForm):
                                              validators=[Optional(), Length(max=512)])
     mfa_required             = BooleanField('2FA obligatoire pour tous les comptes (hors SSO)')
     allow_account_deletion   = BooleanField('Autoriser les utilisateurs à supprimer leur propre compte')
+    accent_color             = StringField('Couleur d\'accent', validators=[Optional(), Length(max=7)])
     submit                   = SubmitField('Sauvegarder')
 
 
@@ -2158,6 +2178,65 @@ def _compute_admin_stats():
     }
 
 
+# ── Branding : logo et CSS dynamique ─────────────────────────────────────────
+@app.route('/logo')
+def logo():
+    if not os.path.exists(LOGO_PATH):
+        abort(404)
+    ct = get_settings().get('logo_content_type', 'image/png')
+    return send_file(LOGO_PATH, mimetype=ct)
+
+
+@app.route('/branding.css')
+def branding_css():
+    accent = get_settings().get('accent_color', '#4361ee')
+    if not re.match(r'^#[0-9a-fA-F]{6}$', accent):
+        accent = '#4361ee'
+    dark = _darken_hex(accent)
+    h = accent.lstrip('#')
+    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+    css = f"""\
+:root {{
+  --accent: {accent};
+  --accent-dark: {dark};
+  --accent-rgb: {r},{g},{b};
+}}
+.navbar {{ background-color: var(--accent) !important; }}
+.btn-primary {{
+  background-color: var(--accent) !important;
+  border-color: var(--accent) !important;
+}}
+.btn-primary:hover, .btn-primary:focus, .btn-primary:active {{
+  background-color: var(--accent-dark) !important;
+  border-color: var(--accent-dark) !important;
+}}
+.btn-outline-primary {{
+  color: var(--accent) !important;
+  border-color: var(--accent) !important;
+}}
+.btn-outline-primary:hover {{
+  background-color: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: #fff !important;
+}}
+.text-primary {{ color: var(--accent) !important; }}
+a:not(.btn):not(.nav-link):not(.navbar-brand):not(.dropdown-item):not([class*="text-"]) {{
+  color: var(--accent);
+}}
+.progress-bar, #upload-progress-bar {{ background-color: var(--accent) !important; }}
+.badge.bg-primary {{ background-color: var(--accent) !important; }}
+.nav-tabs .nav-link.active {{ color: var(--accent) !important; border-bottom-color: var(--accent) !important; }}
+.form-check-input:checked {{
+  background-color: var(--accent) !important;
+  border-color: var(--accent) !important;
+}}
+.avatar-circle {{ background-color: var(--accent) !important; }}
+"""
+    resp = app.response_class(css, mimetype='text/css')
+    resp.headers['Cache-Control'] = 'public, max-age=60'
+    return resp
+
+
 # ── Pages légales ─────────────────────────────────────────────────────────────
 @app.route('/mentions-legales')
 def mentions_legales():
@@ -2242,6 +2321,7 @@ def admin_panel():
         'maintenance_message':      settings.get('maintenance_message', ''),
         'mfa_required':             settings.get('mfa_required') == '1',
         'allow_account_deletion':   settings.get('allow_account_deletion') == '1',
+        'accent_color':             settings.get('accent_color', '#4361ee'),
     })
     sso_form = SSOSettingsForm(data={
         'sso_enabled':       settings.get('sso_enabled') == '1',
@@ -2291,6 +2371,29 @@ def admin_save_settings():
             'mfa_required':             '1' if form.mfa_required.data else '0',
             'allow_account_deletion':   '1' if form.allow_account_deletion.data else '0',
         }
+        # Accent color (validate hex)
+        raw_accent = (form.accent_color.data or '').strip()
+        if re.match(r'^#[0-9a-fA-F]{6}$', raw_accent):
+            values['accent_color'] = raw_accent
+        # Logo upload
+        logo_file = request.files.get('logo')
+        if logo_file and logo_file.filename:
+            ct = logo_file.content_type or 'image/png'
+            if ct in ('image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml',
+                      'image/webp', 'image/gif'):
+                try:
+                    os.makedirs(os.path.dirname(LOGO_PATH), exist_ok=True)
+                    logo_file.save(LOGO_PATH)
+                    values['logo_content_type'] = ct
+                except OSError as e:
+                    app.logger.error('Logo save error: %s', e)
+        # Suppression logo
+        if request.form.get('remove_logo') == '1' and os.path.exists(LOGO_PATH):
+            try:
+                os.remove(LOGO_PATH)
+                values['logo_content_type'] = ''
+            except OSError:
+                pass
         for key, value in values.items():
             g.db.execute('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', (key, value))
         g.db.commit()
