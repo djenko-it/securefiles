@@ -196,7 +196,7 @@
           </div>
           <!-- Résultats multi-fichiers -->
           <div id="multi-result" style="display:none;">
-            <div id="copy-all-wrapper" class="d-flex justify-content-between align-items-center mb-2" style="display:none!important;">
+            <div id="copy-all-wrapper" class="justify-content-between align-items-center mb-2" style="display:none;">
               <p class="text-muted small mb-0">Liens individuels :</p>
               <button id="copy-all-btn" class="btn btn-sm btn-outline-secondary" type="button">
                 <i class="fas fa-copy me-1"></i>Copier tout
@@ -448,7 +448,6 @@
           multi.style.display  = 'block'
           const container = document.getElementById('multi-links')
           container.innerHTML = '<div class="py-2 text-muted small"><i class="fas fa-spinner fa-spin me-2"></i>Création de l\'archive…</div>'
-          document.getElementById('copy-all-wrapper').style.removeProperty('display')
           document.getElementById('copy-all-wrapper').style.display = 'none'
           linkModal.show()
 
