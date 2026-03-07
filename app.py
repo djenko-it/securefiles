@@ -220,6 +220,7 @@ SETTINGS_DEFAULTS = {
     'maintenance_mode':          '0',
     'maintenance_message':       'Le site est temporairement en maintenance. Merci de revenir plus tard.',
     'mfa_required':              '0',
+    'allow_account_deletion':    '0',
     # SSO / OIDC
     'sso_enabled':        '0',
     'sso_force':          '0',
@@ -468,6 +469,7 @@ class AdminSettingsForm(FlaskForm):
     maintenance_message      = TextAreaField('Message de maintenance',
                                              validators=[Optional(), Length(max=512)])
     mfa_required             = BooleanField('2FA obligatoire pour tous les comptes (hors SSO)')
+    allow_account_deletion   = BooleanField('Autoriser les utilisateurs à supprimer leur propre compte')
     submit                   = SubmitField('Sauvegarder')
 
 
@@ -1858,6 +1860,44 @@ def profile_export():
     return response
 
 
+# ── RGPD : suppression de compte (art. 17 — droit à l'effacement) ────────────
+@app.route('/profile/delete-account', methods=['POST'])
+@login_required
+def profile_delete_account():
+    settings = get_settings()
+    if settings.get('allow_account_deletion') != '1':
+        abort(403)
+
+    confirm = request.form.get('confirm_word', '').strip().lower()
+    if confirm != 'supprimer':
+        flash('Confirmation incorrecte. Tapez exactement « supprimer » pour valider.', 'danger')
+        return redirect(url_for('profile'))
+
+    uid = current_user.id
+
+    # Suppression des fichiers sur le disque
+    file_ids = g.db.execute('SELECT id FROM files WHERE owner_id = ?', (uid,)).fetchall()
+    for (fid,) in file_ids:
+        path = os.path.join(app.config['UPLOAD_FOLDER'], fid)
+        try:
+            if os.path.exists(path):
+                os.remove(path)
+        except OSError:
+            pass
+
+    # Suppression en base (fichiers, drop_tokens, bundles, puis utilisateur)
+    g.db.execute('DELETE FROM files WHERE owner_id = ?', (uid,))
+    g.db.execute('DELETE FROM drop_tokens WHERE owner_id = ?', (uid,))
+    g.db.execute('DELETE FROM bundles WHERE owner_id = ?', (uid,))
+    g.db.execute('DELETE FROM users WHERE id = ?', (uid,))
+    g.db.commit()
+
+    audit_log('account_self_deleted', details=f'Compte {current_user.username} auto-supprimé')
+    logout_user()
+    flash('Votre compte et l\'ensemble de vos données ont été supprimés définitivement.', 'success')
+    return redirect(url_for('login'))
+
+
 # ── Liens de dépôt temporaires ────────────────────────────────────────────────
 @app.route('/profile/drop-create', methods=['POST'])
 @login_required
@@ -2201,6 +2241,7 @@ def admin_panel():
         'maintenance_mode':         settings.get('maintenance_mode') == '1',
         'maintenance_message':      settings.get('maintenance_message', ''),
         'mfa_required':             settings.get('mfa_required') == '1',
+        'allow_account_deletion':   settings.get('allow_account_deletion') == '1',
     })
     sso_form = SSOSettingsForm(data={
         'sso_enabled':       settings.get('sso_enabled') == '1',
@@ -2248,6 +2289,7 @@ def admin_save_settings():
             'maintenance_mode':         '1' if form.maintenance_mode.data else '0',
             'maintenance_message':      (form.maintenance_message.data or '').strip(),
             'mfa_required':             '1' if form.mfa_required.data else '0',
+            'allow_account_deletion':   '1' if form.allow_account_deletion.data else '0',
         }
         for key, value in values.items():
             g.db.execute('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', (key, value))

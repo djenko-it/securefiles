@@ -251,6 +251,44 @@
     </div>
   </div>
 
+  {% if settings.allow_account_deletion == '1' %}
+  <!-- Zone danger : suppression de compte -->
+  <div class="card mb-3 border-danger">
+    <div class="card-body p-4">
+      <div class="d-flex align-items-center mb-3">
+        <p class="section-title mb-0 text-danger"><i class="fas fa-triangle-exclamation me-2"></i>Supprimer mon compte</p>
+      </div>
+      <div class="alert alert-danger py-2 small mb-3">
+        <strong>Action irréversible.</strong> La suppression de votre compte entraîne la suppression définitive
+        de toutes vos données : compte, fichiers partagés, liens de dépôt et journaux d'activité.
+        Aucune restauration ne sera possible.
+      </div>
+      <button class="btn btn-sm btn-outline-danger" type="button"
+              data-bs-toggle="collapse" data-bs-target="#delete-account-form">
+        <i class="fas fa-trash me-1"></i>Supprimer mon compte
+      </button>
+      <div class="collapse mt-3" id="delete-account-form">
+        <form method="post" action="{{ url_for('profile_delete_account') }}"
+              onsubmit="return document.getElementById('confirm-word').value.trim().toLowerCase() === 'supprimer'">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <label class="form-label small fw-semibold">
+            Tapez <code>supprimer</code> pour confirmer la suppression définitive :
+          </label>
+          <div class="input-group" style="max-width:360px">
+            <input id="confirm-word" name="confirm_word" type="text"
+                   class="form-control form-control-sm"
+                   placeholder="supprimer" autocomplete="off">
+            <button type="submit" class="btn btn-sm btn-danger">
+              <i class="fas fa-trash me-1"></i>Confirmer
+            </button>
+          </div>
+          <div class="form-text text-danger mt-1">Cette action est définitive et ne peut pas être annulée.</div>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
 </main>
 
 <footer>

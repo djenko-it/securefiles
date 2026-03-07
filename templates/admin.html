@@ -337,6 +337,22 @@
               <div class="form-text">Si activé, tout utilisateur sans 2FA configuré est redirigé vers son profil pour en activer un. Les comptes SSO sont exemptés (authentification déléguée au fournisseur d'identité).</div>
             </div>
 
+            <hr class="my-3">
+            <p class="text-uppercase fw-semibold text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em">
+              <i class="fas fa-user-minus me-1"></i>Gestion du compte utilisateur
+            </p>
+            <div class="mb-4">
+              <div class="form-check form-switch">
+                {{ form.allow_account_deletion(class="form-check-input", role="switch", id="allowAccountDeletion") }}
+                <label class="form-check-label" for="allowAccountDeletion">{{ form.allow_account_deletion.label.text }}</label>
+              </div>
+              <div class="form-text">
+                Si activé, chaque utilisateur voit dans son profil une option pour supprimer définitivement
+                son compte, ses fichiers et ses journaux d'activité (RGPD art. 17 — droit à l'effacement).
+                Désactivé par défaut.
+              </div>
+            </div>
+
             <button type="submit" class="btn btn-primary">
               <i class="fas fa-floppy-disk me-2"></i>{{ form.submit.label.text }}
             </button>
