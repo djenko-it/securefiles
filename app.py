@@ -2220,9 +2220,10 @@ def branding_css():
   color: #fff !important;
 }}
 .text-primary {{ color: var(--accent) !important; }}
-a:not(.btn):not(.nav-link):not(.navbar-brand):not(.dropdown-item):not([class*="text-"]) {{
+a:not(.btn):not(.nav-link):not(.navbar-brand):not(.dropdown-item):not([class*="text-"]):not(.user-avatar) {{
   color: var(--accent);
 }}
+.user-avatar {{ color: #fff !important; }}
 .progress-bar, #upload-progress-bar {{ background-color: var(--accent) !important; }}
 .badge.bg-primary {{ background-color: var(--accent) !important; }}
 .nav-tabs .nav-link.active {{ color: var(--accent) !important; border-bottom-color: var(--accent) !important; }}
