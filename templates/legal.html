@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{ settings.app_name }} — Erreur serveur</title>
+  <title>{{ settings.app_name }} — {{ title }}</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <link href="/static/css/custom.css" rel="stylesheet">
@@ -12,36 +12,25 @@
   <nav class="navbar navbar-dark mb-4">
     <div class="container">
       <a class="navbar-brand" href="/"><i class="fas fa-shield-halved me-2"></i>{{ settings.app_name }}</a>
-      <div class="d-flex align-items-center gap-2">
-        {%- if current_user.is_authenticated %}
-          <a href="{{ url_for('dashboard') }}" class="btn btn-sm btn-outline-light">
-            <i class="fas fa-table-list me-1"></i>Mes partages
-          </a>
-        {%- else %}
-          <a href="{{ url_for('login') }}" class="btn btn-sm btn-outline-light">Connexion</a>
-        {%- endif %}
-      </div>
     </div>
   </nav>
 
-  <main class="container text-center pb-5" style="max-width: 480px;">
-    <div class="card">
-      <div class="card-body p-5">
-        <div class="error-icon text-danger">
-          <i class="fas fa-triangle-exclamation"></i>
+  <main class="container pb-5" style="max-width: 860px;">
+    <div class="card shadow-sm">
+      <div class="card-body p-4 p-md-5">
+        <div class="legal-content">
+          {{ content | safe }}
         </div>
-        <h1 class="h4 fw-semibold mb-2">Erreur serveur</h1>
-        <p class="text-muted mb-4">
-          Une erreur inattendue s'est produite. Réessayez dans quelques instants ou contactez l'administrateur si le problème persiste.
-        </p>
-        <a href="/" class="btn btn-primary">
-          <i class="fas fa-arrow-left me-2"></i>Retour à l'accueil
+        <hr class="mt-4">
+        <a href="javascript:history.back()" class="btn btn-sm btn-outline-secondary">
+          <i class="fas fa-arrow-left me-1"></i>Retour
         </a>
       </div>
     </div>
   </main>
 
   <footer>
+    {{ settings.app_name }} &mdash;
     <a href="mailto:{{ settings.contact_email }}">{{ settings.contact_email }}</a>
     &nbsp;·&nbsp;
     <a href="{{ url_for('mentions_legales') }}">Mentions légales</a>

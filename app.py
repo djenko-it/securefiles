@@ -87,6 +87,122 @@ login_manager.login_message_category = 'warning'
 DATABASE      = '/app/data/messages.db'
 UPLOAD_FOLDER = '/app/data/uploads'
 
+# ── Contenus légaux par défaut (modifiables en administration) ─────────────────
+_DEFAULT_LEGAL_MENTIONS = """\
+<h2>Mentions légales</h2>
+
+<h3>Éditeur du site</h3>
+<p>
+  Ce site est édité par : <strong>[Nom / Raison sociale]</strong><br>
+  Adresse : [Adresse complète]<br>
+  Contact : <a href="mailto:{contact_email}">{contact_email}</a>
+</p>
+
+<h3>Hébergement</h3>
+<p>Ce site est hébergé sur une infrastructure auto-hébergée, dont l'exploitant est responsable.</p>
+
+<h3>Directeur de la publication</h3>
+<p>[Nom du directeur de la publication]</p>
+
+<h3>Propriété intellectuelle</h3>
+<p>
+  Le code source de cette application est distribué sous licence open source.
+  Toute reproduction partielle ou totale du contenu est interdite sans autorisation préalable.
+</p>
+
+<h3>Données personnelles (RGPD)</h3>
+<p>
+  Conformément au Règlement Général sur la Protection des Données (RGPD — UE 2016/679),
+  vous disposez d'un droit d'accès, de rectification, d'effacement et de portabilité
+  de vos données personnelles.
+</p>
+<p>
+  Données collectées : identifiant de connexion, adresse IP anonymisée, journaux d'activité.<br>
+  Durée de conservation : 90 jours pour les journaux d'audit. Les fichiers sont supprimés
+  automatiquement à la date d'expiration choisie lors du dépôt.<br>
+  Aucune donnée n'est transmise à des tiers.
+</p>
+<p>
+  Pour exercer vos droits ou pour toute question relative à vos données personnelles,
+  contactez : <a href="mailto:{contact_email}">{contact_email}</a>
+</p>
+
+<h3>Cookies</h3>
+<p>
+  Ce site utilise uniquement des cookies strictement nécessaires au fonctionnement
+  du service (session de connexion, jeton CSRF). Aucun cookie publicitaire ou de traçage
+  n'est utilisé.
+</p>
+"""
+
+_DEFAULT_TERMS_OF_USE = """\
+<h2>Conditions Générales d'Utilisation</h2>
+<p><em>En vigueur au {date}</em></p>
+
+<h3>1. Objet</h3>
+<p>
+  Les présentes Conditions Générales d'Utilisation (CGU) régissent l'accès et l'utilisation
+  de <strong>{app_name}</strong>, service de partage de fichiers éphémère et chiffré.
+  En accédant au service, l'utilisateur accepte sans réserve les présentes CGU.
+</p>
+
+<h3>2. Accès au service</h3>
+<p>
+  L'accès est réservé aux personnes disposant d'un compte autorisé par l'administrateur.
+  Les liens de partage et les zones de dépôt peuvent être accessibles sans compte,
+  dans les limites définies par l'administrateur.
+</p>
+
+<h3>3. Utilisation acceptable</h3>
+<p>L'utilisateur s'engage à ne pas utiliser ce service pour :</p>
+<ul>
+  <li>Transmettre des fichiers illégaux, malveillants ou portant atteinte aux droits de tiers ;</li>
+  <li>Contourner les mesures de sécurité ou tenter d'accéder à des ressources non autorisées ;</li>
+  <li>Partager du contenu protégé par le droit d'auteur sans autorisation ;</li>
+  <li>Toute activité contraire aux lois et règlements en vigueur.</li>
+</ul>
+
+<h3>4. Durée de conservation des fichiers</h3>
+<p>
+  Les fichiers sont automatiquement supprimés à l'expiration définie lors du dépôt.
+  L'administrateur se réserve le droit de supprimer tout contenu à tout moment,
+  notamment en cas de non-respect des présentes CGU.
+</p>
+
+<h3>5. Chiffrement et sécurité</h3>
+<p>
+  Les fichiers sont chiffrés au repos sur le serveur (Fernet AES-128-CBC + HMAC-SHA256).
+  En mode chiffrement de bout en bout (E2E), les fichiers sont chiffrés côté navigateur
+  (AES-256-GCM) avant envoi : le serveur ne peut pas accéder au contenu.
+  Malgré ces mesures, aucun système n'offre une sécurité absolue.
+</p>
+
+<h3>6. Responsabilité</h3>
+<p>
+  L'éditeur ne saurait être tenu responsable du contenu des fichiers partagés par les
+  utilisateurs, ni des conséquences d'une utilisation non conforme aux présentes CGU.
+  Le service est fourni « en l'état », sans garantie de disponibilité continue.
+</p>
+
+<h3>7. Données personnelles</h3>
+<p>
+  Le traitement des données personnelles est décrit dans les
+  <a href="/mentions-legales">Mentions légales</a>.
+</p>
+
+<h3>8. Modification des CGU</h3>
+<p>
+  Les présentes CGU peuvent être modifiées à tout moment par l'administrateur.
+  La poursuite de l'utilisation du service après modification vaut acceptation des nouvelles CGU.
+</p>
+
+<h3>9. Droit applicable</h3>
+<p>
+  Les présentes CGU sont soumises au droit français. Tout litige relève de la compétence
+  exclusive des tribunaux compétents.
+</p>
+"""
+
 SETTINGS_DEFAULTS = {
     'app_name':           'FileShareApp',
     'contact_email':      'djenko-it@protonmail.com',
@@ -110,6 +226,9 @@ SETTINGS_DEFAULTS = {
     'sso_discovery_url':  '',
     'sso_client_id':      '',
     'sso_client_secret':  '',
+    # Mentions légales / CGU
+    'legal_mentions': _DEFAULT_LEGAL_MENTIONS,
+    'terms_of_use':   _DEFAULT_TERMS_OF_USE,
 }
 
 LOGIN_MAX_ATTEMPTS    = 10
@@ -370,6 +489,12 @@ class SSOSettingsForm(FlaskForm):
     sso_client_secret = PasswordField('Client Secret (laisser vide pour ne pas changer)',
                                       validators=[Optional(), Length(max=512)])
     submit            = SubmitField('Sauvegarder SSO')
+
+
+class LegalForm(FlaskForm):
+    legal_mentions = TextAreaField('Mentions légales (HTML autorisé)', validators=[Optional()])
+    terms_of_use   = TextAreaField('Conditions Générales d\'Utilisation (HTML autorisé)', validators=[Optional()])
+    submit         = SubmitField('Sauvegarder')
 
 
 # ── Base de données ───────────────────────────────────────────────────────────
@@ -1880,6 +2005,27 @@ def drop_zone(drop_token):
                            settings=settings)
 
 
+# ── Pages légales ─────────────────────────────────────────────────────────────
+@app.route('/mentions-legales')
+def mentions_legales():
+    s = get_settings()
+    content = s.get('legal_mentions') or _DEFAULT_LEGAL_MENTIONS
+    content = content.replace('{contact_email}', s.get('contact_email', '')) \
+                     .replace('{app_name}', s.get('app_name', ''))
+    return render_template('legal.html', title='Mentions légales', content=content, settings=s)
+
+
+@app.route('/cgu')
+def cgu():
+    from datetime import date as _date
+    s = get_settings()
+    content = s.get('terms_of_use') or _DEFAULT_TERMS_OF_USE
+    content = content.replace('{contact_email}', s.get('contact_email', '')) \
+                     .replace('{app_name}', s.get('app_name', '')) \
+                     .replace('{date}', _date.today().strftime('%d/%m/%Y'))
+    return render_template('legal.html', title='Conditions Générales d\'Utilisation', content=content, settings=s)
+
+
 # ── Administration ────────────────────────────────────────────────────────────
 @app.route('/admin')
 @login_required
@@ -1946,8 +2092,12 @@ def admin_panel():
         'sso_discovery_url': settings.get('sso_discovery_url', ''),
         'sso_client_id':     settings.get('sso_client_id', ''),
     })
+    legal_form = LegalForm(data={
+        'legal_mentions': settings.get('legal_mentions', _DEFAULT_LEGAL_MENTIONS),
+        'terms_of_use':   settings.get('terms_of_use',   _DEFAULT_TERMS_OF_USE),
+    })
     return render_template('admin.html', users=users, form=form, sso_form=sso_form,
-                           settings=settings, logs=logs)
+                           legal_form=legal_form, settings=settings, logs=logs)
 
 
 @app.route('/admin/settings', methods=['POST'])
@@ -2185,6 +2335,26 @@ def admin_save_sso():
             for err in errors:
                 flash(f'{field} : {err}', 'danger')
     return redirect(url_for('admin_panel') + '#sso')
+
+
+@app.route('/admin/legal', methods=['POST'])
+@login_required
+@admin_required
+def admin_save_legal():
+    form = LegalForm()
+    if form.validate_on_submit():
+        for key, value in {'legal_mentions': form.legal_mentions.data,
+                           'terms_of_use':   form.terms_of_use.data}.items():
+            g.db.execute('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',
+                         (key, value or ''))
+        g.db.commit()
+        audit_log('admin_legal', details='Mentions légales / CGU mis à jour')
+        flash('Mentions légales et CGU sauvegardées.', 'success')
+    else:
+        for field, errors in form.errors.items():
+            for err in errors:
+                flash(f'{field} : {err}', 'danger')
+    return redirect(url_for('admin_panel') + '#legal')
 
 
 # ── Pages d'erreur ────────────────────────────────────────────────────────────

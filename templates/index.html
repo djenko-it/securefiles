@@ -215,6 +215,10 @@
   <footer>
     {{ settings.app_name }} &mdash;
     <a href="mailto:{{ settings.contact_email }}">{{ settings.contact_email }}</a>
+    &nbsp;·&nbsp;
+    <a href="{{ url_for('mentions_legales') }}">Mentions légales</a>
+    &nbsp;·&nbsp;
+    <a href="{{ url_for('cgu') }}">CGU</a>
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
