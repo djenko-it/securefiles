@@ -15,6 +15,7 @@ from functools import wraps
 from urllib.parse import urlencode, urlparse
 
 import requests
+import nh3
 
 import pyotp
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -449,6 +450,15 @@ class LoginForm(FlaskForm):
     submit   = SubmitField('Se connecter')
 
 
+class SetPasswordForm(FlaskForm):
+    """Utilisé pour le reset via lien admin (sans connaître l'ancien mot de passe)."""
+    password = PasswordField('Nouveau mot de passe', validators=[DataRequired(), Length(min=10)])
+    confirm  = PasswordField('Confirmer', validators=[
+        DataRequired(), EqualTo('password', message='Les mots de passe ne correspondent pas.'),
+    ])
+    submit   = SubmitField('Définir le mot de passe')
+
+
 class ChangePasswordForm(FlaskForm):
     current  = PasswordField('Mot de passe actuel', validators=[DataRequired()])
     password = PasswordField('Nouveau mot de passe', validators=[DataRequired(), Length(min=10)])
@@ -611,6 +621,8 @@ def init_db():
             ('failed_attempts',        'INTEGER DEFAULT 0'),
             ('locked_until',           'TEXT'),
             ('totp_backup_codes',      'TEXT'),
+            ('reset_token_hash',       'TEXT'),
+            ('reset_token_expiry',     'TEXT'),
         ]:
             if col not in existing_users:
                 conn.execute(f'ALTER TABLE users ADD COLUMN {col} {ddl}')
@@ -1360,6 +1372,35 @@ def login():
         audit_log('login_failed', target=uname)
         flash('Identifiants incorrects.', 'danger')
     return render_template('login.html', form=form, settings=settings)
+
+
+@app.route('/reset-password/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    row = g.db.execute(
+        'SELECT id, username, reset_token_expiry FROM users WHERE reset_token_hash = ?',
+        (token_hash,),
+    ).fetchone()
+    if not row:
+        flash("Lien invalide ou déjà utilisé.", 'danger')
+        return redirect(url_for('login'))
+    user_id, username, expiry_str = row
+    if datetime.utcnow() > datetime.fromisoformat(expiry_str):
+        g.db.execute('UPDATE users SET reset_token_hash = NULL, reset_token_expiry = NULL WHERE id = ?', (user_id,))
+        g.db.commit()
+        flash("Ce lien a expiré. Demandez un nouveau lien à l'administrateur.", 'danger')
+        return redirect(url_for('login'))
+    form = SetPasswordForm()
+    if form.validate_on_submit():
+        g.db.execute(
+            'UPDATE users SET password = ?, reset_token_hash = NULL, reset_token_expiry = NULL WHERE id = ?',
+            (generate_password_hash(form.password.data), user_id),
+        )
+        g.db.commit()
+        audit_log('reset_password', target=username, details='Mot de passe réinitialisé via lien admin')
+        flash("Mot de passe modifié. Vous pouvez vous connecter.", 'success')
+        return redirect(url_for('login'))
+    return render_template('reset_password.html', form=form, username=username, settings=get_settings())
 
 
 @app.route('/logout')
@@ -2242,13 +2283,35 @@ a:not(.btn):not(.nav-link):not(.navbar-brand):not(.dropdown-item):not([class*="t
 
 
 # ── Pages légales ─────────────────────────────────────────────────────────────
+_LEGAL_ALLOWED_TAGS = {
+    'p', 'br', 'strong', 'em', 'u', 'b', 'i', 's',
+    'h1', 'h2', 'h3', 'h4', 'ul', 'ol', 'li',
+    'a', 'blockquote', 'hr', 'span', 'div',
+}
+_LEGAL_ALLOWED_ATTRS = {
+    'a': {'href', 'title', 'target', 'rel'},
+    'span': {'class'},
+    'div': {'class'},
+}
+
+def _sanitize_legal(html: str) -> str:
+    """Sanitise le HTML des pages légales — whitelist stricte, pas de script/event handler."""
+    return nh3.clean(
+        html,
+        tags=_LEGAL_ALLOWED_TAGS,
+        attributes=_LEGAL_ALLOWED_ATTRS,
+        link_rel='noopener noreferrer',
+    )
+
+
 @app.route('/mentions-legales')
 def mentions_legales():
     s = get_settings()
     content = s.get('legal_mentions') or _DEFAULT_LEGAL_MENTIONS
     content = content.replace('{contact_email}', s.get('contact_email', '')) \
                      .replace('{app_name}', s.get('app_name', ''))
-    return render_template('legal.html', title='Mentions légales', content=content, settings=s)
+    return render_template('legal.html', title='Mentions légales',
+                           content=_sanitize_legal(content), settings=s)
 
 
 @app.route('/cgu')
@@ -2259,7 +2322,8 @@ def cgu():
     content = content.replace('{contact_email}', s.get('contact_email', '')) \
                      .replace('{app_name}', s.get('app_name', '')) \
                      .replace('{date}', _date.today().strftime('%d/%m/%Y'))
-    return render_template('legal.html', title='Conditions Générales d\'Utilisation', content=content, settings=s)
+    return render_template('legal.html', title='Conditions Générales d\'Utilisation',
+                           content=_sanitize_legal(content), settings=s)
 
 
 # ── Administration ────────────────────────────────────────────────────────────
@@ -2459,14 +2523,22 @@ def admin_reset_password(user_id):
         return redirect(url_for('admin_panel'))
     username, is_sso = row[0], bool(row[1])
     if is_sso:
-        flash(f"Impossible de réinitialiser le mot de passe d'un compte SSO.", 'danger')
+        flash("Impossible de réinitialiser le mot de passe d'un compte SSO.", 'danger')
         return redirect(url_for('admin_panel'))
-    tmp_pw = secrets.token_urlsafe(12)
-    g.db.execute('UPDATE users SET password = ? WHERE id = ?',
-                 (generate_password_hash(tmp_pw), user_id))
+    token       = secrets.token_urlsafe(32)
+    token_hash  = hashlib.sha256(token.encode()).hexdigest()
+    expiry      = (datetime.utcnow() + timedelta(hours=1)).isoformat()
+    g.db.execute(
+        'UPDATE users SET reset_token_hash = ?, reset_token_expiry = ? WHERE id = ?',
+        (token_hash, expiry, user_id),
+    )
     g.db.commit()
-    audit_log('admin_reset_password', target=username, details='Mot de passe réinitialisé')
-    flash(f"Mot de passe de « {username} » réinitialisé. Mot de passe temporaire : {tmp_pw}", 'warning')
+    audit_log('admin_reset_password', target=username, details='Lien de réinitialisation généré')
+    reset_url = url_for('reset_password', token=token, _external=True)
+    flash(
+        f"Lien de réinitialisation pour « {username} » (valide 1 h) : {reset_url}",
+        'warning',
+    )
     return redirect(url_for('admin_panel'))
 
 
