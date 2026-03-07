@@ -91,6 +91,12 @@
         <i class="fas fa-scale-balanced me-1"></i>Mentions légales / CGU
       </button>
     </li>
+    <li class="nav-item">
+      <button class="nav-link" id="tab-analytics-btn" data-bs-toggle="tab"
+              data-bs-target="#tab-analytics" type="button" role="tab">
+        <i class="fas fa-chart-line me-1"></i>Tableau de bord
+      </button>
+    </li>
   </ul>
 
   <div class="tab-content" id="adminTabsContent">
@@ -552,6 +558,97 @@
       </div>
     </div>
 
+    <!-- ── Onglet Tableau de bord ─────────────────────────────────────────── -->
+    <div class="tab-pane fade" id="tab-analytics" role="tabpanel">
+
+      <!-- KPI cards -->
+      <div class="row g-3 mb-4">
+        {% set kpi = stats.kpi %}
+        <div class="col-6 col-lg">
+          <div class="card h-100 text-center shadow-sm">
+            <div class="card-body py-3">
+              <div class="text-primary mb-1"><i class="fas fa-users fa-lg"></i></div>
+              <div class="fs-3 fw-bold">{{ kpi.total_users }}</div>
+              <div class="text-muted small">Comptes</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-lg">
+          <div class="card h-100 text-center shadow-sm">
+            <div class="card-body py-3">
+              <div class="text-success mb-1"><i class="fas fa-file fa-lg"></i></div>
+              <div class="fs-3 fw-bold">{{ kpi.active_files }}</div>
+              <div class="text-muted small">Fichiers actifs</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-lg">
+          <div class="card h-100 text-center shadow-sm">
+            <div class="card-body py-3">
+              <div class="text-info mb-1"><i class="fas fa-upload fa-lg"></i></div>
+              <div class="fs-3 fw-bold">{{ kpi.total_uploads }}</div>
+              <div class="text-muted small">Envois totaux</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-lg">
+          <div class="card h-100 text-center shadow-sm">
+            <div class="card-body py-3">
+              <div class="text-warning mb-1"><i class="fas fa-download fa-lg"></i></div>
+              <div class="fs-3 fw-bold">{{ kpi.total_downloads }}</div>
+              <div class="text-muted small">Téléchargements</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-lg">
+          <div class="card h-100 text-center shadow-sm">
+            <div class="card-body py-3">
+              <div class="text-danger mb-1"><i class="fas fa-hard-drive fa-lg"></i></div>
+              <div class="fs-3 fw-bold" id="kpi-storage"></div>
+              <div class="text-muted small">Stockage utilisé</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Activité 30 jours -->
+      <div class="card shadow-sm mb-4">
+        <div class="card-body p-4">
+          <p class="fw-semibold mb-3"><i class="fas fa-chart-line me-2 text-primary"></i>Activité des 30 derniers jours</p>
+          <canvas id="chartDaily" height="90"></canvas>
+        </div>
+      </div>
+
+      <!-- Activité mensuelle + Répartition actions -->
+      <div class="row g-3 mb-4">
+        <div class="col-lg-8">
+          <div class="card shadow-sm h-100">
+            <div class="card-body p-4">
+              <p class="fw-semibold mb-3"><i class="fas fa-chart-bar me-2 text-success"></i>Activité mensuelle — 12 mois</p>
+              <canvas id="chartMonthly" height="130"></canvas>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-4">
+          <div class="card shadow-sm h-100">
+            <div class="card-body p-4">
+              <p class="fw-semibold mb-3"><i class="fas fa-chart-pie me-2 text-info"></i>Répartition des actions</p>
+              <canvas id="chartActions"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Nouveaux comptes par mois -->
+      <div class="card shadow-sm mb-4">
+        <div class="card-body p-4">
+          <p class="fw-semibold mb-3"><i class="fas fa-user-plus me-2 text-warning"></i>Nouveaux comptes — 12 mois</p>
+          <canvas id="chartUsers" height="70"></canvas>
+        </div>
+      </div>
+
+    </div><!-- /tab-analytics -->
+
   </div><!-- /tab-content -->
 </main>
 
@@ -562,7 +659,7 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
   // Ouvre l'onglet correct selon le hash d'URL
-  const hashTabMap = { '#settings': 'tab-settings-btn', '#logs': 'tab-logs-btn', '#sso': 'tab-sso-btn', '#legal': 'tab-legal-btn' };
+  const hashTabMap = { '#settings': 'tab-settings-btn', '#logs': 'tab-logs-btn', '#sso': 'tab-sso-btn', '#legal': 'tab-legal-btn', '#analytics': 'tab-analytics-btn' };
   const targetBtn  = hashTabMap[window.location.hash];
   if (targetBtn) bootstrap.Tab.getOrCreateInstance(document.getElementById(targetBtn)).show();
 
@@ -597,6 +694,124 @@
 
   filterSel.addEventListener('change', filterLogs);
   searchInput.addEventListener('input',  filterLogs);
+</script>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+  const S = {{ stats | tojson }};
+
+  // ── Helper stockage ──────────────────────────────────────────────────────
+  function fmtBytes(b) {
+    if (b >= 1073741824) return (b / 1073741824).toFixed(2) + ' Go';
+    if (b >= 1048576)    return (b / 1048576).toFixed(1) + ' Mo';
+    if (b >= 1024)       return (b / 1024).toFixed(0) + ' Ko';
+    return b + ' o';
+  }
+  document.getElementById('kpi-storage').textContent = fmtBytes(S.kpi.storage_bytes);
+
+  // ── Palette ──────────────────────────────────────────────────────────────
+  const C = {
+    blue:   'rgba(67,97,238,1)',
+    blueA:  'rgba(67,97,238,0.15)',
+    green:  'rgba(46,196,182,1)',
+    greenA: 'rgba(46,196,182,0.15)',
+    warn:   'rgba(247,127,0,1)',
+    warnA:  'rgba(247,127,0,0.15)',
+    pie: [
+      '#4361ee','#2ec4b6','#f77f00','#e63946','#8338ec',
+      '#3a86ff','#fb5607','#06d6a0','#ffbe0b','#ef476f'
+    ],
+  };
+  const isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+  const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.07)';
+  const tickColor = isDark ? '#adb5bd' : '#6c757d';
+  const baseOpts = {
+    responsive: true,
+    plugins: { legend: { labels: { color: tickColor } } },
+    scales: {
+      x: { ticks: { color: tickColor }, grid: { color: gridColor } },
+      y: { ticks: { color: tickColor }, grid: { color: gridColor }, beginAtZero: true },
+    },
+  };
+
+  // Initialise les graphes seulement quand l'onglet devient visible
+  let chartsBuilt = false;
+  document.getElementById('tab-analytics-btn').addEventListener('shown.bs.tab', function () {
+    if (chartsBuilt) return;
+    chartsBuilt = true;
+
+    // ── Ligne : activité 30 jours ──────────────────────────────────────────
+    new Chart(document.getElementById('chartDaily'), {
+      type: 'line',
+      data: {
+        labels: S.daily.labels,
+        datasets: [
+          { label: 'Envois',            data: S.daily.uploads,
+            borderColor: C.blue,  backgroundColor: C.blueA,  fill: true, tension: 0.3, pointRadius: 3 },
+          { label: 'Téléchargements',   data: S.daily.downloads,
+            borderColor: C.green, backgroundColor: C.greenA, fill: true, tension: 0.3, pointRadius: 3 },
+        ],
+      },
+      options: { ...baseOpts },
+    });
+
+    // ── Barres groupées : mensuel 12 mois ─────────────────────────────────
+    new Chart(document.getElementById('chartMonthly'), {
+      type: 'bar',
+      data: {
+        labels: S.monthly.labels,
+        datasets: [
+          { label: 'Envois',          data: S.monthly.uploads,
+            backgroundColor: C.blue,  borderRadius: 4 },
+          { label: 'Téléchargements', data: S.monthly.downloads,
+            backgroundColor: C.green, borderRadius: 4 },
+        ],
+      },
+      options: { ...baseOpts },
+    });
+
+    // ── Donut : répartition actions ───────────────────────────────────────
+    new Chart(document.getElementById('chartActions'), {
+      type: 'doughnut',
+      data: {
+        labels: S.actions.labels,
+        datasets: [{ data: S.actions.counts, backgroundColor: C.pie, hoverOffset: 6 }],
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position: 'bottom', labels: { color: tickColor, padding: 10, boxWidth: 12 } },
+        },
+      },
+    });
+
+    // ── Barres : nouveaux comptes par mois ────────────────────────────────
+    new Chart(document.getElementById('chartUsers'), {
+      type: 'bar',
+      data: {
+        labels: S.monthly.labels,
+        datasets: [
+          { label: 'Nouveaux comptes', data: S.monthly.users,
+            backgroundColor: C.warn, borderRadius: 4 },
+        ],
+      },
+      options: {
+        ...baseOpts,
+        scales: {
+          ...baseOpts.scales,
+          y: { ...baseOpts.scales.y, ticks: { ...baseOpts.scales.y.ticks, precision: 0 } },
+        },
+      },
+    });
+  });
+
+  // Si on arrive directement sur l'onglet via le hash, déclencher l'init
+  if (window.location.hash === '#analytics') {
+    document.getElementById('tab-analytics-btn').dispatchEvent(new Event('shown.bs.tab'));
+  }
+})();
 </script>
 </body>
 </html>

@@ -2011,6 +2011,113 @@ def drop_zone(drop_token):
                            settings=settings)
 
 
+# ── Statistiques admin ─────────────────────────────────────────────────────────
+def _compute_admin_stats():
+    from datetime import date as _d, timedelta as _td
+
+    def _months_back(n):
+        months, d = [], _d.today().replace(day=1)
+        for _ in range(n):
+            months.append(d.strftime('%Y-%m'))
+            d = (d - _td(days=1)).replace(day=1)
+        return list(reversed(months))
+
+    with sqlite3.connect(DATABASE) as conn:
+        conn.execute('PRAGMA journal_mode=WAL')
+
+        # ── KPI ──────────────────────────────────────────────────────────────
+        total_users    = conn.execute('SELECT COUNT(*) FROM users').fetchone()[0]
+        active_files   = conn.execute(
+            "SELECT COUNT(*) FROM files WHERE expiry > datetime('now')"
+        ).fetchone()[0]
+        total_uploads  = conn.execute(
+            "SELECT COUNT(*) FROM audit_logs WHERE action='upload'"
+        ).fetchone()[0]
+        total_downloads = conn.execute(
+            "SELECT COUNT(*) FROM audit_logs WHERE action IN ('download','bundle_download')"
+        ).fetchone()[0]
+
+        # ── Stockage total ───────────────────────────────────────────────────
+        storage_bytes = 0
+        try:
+            for fname in os.listdir(UPLOAD_FOLDER):
+                p = os.path.join(UPLOAD_FOLDER, fname)
+                if os.path.isfile(p):
+                    storage_bytes += os.path.getsize(p)
+        except OSError:
+            pass
+
+        # ── Activité des 30 derniers jours ───────────────────────────────────
+        today   = _d.today()
+        days_30 = [(today - _td(days=i)).isoformat() for i in range(29, -1, -1)]
+        rows = conn.execute(
+            "SELECT DATE(timestamp), COUNT(*) FROM audit_logs"
+            " WHERE action='upload' AND timestamp >= date('now','-29 days')"
+            " GROUP BY DATE(timestamp)"
+        ).fetchall()
+        upl_day = {r[0]: r[1] for r in rows}
+        rows = conn.execute(
+            "SELECT DATE(timestamp), COUNT(*) FROM audit_logs"
+            " WHERE action IN ('download','bundle_download')"
+            " AND timestamp >= date('now','-29 days') GROUP BY DATE(timestamp)"
+        ).fetchall()
+        dl_day = {r[0]: r[1] for r in rows}
+
+        # ── Activité mensuelle (12 mois) ─────────────────────────────────────
+        months_12 = _months_back(12)
+        rows = conn.execute(
+            "SELECT strftime('%Y-%m',timestamp), action, COUNT(*) FROM audit_logs"
+            " WHERE action IN ('upload','download','bundle_download')"
+            " AND timestamp >= date('now','-365 days')"
+            " GROUP BY strftime('%Y-%m',timestamp), action"
+        ).fetchall()
+        m_upl, m_dl = {}, {}
+        for month, action, cnt in rows:
+            if action == 'upload':
+                m_upl[month] = m_upl.get(month, 0) + cnt
+            else:
+                m_dl[month]  = m_dl.get(month, 0) + cnt
+
+        # ── Nouveaux comptes par mois (12 mois) ──────────────────────────────
+        rows_users = conn.execute(
+            "SELECT strftime('%Y-%m',created_at), COUNT(*) FROM users"
+            " WHERE created_at >= date('now','-365 days')"
+            " GROUP BY strftime('%Y-%m',created_at)"
+        ).fetchall()
+        m_users = {r[0]: r[1] for r in rows_users}
+
+        # ── Répartition des actions (top 10) ─────────────────────────────────
+        rows_actions = conn.execute(
+            "SELECT action, COUNT(*) FROM audit_logs"
+            " GROUP BY action ORDER BY COUNT(*) DESC LIMIT 10"
+        ).fetchall()
+
+    return {
+        'kpi': {
+            'total_users':     total_users,
+            'active_files':    active_files,
+            'total_uploads':   total_uploads,
+            'total_downloads': total_downloads,
+            'storage_bytes':   storage_bytes,
+        },
+        'daily': {
+            'labels':    [d[5:] for d in days_30],
+            'uploads':   [upl_day.get(d, 0) for d in days_30],
+            'downloads': [dl_day.get(d, 0)  for d in days_30],
+        },
+        'monthly': {
+            'labels':    months_12,
+            'uploads':   [m_upl.get(m, 0)   for m in months_12],
+            'downloads': [m_dl.get(m, 0)    for m in months_12],
+            'users':     [m_users.get(m, 0) for m in months_12],
+        },
+        'actions': {
+            'labels': [r[0] for r in rows_actions],
+            'counts': [r[1] for r in rows_actions],
+        },
+    }
+
+
 # ── Pages légales ─────────────────────────────────────────────────────────────
 @app.route('/mentions-legales')
 def mentions_legales():
@@ -2106,8 +2213,10 @@ def admin_panel():
         'legal_mentions': settings.get('legal_mentions', _DEFAULT_LEGAL_MENTIONS),
         'terms_of_use':   settings.get('terms_of_use',   _DEFAULT_TERMS_OF_USE),
     })
+    stats = _compute_admin_stats()
     return render_template('admin.html', users=users, form=form, sso_form=sso_form,
-                           legal_form=legal_form, settings=settings, logs=logs)
+                           legal_form=legal_form, settings=settings, logs=logs,
+                           stats=stats)
 
 
 @app.route('/admin/settings', methods=['POST'])
