@@ -2289,7 +2289,7 @@ _LEGAL_ALLOWED_TAGS = {
     'a', 'blockquote', 'hr', 'span', 'div',
 }
 _LEGAL_ALLOWED_ATTRS = {
-    'a': {'href', 'title', 'target', 'rel'},
+    'a': {'href', 'title', 'target'},   # 'rel' géré par link_rel= de nh3
     'span': {'class'},
     'div': {'class'},
 }
