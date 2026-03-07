@@ -2230,10 +2230,10 @@ a:not(.btn):not(.nav-link):not(.navbar-brand):not(.dropdown-item):not([class*="t
   background-color: var(--accent) !important;
   border-color: var(--accent) !important;
 }}
-.avatar-circle {{ background-color: var(--accent) !important; }}
+.avatar-circle {{ background-color: var(--accent) !important; color: #fff !important; }}
 """
     resp = app.response_class(css, mimetype='text/css')
-    resp.headers['Cache-Control'] = 'public, max-age=60'
+    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     return resp
 
 
