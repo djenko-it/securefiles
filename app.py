@@ -279,31 +279,23 @@ except Exception as exc:
 
 
 def _encrypt(data: bytes) -> bytes:
-    return fernet.encrypt(data) if fernet else data
+    return fernet.encrypt(data)
 
 
 def _decrypt(data: bytes) -> bytes:
-    if not fernet:
-        return data
-    try:
-        return fernet.decrypt(data)
-    except InvalidToken:
-        raise
+    return fernet.decrypt(data)
 
 
 def _encrypt_secret(secret: str) -> str:
-    if fernet and secret:
+    if secret:
         return fernet.encrypt(secret.encode()).decode()
     return secret
 
 
 def _decrypt_secret(encrypted: str) -> str:
-    if not fernet or not encrypted:
-        return encrypted or ''
-    try:
-        return fernet.decrypt(encrypted.encode()).decode()
-    except (InvalidToken, Exception):
-        raise
+    if not encrypted:
+        return ''
+    return fernet.decrypt(encrypted.encode()).decode()
 
 
 # ── Backup codes (TOTP recovery) ──────────────────────────────────────────────

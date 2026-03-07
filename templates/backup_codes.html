@@ -54,6 +54,14 @@
   </div>
 </main>
 
+<footer>
+  <a href="mailto:{{ settings.contact_email }}">{{ settings.contact_email }}</a>
+  &nbsp;·&nbsp;
+  <a href="{{ url_for('mentions_legales') }}">Mentions légales</a>
+  &nbsp;·&nbsp;
+  <a href="{{ url_for('cgu') }}">CGU</a>
+</footer>
+
 <script>
 function copyCodes() {
   const text = [...document.querySelectorAll('#codes-block div')].map(d => d.textContent.trim()).join('\n');
