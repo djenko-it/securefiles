@@ -2202,7 +2202,6 @@ def branding_css():
   --accent-dark: {dark};
   --accent-rgb: {r},{g},{b};
 }}
-.navbar {{ background-color: var(--accent) !important; }}
 .btn-primary {{
   background-color: var(--accent) !important;
   border-color: var(--accent) !important;
