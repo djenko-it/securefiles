@@ -413,8 +413,17 @@
 
       // ── Affichage des résultats ───────────────────────────────────────────────
       async function showResults(results) {
-        const single = document.getElementById('single-result')
-        const multi  = document.getElementById('multi-result')
+        const single      = document.getElementById('single-result')
+        const multi       = document.getElementById('multi-result')
+        const labelEl     = document.getElementById('linkModalLabel')
+        const successCount = results.filter(r => r.success).length
+        if (successCount === 0) {
+          labelEl.innerHTML = '<i class="fas fa-times-circle text-danger me-2"></i>Échec de l\'envoi'
+        } else if (successCount < results.length) {
+          labelEl.innerHTML = '<i class="fas fa-exclamation-circle text-warning me-2"></i>Envoi partiel (' + successCount + '/' + results.length + ')'
+        } else {
+          labelEl.innerHTML = '<i class="fas fa-circle-check text-success me-2"></i>Fichier(s) prêt(s) !'
+        }
 
         // Cas fichier unique
         if (results.length === 1 && results[0].success) {

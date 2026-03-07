@@ -31,7 +31,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 from wtforms import (BooleanField, FileField, IntegerField, PasswordField,
                      SelectField, StringField, SubmitField, TextAreaField)
-from wtforms.validators import DataRequired, EqualTo, Length, NumberRange, Optional
+from wtforms.validators import DataRequired, EqualTo, Length, NumberRange, Optional, Regexp
 
 try:
     from webauthn import (
@@ -291,7 +291,11 @@ class FileUploadForm(FlaskForm):
 
 
 class RegisterForm(FlaskForm):
-    username = StringField('Nom d\'utilisateur', validators=[DataRequired(), Length(min=3, max=32)])
+    username = StringField('Nom d\'utilisateur', validators=[
+        DataRequired(), Length(min=3, max=32),
+        Regexp(r'^[a-zA-Z0-9._-]+$',
+               message="Uniquement lettres, chiffres, points, tirets et underscores."),
+    ])
     password = PasswordField('Mot de passe', validators=[DataRequired(), Length(min=10)])
     confirm  = PasswordField('Confirmer', validators=[
         DataRequired(), EqualTo('password', message='Les mots de passe ne correspondent pas.'),
