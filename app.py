@@ -97,7 +97,7 @@ SETTINGS_DEFAULTS = {
     'max_files_per_user': '0',
     'max_storage_mb':     '0',
     'welcome_banner':            '',
-    'audit_log_retention_days':  '0',
+    'audit_log_retention_days':  '90',
     'max_file_size_unit':        'mo',
     'e2e_mode':                  'optional',
     'maintenance_mode':          '0',
@@ -144,13 +144,19 @@ def get_rp_origin():
 # ── Chiffrement Fernet ────────────────────────────────────────────────────────
 _raw_key = os.environ.get('ENCRYPTION_KEY', '').strip().strip('"').strip("'")
 _raw_key = _raw_key.split('#')[0].strip()
-if _raw_key:
-    try:
-        fernet = Fernet(_raw_key.encode())
-    except Exception:
-        fernet = None
-else:
-    fernet = None
+if not _raw_key:
+    raise RuntimeError(
+        "ENCRYPTION_KEY non définie. Les fichiers seraient stockés en clair, "
+        "ce qui est incompatible avec les exigences RGPD. "
+        "Générez une clé avec : python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\""
+    )
+try:
+    fernet = Fernet(_raw_key.encode())
+except Exception as exc:
+    raise RuntimeError(
+        f"ENCRYPTION_KEY invalide ({exc}). "
+        "Générez une clé valide avec : python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\""
+    ) from exc
 
 
 def _encrypt(data: bytes) -> bytes:
@@ -531,10 +537,26 @@ def close_connection(exception):
 
 
 # ── Journal d'audit ───────────────────────────────────────────────────────────
+def _anonymize_ip(ip: str) -> str:
+    """Anonymise l'adresse IP pour conformité RGPD.
+    IPv4 : masque le dernier octet  (192.168.1.42  → 192.168.1.x)
+    IPv6 : masque les 64 derniers bits (2001:db8::1 → 2001:db8::x)
+    """
+    if not ip:
+        return None
+    if ':' in ip:
+        parts = ip.split(':')
+        return ':'.join(parts[:4]) + '::x'
+    parts = ip.split('.')
+    if len(parts) == 4:
+        return '.'.join(parts[:3]) + '.x'
+    return None
+
+
 def audit_log(action: str, target: str = None, details: str = None):
     uid   = current_user.id       if current_user.is_authenticated else None
     uname = current_user.username if current_user.is_authenticated else None
-    ip    = request.remote_addr
+    ip    = _anonymize_ip(request.remote_addr)
     try:
         g.db.execute(
             'INSERT INTO audit_logs (user_id, username, action, target, details, ip_address)'
@@ -1658,6 +1680,51 @@ def delete_file(file_id):
         g.db.commit()
         audit_log('delete_file', target=file_id, details=row[1])
     return redirect(url_for('dashboard'))
+
+
+# ── RGPD : export des données personnelles (art. 20) ─────────────────────────
+@app.route('/profile/export')
+@login_required
+def profile_export():
+    """Retourne un JSON contenant toutes les données personnelles de l'utilisateur."""
+    user_row = g.db.execute(
+        'SELECT username, created_at, theme, avatar_color, is_admin, sso_user FROM users WHERE id = ?',
+        (current_user.id,)
+    ).fetchone()
+    files = g.db.execute(
+        'SELECT id, original_filename, expiry, views, max_downloads FROM files WHERE owner_id = ?',
+        (current_user.id,)
+    ).fetchall()
+    logs = g.db.execute(
+        'SELECT timestamp, action, target, details, ip_address FROM audit_logs WHERE user_id = ? ORDER BY timestamp DESC',
+        (current_user.id,)
+    ).fetchall()
+    payload = {
+        'export_date': datetime.now().isoformat(),
+        'account': {
+            'username':    user_row[0],
+            'created_at':  user_row[1],
+            'theme':       user_row[2],
+            'avatar_color': user_row[3],
+            'is_admin':    bool(user_row[4]),
+            'sso_user':    bool(user_row[5]),
+        },
+        'files': [
+            {'id': r[0], 'filename': r[1], 'expiry': r[2], 'views': r[3], 'max_downloads': r[4]}
+            for r in files
+        ],
+        'audit_logs': [
+            {'timestamp': r[0], 'action': r[1], 'target': r[2], 'details': r[3], 'ip_address': r[4]}
+            for r in logs
+        ],
+    }
+    audit_log('rgpd_export')
+    response = app.response_class(
+        response=json.dumps(payload, ensure_ascii=False, indent=2),
+        mimetype='application/json',
+        headers={'Content-Disposition': f'attachment; filename="mes-donnees-{current_user.username}.json"'}
+    )
+    return response
 
 
 # ── Liens de dépôt temporaires ────────────────────────────────────────────────

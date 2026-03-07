@@ -9,7 +9,8 @@
 Les services de partage grand public (WeTransfer, Smash, Filemail…) traitent vos fichiers sur leurs infrastructures. SecureFiles vous rend le contrôle : vous choisissez le serveur, les règles d'accès et la durée de vie des données.
 
 - **Vos données restent chez vous** — aucun tiers n'a accès à vos fichiers
-- **Chiffrement au repos** — les fichiers sont chiffrés sur le disque (AES-128)
+- **Chiffrement au repos** — les fichiers sont chiffrés sur le disque (Fernet : AES-128-CBC + HMAC-SHA256)
+- **Chiffrement de bout en bout (E2E)** — en mode E2E, le fichier est chiffré côté navigateur (AES-256-GCM) avant envoi ; le serveur ne voit jamais le contenu en clair
 - **Éphémère par nature** — expiration automatique, suppression après téléchargement
 - **Déploiement simple** — un `docker compose up` suffit
 
