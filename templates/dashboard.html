@@ -186,7 +186,7 @@
             <div class="d-flex justify-content-between mb-1">
               <small class="text-muted"><i class="fas fa-hard-drive me-1"></i>Stockage</small>
               <small class="fw-semibold">
-                {{ quota.used_str }}{% if quota.max_storage_mb > 0 %} / {{ quota.max_storage_mb }} Mo{% endif %}
+                {{ quota.used_str }}{% if quota.max_storage_str %} / {{ quota.max_storage_str }}{% endif %}
               </small>
             </div>
             {% if quota.storage_pct is not none %}

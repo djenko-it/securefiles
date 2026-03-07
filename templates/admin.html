@@ -249,10 +249,10 @@
                 <div class="form-text">0 = pas de limite.</div>
               </div>
               <div class="col-md-6">
-                <label class="form-label">{{ form.max_storage_mb.label.text }}</label>
+                <label class="form-label">{{ form.max_storage_value.label.text }}</label>
                 <div class="input-group">
-                  {{ form.max_storage_mb(class="form-control") }}
-                  <span class="input-group-text">Mo</span>
+                  {{ form.max_storage_value(class="form-control") }}
+                  {{ form.max_storage_unit(class="form-select", style="max-width:5rem") }}
                 </div>
                 <div class="form-text">0 = pas de limite.</div>
               </div>

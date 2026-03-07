@@ -212,6 +212,7 @@ SETTINGS_DEFAULTS = {
     'default_expiry':     '1d',
     'max_files_per_user': '0',
     'max_storage_mb':     '0',
+    'max_storage_unit':   'mo',
     'welcome_banner':            '',
     'audit_log_retention_days':  '90',
     'max_file_size_unit':        'mo',
@@ -453,8 +454,9 @@ class AdminSettingsForm(FlaskForm):
     ])
     max_files_per_user       = IntegerField('Quota fichiers / utilisateur (0 = illimité)',
                                             validators=[NumberRange(min=0)])
-    max_storage_mb           = IntegerField('Quota stockage / utilisateur en Mo (0 = illimité)',
+    max_storage_value        = IntegerField('Quota stockage / utilisateur (0 = illimité)',
                                             validators=[NumberRange(min=0)])
+    max_storage_unit         = SelectField('Unité stockage', choices=[('mo', 'Mo'), ('go', 'Go')])
     audit_log_retention_days = IntegerField('Rétention des logs d\'audit (jours, 0 = illimité)',
                                             validators=[NumberRange(min=0)])
     e2e_mode                 = SelectField('Chiffrement de bout en bout', choices=[
@@ -852,8 +854,11 @@ def upload_file():
             except OSError:
                 pass
         if used + size_bytes > max_storage * 1024 * 1024:
+            _s_unit = settings.get('max_storage_unit', 'mo')
+            _s_disp = max_storage // 1024 if _s_unit == 'go' else max_storage
+            _s_label = 'Go' if _s_unit == 'go' else 'Mo'
             return {'success': False,
-                    'message': f"Quota de stockage dépassé ({max_storage} Mo maximum)."}
+                    'message': f"Quota de stockage dépassé ({_s_disp} {_s_label} maximum)."}
 
     file_id      = str(uuid.uuid4())
     expiry_str   = request.form.get('expiry', settings['default_expiry'])
@@ -1735,9 +1740,10 @@ def dashboard():
         for (fid,) in all_ids
         if os.path.exists(os.path.join(app.config['UPLOAD_FOLDER'], fid))
     )
-    max_storage_mb = int(settings['max_storage_mb'])
-    max_files      = int(settings['max_files_per_user'])
-    file_count     = len(all_ids)
+    max_storage_mb   = int(settings['max_storage_mb'])
+    _s_unit          = settings.get('max_storage_unit', 'mo')
+    max_files        = int(settings['max_files_per_user'])
+    file_count       = len(all_ids)
 
     def _fmt_bytes(b):
         if b >= 1024 ** 3:
@@ -1746,9 +1752,17 @@ def dashboard():
             return f"{b / 1024 ** 2:.1f} Mo"
         return f"{b / 1024:.0f} Ko"
 
+    if max_storage_mb > 0:
+        _s_disp  = max_storage_mb // 1024 if _s_unit == 'go' else max_storage_mb
+        _s_label = 'Go' if _s_unit == 'go' else 'Mo'
+        _max_str = f"{_s_disp} {_s_label}"
+    else:
+        _max_str = None
+
     quota = {
         'used_str':       _fmt_bytes(used_bytes),
         'max_storage_mb': max_storage_mb,
+        'max_storage_str': _max_str,
         'storage_pct':    min(100, round(used_bytes * 100 / (max_storage_mb * 1048576)))
                           if max_storage_mb > 0 else None,
         'file_count':     file_count,
@@ -2060,6 +2074,9 @@ def admin_panel():
     _unit = settings.get('max_file_size_unit', 'mo')
     _mb   = int(settings['max_file_size_mb'])
     _display_val = _mb // 1024 if _unit == 'go' else _mb
+    _s_unit = settings.get('max_storage_unit', 'mo')
+    _s_mb   = int(settings['max_storage_mb'])
+    _s_display = _s_mb // 1024 if _s_unit == 'go' else _s_mb
     form = AdminSettingsForm(data={
         'app_name':                 settings['app_name'],
         'contact_email':            settings['contact_email'],
@@ -2070,7 +2087,8 @@ def admin_panel():
         'allow_registration':       settings['allow_registration'] == '1',
         'default_expiry':           settings['default_expiry'],
         'max_files_per_user':       int(settings['max_files_per_user']),
-        'max_storage_mb':           int(settings['max_storage_mb']),
+        'max_storage_value':        _s_display,
+        'max_storage_unit':         _s_unit,
         'audit_log_retention_days': int(settings.get('audit_log_retention_days', '0')),
         'e2e_mode':                 settings.get('e2e_mode', 'optional'),
         'maintenance_mode':         settings.get('maintenance_mode') == '1',
@@ -2098,9 +2116,12 @@ def admin_panel():
 def admin_save_settings():
     form = AdminSettingsForm()
     if form.validate_on_submit():
-        _unit = form.max_file_size_unit.data
-        _val  = form.max_file_size_value.data
-        _mb   = _val * 1024 if _unit == 'go' else _val
+        _unit  = form.max_file_size_unit.data
+        _val   = form.max_file_size_value.data
+        _mb    = _val * 1024 if _unit == 'go' else _val
+        _s_unit = form.max_storage_unit.data
+        _s_val  = form.max_storage_value.data
+        _s_mb   = _s_val * 1024 if _s_unit == 'go' else _s_val
         values = {
             'app_name':                 form.app_name.data.strip(),
             'contact_email':            form.contact_email.data.strip(),
@@ -2111,7 +2132,8 @@ def admin_save_settings():
             'allow_registration':       '1' if form.allow_registration.data else '0',
             'default_expiry':           form.default_expiry.data,
             'max_files_per_user':       str(form.max_files_per_user.data),
-            'max_storage_mb':           str(form.max_storage_mb.data),
+            'max_storage_mb':           str(_s_mb),
+            'max_storage_unit':         _s_unit,
             'audit_log_retention_days': str(form.audit_log_retention_days.data),
             'e2e_mode':                 form.e2e_mode.data,
             'maintenance_mode':         '1' if form.maintenance_mode.data else '0',
