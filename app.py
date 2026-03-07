@@ -409,8 +409,9 @@ def inject_globals():
             'user_theme':        current_user.theme,
             'user_avatar_color': current_user.avatar_color,
             'user_avatar_letter': current_user.avatar_letter,
+            'csp_nonce': g.get('csp_nonce', ''),
         }
-    return {'user_theme': 'light', 'user_avatar_color': '#4361ee', 'user_avatar_letter': '?'}
+    return {'user_theme': 'light', 'user_avatar_color': '#4361ee', 'user_avatar_letter': '?', 'csp_nonce': g.get('csp_nonce', '')}
 
 
 # ── Formulaires WTForms ───────────────────────────────────────────────────────
@@ -617,6 +618,7 @@ def init_db():
 
 @app.before_request
 def before_request():
+    g.csp_nonce = secrets.token_urlsafe(16)
     g.db = get_db()
     if request.path.startswith('/static'):
         return
@@ -651,13 +653,14 @@ def set_security_headers(response):
     # /preview/ doit pouvoir s'afficher dans une iframe same-origin (aperçu PDF/vidéo)
     is_preview     = request.path.startswith('/preview/')
     frame_ancestors = "'self'" if is_preview else "'none'"
+    nonce = g.get('csp_nonce', secrets.token_urlsafe(16))
     csp = (
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
-        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com; "
-        "font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com data:; "
+        f"script-src 'self' 'nonce-{nonce}'; "
+        f"style-src 'self' 'nonce-{nonce}'; "
+        "font-src 'self' data:; "
         "img-src 'self' data: blob:; "
-        "connect-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
+        "connect-src 'self'; "
         f"frame-ancestors {frame_ancestors}; "
         "object-src 'none'; "
         "base-uri 'self';"
