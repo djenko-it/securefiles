@@ -482,7 +482,7 @@
         // Cas avec erreurs ou E2E → liens individuels
         single.style.display = 'none'
         multi.style.display  = 'block'
-        document.getElementById('copy-all-wrapper').style.display = 'flex'
+        document.getElementById('copy-all-wrapper').style.display = successCount > 0 ? 'flex' : 'none'
         renderIndividual(document.getElementById('multi-links'), results)
         linkModal.show()
       }
