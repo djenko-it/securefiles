@@ -71,7 +71,7 @@ app.config.update(
     SESSION_COOKIE_SAMESITE='Lax', # protection CSRF de base
     REMEMBER_COOKIE_SECURE=True,
     REMEMBER_COOKIE_HTTPONLY=True,
-    MAX_CONTENT_LENGTH=512 * 1024 * 1024,  # 512 Mo max au niveau Flask
+    MAX_CONTENT_LENGTH=10 * 1024 * 1024 * 1024,  # 10 Go max au niveau Flask (la limite applicative est dans les settings)
 )
 csrf = CSRFProtect(app)
 logging.basicConfig(level=logging.INFO)
