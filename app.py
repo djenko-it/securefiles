@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 from functools import wraps
 from urllib.parse import urlencode, urlparse
 
+import mistune
 import requests
 import nh3
 
@@ -109,118 +110,106 @@ def _darken_hex(h: str, amount: float = 0.15) -> str:
 
 # ── Contenus légaux par défaut (modifiables en administration) ─────────────────
 _DEFAULT_LEGAL_MENTIONS = """\
-<h2>Mentions légales</h2>
+## Mentions légales
 
-<h3>Éditeur du site</h3>
-<p>
-  Ce site est édité par : <strong>[Nom / Raison sociale]</strong><br>
-  Adresse : [Adresse complète]<br>
-  Contact : <a href="mailto:{contact_email}">{contact_email}</a>
-</p>
+### Éditeur du site
 
-<h3>Hébergement</h3>
-<p>Ce site est hébergé sur une infrastructure auto-hébergée, dont l'exploitant est responsable.</p>
+Ce site est édité par : **[Nom / Raison sociale]**
+Adresse : [Adresse complète]
+Contact : [{contact_email}](mailto:{contact_email})
 
-<h3>Directeur de la publication</h3>
-<p>[Nom du directeur de la publication]</p>
+### Hébergement
 
-<h3>Propriété intellectuelle</h3>
-<p>
-  Le code source de cette application est distribué sous licence open source.
-  Toute reproduction partielle ou totale du contenu est interdite sans autorisation préalable.
-</p>
+Ce site est hébergé sur une infrastructure auto-hébergée, dont l'exploitant est responsable.
 
-<h3>Données personnelles (RGPD)</h3>
-<p>
-  Conformément au Règlement Général sur la Protection des Données (RGPD — UE 2016/679),
-  vous disposez d'un droit d'accès, de rectification, d'effacement et de portabilité
-  de vos données personnelles.
-</p>
-<p>
-  Données collectées : identifiant de connexion, adresse IP anonymisée, journaux d'activité.<br>
-  Durée de conservation : 90 jours pour les journaux d'audit. Les fichiers sont supprimés
-  automatiquement à la date d'expiration choisie lors du dépôt.<br>
-  Aucune donnée n'est transmise à des tiers.
-</p>
-<p>
-  Pour exercer vos droits ou pour toute question relative à vos données personnelles,
-  contactez : <a href="mailto:{contact_email}">{contact_email}</a>
-</p>
+### Directeur de la publication
 
-<h3>Cookies</h3>
-<p>
-  Ce site utilise uniquement des cookies strictement nécessaires au fonctionnement
-  du service (session de connexion, jeton CSRF). Aucun cookie publicitaire ou de traçage
-  n'est utilisé.
-</p>
+[Nom du directeur de la publication]
+
+### Propriété intellectuelle
+
+Le code source de cette application est distribué sous licence open source.
+Toute reproduction partielle ou totale du contenu est interdite sans autorisation préalable.
+
+### Données personnelles (RGPD)
+
+Conformément au Règlement Général sur la Protection des Données (RGPD — UE 2016/679),
+vous disposez d'un droit d'accès, de rectification, d'effacement et de portabilité
+de vos données personnelles.
+
+Données collectées : identifiant de connexion, adresse IP anonymisée, journaux d'activité.
+Durée de conservation : 90 jours pour les journaux d'audit. Les fichiers sont supprimés
+automatiquement à la date d'expiration choisie lors du dépôt.
+Aucune donnée n'est transmise à des tiers.
+
+Pour exercer vos droits, contactez : [{contact_email}](mailto:{contact_email})
+
+### Cookies
+
+Ce site utilise uniquement des cookies strictement nécessaires au fonctionnement
+du service (session de connexion, jeton CSRF). Aucun cookie publicitaire ou de traçage
+n'est utilisé.
 """
 
 _DEFAULT_TERMS_OF_USE = """\
-<h2>Conditions Générales d'Utilisation</h2>
-<p><em>En vigueur au {date}</em></p>
+## Conditions Générales d'Utilisation
 
-<h3>1. Objet</h3>
-<p>
-  Les présentes Conditions Générales d'Utilisation (CGU) régissent l'accès et l'utilisation
-  de <strong>{app_name}</strong>, service de partage de fichiers éphémère et chiffré.
-  En accédant au service, l'utilisateur accepte sans réserve les présentes CGU.
-</p>
+*En vigueur au {date}*
 
-<h3>2. Accès au service</h3>
-<p>
-  L'accès est réservé aux personnes disposant d'un compte autorisé par l'administrateur.
-  Les liens de partage et les zones de dépôt peuvent être accessibles sans compte,
-  dans les limites définies par l'administrateur.
-</p>
+### 1. Objet
 
-<h3>3. Utilisation acceptable</h3>
-<p>L'utilisateur s'engage à ne pas utiliser ce service pour :</p>
-<ul>
-  <li>Transmettre des fichiers illégaux, malveillants ou portant atteinte aux droits de tiers ;</li>
-  <li>Contourner les mesures de sécurité ou tenter d'accéder à des ressources non autorisées ;</li>
-  <li>Partager du contenu protégé par le droit d'auteur sans autorisation ;</li>
-  <li>Toute activité contraire aux lois et règlements en vigueur.</li>
-</ul>
+Les présentes Conditions Générales d'Utilisation (CGU) régissent l'accès et l'utilisation
+de **{app_name}**, service de partage de fichiers éphémère et chiffré.
+En accédant au service, l'utilisateur accepte sans réserve les présentes CGU.
 
-<h3>4. Durée de conservation des fichiers</h3>
-<p>
-  Les fichiers sont automatiquement supprimés à l'expiration définie lors du dépôt.
-  L'administrateur se réserve le droit de supprimer tout contenu à tout moment,
-  notamment en cas de non-respect des présentes CGU.
-</p>
+### 2. Accès au service
 
-<h3>5. Chiffrement et sécurité</h3>
-<p>
-  Les fichiers sont chiffrés au repos sur le serveur (Fernet AES-128-CBC + HMAC-SHA256).
-  En mode chiffrement de bout en bout (E2E), les fichiers sont chiffrés côté navigateur
-  (AES-256-GCM) avant envoi : le serveur ne peut pas accéder au contenu.
-  Malgré ces mesures, aucun système n'offre une sécurité absolue.
-</p>
+L'accès est réservé aux personnes disposant d'un compte autorisé par l'administrateur.
+Les liens de partage et les zones de dépôt peuvent être accessibles sans compte,
+dans les limites définies par l'administrateur.
 
-<h3>6. Responsabilité</h3>
-<p>
-  L'éditeur ne saurait être tenu responsable du contenu des fichiers partagés par les
-  utilisateurs, ni des conséquences d'une utilisation non conforme aux présentes CGU.
-  Le service est fourni « en l'état », sans garantie de disponibilité continue.
-</p>
+### 3. Utilisation acceptable
 
-<h3>7. Données personnelles</h3>
-<p>
-  Le traitement des données personnelles est décrit dans les
-  <a href="/mentions-legales">Mentions légales</a>.
-</p>
+L'utilisateur s'engage à ne pas utiliser ce service pour :
 
-<h3>8. Modification des CGU</h3>
-<p>
-  Les présentes CGU peuvent être modifiées à tout moment par l'administrateur.
-  La poursuite de l'utilisation du service après modification vaut acceptation des nouvelles CGU.
-</p>
+- Transmettre des fichiers illégaux, malveillants ou portant atteinte aux droits de tiers ;
+- Contourner les mesures de sécurité ou tenter d'accéder à des ressources non autorisées ;
+- Partager du contenu protégé par le droit d'auteur sans autorisation ;
+- Toute activité contraire aux lois et règlements en vigueur.
 
-<h3>9. Droit applicable</h3>
-<p>
-  Les présentes CGU sont soumises au droit français. Tout litige relève de la compétence
-  exclusive des tribunaux compétents.
-</p>
+### 4. Durée de conservation des fichiers
+
+Les fichiers sont automatiquement supprimés à l'expiration définie lors du dépôt.
+L'administrateur se réserve le droit de supprimer tout contenu à tout moment,
+notamment en cas de non-respect des présentes CGU.
+
+### 5. Chiffrement et sécurité
+
+Les fichiers sont chiffrés au repos sur le serveur (Fernet AES-128-CBC + HMAC-SHA256).
+En mode chiffrement de bout en bout (E2E), les fichiers sont chiffrés côté navigateur
+(AES-256-GCM) avant envoi : le serveur ne peut pas accéder au contenu.
+Malgré ces mesures, aucun système n'offre une sécurité absolue.
+
+### 6. Responsabilité
+
+L'éditeur ne saurait être tenu responsable du contenu des fichiers partagés par les
+utilisateurs, ni des conséquences d'une utilisation non conforme aux présentes CGU.
+Le service est fourni « en l'état », sans garantie de disponibilité continue.
+
+### 7. Données personnelles
+
+Le traitement des données personnelles est décrit dans les
+[Mentions légales](/mentions-legales).
+
+### 8. Modification des CGU
+
+Les présentes CGU peuvent être modifiées à tout moment par l'administrateur.
+La poursuite de l'utilisation du service après modification vaut acceptation des nouvelles CGU.
+
+### 9. Droit applicable
+
+Les présentes CGU sont soumises au droit français. Tout litige relève de la compétence
+exclusive des tribunaux compétents.
 """
 
 SETTINGS_DEFAULTS = {
@@ -686,8 +675,8 @@ class SSOSettingsForm(FlaskForm):
 
 
 class LegalForm(FlaskForm):
-    legal_mentions = TextAreaField('Mentions légales (HTML autorisé)', validators=[Optional()])
-    terms_of_use   = TextAreaField('Conditions Générales d\'Utilisation (HTML autorisé)', validators=[Optional()])
+    legal_mentions = TextAreaField('Mentions légales (Markdown)', validators=[Optional()])
+    terms_of_use   = TextAreaField('Conditions Générales d\'Utilisation (Markdown)', validators=[Optional()])
     submit         = SubmitField('Sauvegarder')
 
 
@@ -2455,8 +2444,12 @@ _LEGAL_ALLOWED_ATTRS = {
     'div': {'class'},
 }
 
-def _sanitize_legal(html: str) -> str:
-    """Sanitise le HTML des pages légales — whitelist stricte, pas de script/event handler."""
+_md_parser = mistune.create_markdown()
+
+
+def _sanitize_legal(md: str) -> str:
+    """Convertit le Markdown en HTML, puis sanitise avec une whitelist stricte."""
+    html = _md_parser(md)
     return nh3.clean(
         html,
         tags=_LEGAL_ALLOWED_TAGS,
