@@ -252,6 +252,14 @@ SETTINGS_DEFAULTS = {
     # Mentions légales / CGU
     'legal_mentions': _DEFAULT_LEGAL_MENTIONS,
     'terms_of_use':   _DEFAULT_TERMS_OF_USE,
+    # Stockage S3
+    'storage_backend':   'local',   # 'local' | 's3'
+    's3_bucket':         '',
+    's3_region':         '',
+    's3_endpoint_url':   '',        # vide = AWS standard ; sinon MinIO/R2/etc.
+    's3_access_key':     '',
+    's3_secret_key':     '',        # chiffré avec Fernet
+    's3_prefix':         '',        # préfixe/dossier optionnel dans le bucket
 }
 
 LOGIN_MAX_ATTEMPTS    = 10
@@ -319,6 +327,119 @@ def _decrypt_secret(encrypted: str) -> str:
     if not encrypted:
         return ''
     return fernet.decrypt(encrypted.encode()).decode()
+
+
+# ── Couche de stockage abstraite (local / S3) ─────────────────────────────────
+try:
+    import boto3
+    from botocore.exceptions import BotoCoreError, ClientError as S3ClientError
+    _BOTO3_AVAILABLE = True
+except ImportError:
+    _BOTO3_AVAILABLE = False
+
+
+def _get_s3_settings():
+    """Retourne les paramètres S3 depuis la base de données (sans g, utilisable hors contexte)."""
+    try:
+        with sqlite3.connect(DATABASE) as conn:
+            rows = conn.execute("SELECT key, value FROM settings WHERE key LIKE 's3_%' OR key = 'storage_backend'").fetchall()
+        s = dict(SETTINGS_DEFAULTS)
+        s.update({r[0]: r[1] for r in rows})
+        return s
+    except Exception:
+        return dict(SETTINGS_DEFAULTS)
+
+
+def _build_s3_client(s):
+    """Construit un client boto3 à partir des paramètres s."""
+    kwargs = {
+        'aws_access_key_id':     s.get('s3_access_key') or None,
+        'aws_secret_access_key': _decrypt_secret(s.get('s3_secret_key', '')) or None,
+        'region_name':           s.get('s3_region') or None,
+    }
+    endpoint = s.get('s3_endpoint_url', '').strip()
+    if endpoint:
+        kwargs['endpoint_url'] = endpoint
+    return boto3.client('s3', **kwargs)
+
+
+def _s3_key(file_id: str, s=None) -> str:
+    prefix = (s or {}).get('s3_prefix', '').strip().strip('/')
+    return f"{prefix}/{file_id}" if prefix else file_id
+
+
+def storage_write(file_id: str, data: bytes) -> None:
+    """Écrit des données chiffrées dans le backend actif."""
+    s = _get_s3_settings()
+    if s.get('storage_backend') == 's3':
+        if not _BOTO3_AVAILABLE:
+            raise RuntimeError("boto3 non installé — impossible d'utiliser le backend S3.")
+        client = _build_s3_client(s)
+        client.put_object(Bucket=s['s3_bucket'], Key=_s3_key(file_id, s), Body=data)
+    else:
+        dest = os.path.join(app.config['UPLOAD_FOLDER'], file_id)
+        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+        with open(dest, 'wb') as fh:
+            fh.write(data)
+
+
+def storage_read(file_id: str) -> bytes:
+    """Lit et retourne les données chiffrées depuis le backend actif."""
+    s = _get_s3_settings()
+    if s.get('storage_backend') == 's3':
+        if not _BOTO3_AVAILABLE:
+            raise RuntimeError("boto3 non installé.")
+        client = _build_s3_client(s)
+        resp = client.get_object(Bucket=s['s3_bucket'], Key=_s3_key(file_id, s))
+        return resp['Body'].read()
+    else:
+        path = os.path.join(app.config['UPLOAD_FOLDER'], file_id)
+        with open(path, 'rb') as fh:
+            return fh.read()
+
+
+def storage_delete(file_id: str) -> bool:
+    """Supprime un fichier du backend actif. Retourne True si supprimé."""
+    s = _get_s3_settings()
+    if s.get('storage_backend') == 's3':
+        if not _BOTO3_AVAILABLE:
+            return False
+        try:
+            client = _build_s3_client(s)
+            client.delete_object(Bucket=s['s3_bucket'], Key=_s3_key(file_id, s))
+            return True
+        except Exception as exc:
+            app.logger.error("S3 delete error %s: %s", file_id, exc)
+            return False
+    else:
+        path = os.path.join(app.config['UPLOAD_FOLDER'], file_id)
+        try:
+            if os.path.exists(path):
+                os.remove(path)
+                return True
+        except OSError as exc:
+            app.logger.error("Erreur suppression fichier %s : %s", file_id, exc)
+        return False
+
+
+def storage_get_size(file_id: str) -> int:
+    """Retourne la taille en octets d'un fichier dans le backend actif (0 si absent)."""
+    s = _get_s3_settings()
+    if s.get('storage_backend') == 's3':
+        if not _BOTO3_AVAILABLE:
+            return 0
+        try:
+            client = _build_s3_client(s)
+            resp = client.head_object(Bucket=s['s3_bucket'], Key=_s3_key(file_id, s))
+            return resp['ContentLength']
+        except Exception:
+            return 0
+    else:
+        path = os.path.join(app.config['UPLOAD_FOLDER'], file_id)
+        try:
+            return os.path.getsize(path) if os.path.exists(path) else 0
+        except OSError:
+            return 0
 
 
 # ── Backup codes (TOTP recovery) ──────────────────────────────────────────────
@@ -523,6 +644,23 @@ class LegalForm(FlaskForm):
     legal_mentions = TextAreaField('Mentions légales (HTML autorisé)', validators=[Optional()])
     terms_of_use   = TextAreaField('Conditions Générales d\'Utilisation (HTML autorisé)', validators=[Optional()])
     submit         = SubmitField('Sauvegarder')
+
+
+class S3SettingsForm(FlaskForm):
+    storage_backend = SelectField('Backend de stockage', choices=[
+        ('local', 'Local (système de fichiers)'),
+        ('s3',    'S3 (AWS, MinIO, Cloudflare R2…)'),
+    ])
+    s3_bucket       = StringField('Nom du bucket', validators=[Optional(), Length(max=128)])
+    s3_region       = StringField('Région AWS (ex: eu-west-3)', validators=[Optional(), Length(max=64)])
+    s3_endpoint_url = StringField('Endpoint URL (vide = AWS par défaut)',
+                                  validators=[Optional(), Length(max=512)])
+    s3_access_key   = StringField('Access Key ID', validators=[Optional(), Length(max=256)])
+    s3_secret_key   = PasswordField('Secret Access Key (laisser vide pour ne pas changer)',
+                                    validators=[Optional(), Length(max=512)])
+    s3_prefix       = StringField('Préfixe (dossier dans le bucket)',
+                                  validators=[Optional(), Length(max=256)])
+    submit          = SubmitField('Sauvegarder le stockage')
 
 
 # ── Base de données ───────────────────────────────────────────────────────────
@@ -745,12 +883,9 @@ def cleanup_expired_files():
             conn.execute('PRAGMA journal_mode=WAL')
             expired = conn.execute('SELECT id FROM files WHERE expiry < ?', (now,)).fetchall()
             for (fid,) in expired:
-                path = os.path.join(UPLOAD_FOLDER, fid)
-                try:
-                    if os.path.exists(path):
-                        os.remove(path)
-                        deleted += 1
-                except OSError:
+                if storage_delete(fid):
+                    deleted += 1
+                else:
                     errors += 1
             conn.execute('DELETE FROM files WHERE expiry < ?', (now,))
     except Exception:
@@ -830,14 +965,7 @@ def _require_uuid(file_id: str) -> None:
 
 
 def _remove_file(file_id: str) -> bool:
-    path = os.path.join(app.config['UPLOAD_FOLDER'], file_id)
-    try:
-        if os.path.exists(path):
-            os.remove(path)
-            return True
-    except OSError as exc:
-        app.logger.error("Erreur suppression fichier %s : %s", file_id, exc)
-    return False
+    return storage_delete(file_id)
 
 
 # ── Routes principales ────────────────────────────────────────────────────────
@@ -884,13 +1012,7 @@ def upload_file():
         file_ids = g.db.execute(
             'SELECT id FROM files WHERE owner_id = ?', (current_user.id,)
         ).fetchall()
-        used = 0
-        for (fid,) in file_ids:
-            p = os.path.join(app.config['UPLOAD_FOLDER'], fid)
-            try:
-                used += os.path.getsize(p) if os.path.exists(p) else 0
-            except OSError:
-                pass
+        used = sum(storage_get_size(fid) for (fid,) in file_ids)
         if used + size_bytes > max_storage * 1024 * 1024:
             _s_unit = settings.get('max_storage_unit', 'mo')
             _s_disp = max_storage // 1024 if _s_unit == 'go' else max_storage
@@ -924,13 +1046,10 @@ def upload_file():
     password        = request.form.get('password', '')
     hashed_password = generate_password_hash(password) if password else None
 
-    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-    dest = os.path.join(app.config['UPLOAD_FOLDER'], file_id)
     try:
         raw_data = file.read()
-        with open(dest, 'wb') as fh:
-            fh.write(_encrypt(raw_data))
-    except OSError as exc:
+        storage_write(file_id, _encrypt(raw_data))
+    except Exception as exc:
         app.logger.error("Erreur écriture fichier %s : %s", file_id, exc)
         return {'success': False, 'message': 'Erreur interne lors de l\'enregistrement.'}
 
@@ -1044,11 +1163,9 @@ def download_direct(file_id):
     g.db.commit()
     audit_log('download', target=file_id, details=original_filename)
 
-    path = os.path.join(app.config['UPLOAD_FOLDER'], file_id)
     try:
-        with open(path, 'rb') as fh:
-            raw = fh.read()
-    except OSError:
+        raw = storage_read(file_id)
+    except Exception:
         return redirect(url_for('file_not_found'))
 
     try:
@@ -1089,11 +1206,9 @@ def preview_file(file_id):
         if not auth_ts or (datetime.now().timestamp() - auth_ts) > 3600:
             abort(403)
 
-    path = os.path.join(app.config['UPLOAD_FOLDER'], file_id)
     try:
-        with open(path, 'rb') as fh:
-            raw = fh.read()
-    except OSError:
+        raw = storage_read(file_id)
+    except Exception:
         abort(404)
 
     try:
@@ -1242,12 +1357,10 @@ def bundle_zip(bundle_id):
                 continue
             if max_downloads != 'unlimited' and int(max_downloads) - views <= 0:
                 continue
-            path = os.path.join(app.config['UPLOAD_FOLDER'], fid)
             try:
-                with open(path, 'rb') as fh:
-                    raw = fh.read()
+                raw = storage_read(fid)
                 zf.writestr(fname, _decrypt(raw))
-            except (OSError, InvalidToken):
+            except Exception:
                 continue
             g.db.execute('UPDATE files SET views = views + 1 WHERE id = ?', (fid,))
             added += 1
@@ -1802,11 +1915,7 @@ def dashboard():
     all_ids    = g.db.execute(
         'SELECT id FROM files WHERE owner_id = ?', (current_user.id,)
     ).fetchall()
-    used_bytes = sum(
-        os.path.getsize(os.path.join(app.config['UPLOAD_FOLDER'], fid))
-        for (fid,) in all_ids
-        if os.path.exists(os.path.join(app.config['UPLOAD_FOLDER'], fid))
-    )
+    used_bytes = sum(storage_get_size(fid) for (fid,) in all_ids)
     max_storage_mb   = int(settings['max_storage_mb'])
     _s_unit          = settings.get('max_storage_unit', 'mo')
     max_files        = int(settings['max_files_per_user'])
@@ -1940,15 +2049,10 @@ def profile_delete_account():
 
     uid = current_user.id
 
-    # Suppression des fichiers sur le disque
+    # Suppression des fichiers dans le backend de stockage
     file_ids = g.db.execute('SELECT id FROM files WHERE owner_id = ?', (uid,)).fetchall()
     for (fid,) in file_ids:
-        path = os.path.join(app.config['UPLOAD_FOLDER'], fid)
-        try:
-            if os.path.exists(path):
-                os.remove(path)
-        except OSError:
-            pass
+        storage_delete(fid)
 
     # Suppression en base (fichiers, drop_tokens, bundles, puis utilisateur)
     g.db.execute('DELETE FROM files WHERE owner_id = ?', (uid,))
@@ -2053,11 +2157,7 @@ def drop_zone(drop_token):
             if max_storage_mb > 0:
                 all_ids    = g.db.execute('SELECT id FROM files WHERE owner_id = ?',
                                           (recipient_id,)).fetchall()
-                used_bytes = sum(
-                    os.path.getsize(os.path.join(app.config['UPLOAD_FOLDER'], fid))
-                    for (fid,) in all_ids
-                    if os.path.exists(os.path.join(app.config['UPLOAD_FOLDER'], fid))
-                )
+                used_bytes = sum(storage_get_size(fid) for (fid,) in all_ids)
                 if used_bytes + len(raw_data) > max_storage_mb * 1048576:
                     flash("Le destinataire n'a plus d'espace de stockage disponible.", 'danger')
                     return render_template('drop.html', recipient=recipient_name,
@@ -2080,12 +2180,9 @@ def drop_zone(drop_token):
 
             file_id     = str(uuid.uuid4())
             expiry_time = get_expiry_time(settings['default_expiry'])
-            dest        = os.path.join(app.config['UPLOAD_FOLDER'], file_id)
-            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
             try:
-                with open(dest, 'wb') as fh:
-                    fh.write(_encrypt(raw_data))
-            except OSError:
+                storage_write(file_id, _encrypt(raw_data))
+            except Exception:
                 flash("Erreur interne lors de l'enregistrement.", 'danger')
                 return render_template('drop.html', recipient=recipient_name,
                                        drop_token=drop_token, success=False,
@@ -2144,13 +2241,20 @@ def _compute_admin_stats():
 
         # ── Stockage total ───────────────────────────────────────────────────
         storage_bytes = 0
-        try:
-            for fname in os.listdir(UPLOAD_FOLDER):
-                p = os.path.join(UPLOAD_FOLDER, fname)
-                if os.path.isfile(p):
-                    storage_bytes += os.path.getsize(p)
-        except OSError:
-            pass
+        s_cfg = _get_s3_settings()
+        if s_cfg.get('storage_backend') == 's3':
+            # Sur S3 : on somme via head_object pour chaque fichier en base
+            all_fids = conn.execute('SELECT id FROM files').fetchall()
+            for (fid,) in all_fids:
+                storage_bytes += storage_get_size(fid)
+        else:
+            try:
+                for fname in os.listdir(UPLOAD_FOLDER):
+                    p = os.path.join(UPLOAD_FOLDER, fname)
+                    if os.path.isfile(p):
+                        storage_bytes += os.path.getsize(p)
+            except OSError:
+                pass
 
         # ── Activité des 30 derniers jours ───────────────────────────────────
         today   = _d.today()
@@ -2340,13 +2444,7 @@ def admin_panel():
     users = []
     for uid, username, created_at, is_admin, sso_user, file_count in rows:
         file_ids = g.db.execute('SELECT id FROM files WHERE owner_id = ?', (uid,)).fetchall()
-        used = 0
-        for (fid,) in file_ids:
-            p = os.path.join(app.config['UPLOAD_FOLDER'], fid)
-            try:
-                used += os.path.getsize(p) if os.path.exists(p) else 0
-            except OSError:
-                pass
+        used = sum(storage_get_size(fid) for (fid,) in file_ids)
         users.append({
             'id': uid, 'username': username, 'created_at': created_at,
             'is_admin': bool(is_admin), 'sso_user': bool(sso_user),
@@ -2398,14 +2496,22 @@ def admin_panel():
         'sso_discovery_url': settings.get('sso_discovery_url', ''),
         'sso_client_id':     settings.get('sso_client_id', ''),
     })
+    s3_form = S3SettingsForm(data={
+        'storage_backend': settings.get('storage_backend', 'local'),
+        's3_bucket':       settings.get('s3_bucket', ''),
+        's3_region':       settings.get('s3_region', ''),
+        's3_endpoint_url': settings.get('s3_endpoint_url', ''),
+        's3_access_key':   settings.get('s3_access_key', ''),
+        's3_prefix':       settings.get('s3_prefix', ''),
+    })
     legal_form = LegalForm(data={
         'legal_mentions': settings.get('legal_mentions', _DEFAULT_LEGAL_MENTIONS),
         'terms_of_use':   settings.get('terms_of_use',   _DEFAULT_TERMS_OF_USE),
     })
     stats = _compute_admin_stats()
     return render_template('admin.html', users=users, form=form, sso_form=sso_form,
-                           legal_form=legal_form, settings=settings, logs=logs,
-                           stats=stats)
+                           s3_form=s3_form, legal_form=legal_form, settings=settings,
+                           logs=logs, stats=stats)
 
 
 @app.route('/admin/settings', methods=['POST'])
@@ -2679,6 +2785,35 @@ def admin_save_sso():
             for err in errors:
                 flash(f'{field} : {err}', 'danger')
     return redirect(url_for('admin_panel') + '#sso')
+
+
+@app.route('/admin/s3', methods=['POST'])
+@login_required
+@admin_required
+def admin_save_s3():
+    form = S3SettingsForm()
+    if form.validate_on_submit():
+        existing = get_settings()
+        new_secret = form.s3_secret_key.data.strip()
+        values = {
+            'storage_backend': form.storage_backend.data,
+            's3_bucket':       form.s3_bucket.data.strip(),
+            's3_region':       form.s3_region.data.strip(),
+            's3_endpoint_url': form.s3_endpoint_url.data.strip(),
+            's3_access_key':   form.s3_access_key.data.strip(),
+            's3_secret_key':   _encrypt_secret(new_secret) if new_secret else existing.get('s3_secret_key', ''),
+            's3_prefix':       form.s3_prefix.data.strip().strip('/'),
+        }
+        for key, value in values.items():
+            g.db.execute('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', (key, value))
+        g.db.commit()
+        audit_log('admin_settings', details='Paramètres stockage S3 mis à jour')
+        flash('Configuration du stockage sauvegardée.', 'success')
+    else:
+        for field, errors in form.errors.items():
+            for err in errors:
+                flash(f'{field} : {err}', 'danger')
+    return redirect(url_for('admin_panel') + '#s3')
 
 
 @app.route('/admin/legal', methods=['POST'])
