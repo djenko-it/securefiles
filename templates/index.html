@@ -344,6 +344,10 @@
             if (e.lengthComputable) onProgress(e.loaded, e.total)
           })
           xhr.addEventListener('load', () => {
+            if (xhr.status === 413) {
+              resolve({ success: false, message: 'Fichier trop grand (limite serveur dépassée).' })
+              return
+            }
             try { resolve(JSON.parse(xhr.responseText)) }
             catch { reject(new Error('Réponse invalide')) }
           })

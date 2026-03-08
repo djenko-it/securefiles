@@ -2951,6 +2951,11 @@ def _error_theme():
     return current_user.theme if current_user.is_authenticated else 'light'
 
 
+@app.errorhandler(413)
+def request_entity_too_large(e):
+    return jsonify({'success': False, 'message': 'Fichier trop grand (limite serveur dépassée).'}), 413
+
+
 @app.errorhandler(404)
 def page_not_found(e):
     return render_template('404.html', settings=get_settings(), user_theme=_error_theme()), 404
