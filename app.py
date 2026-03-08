@@ -70,6 +70,7 @@ app.config.update(
     SESSION_COOKIE_SAMESITE='Lax', # protection CSRF de base
     REMEMBER_COOKIE_SECURE=True,
     REMEMBER_COOKIE_HTTPONLY=True,
+    MAX_CONTENT_LENGTH=512 * 1024 * 1024,  # 512 Mo max au niveau Flask
 )
 csrf = CSRFProtect(app)
 logging.basicConfig(level=logging.INFO)
@@ -336,6 +337,50 @@ try:
     _BOTO3_AVAILABLE = True
 except ImportError:
     _BOTO3_AVAILABLE = False
+
+# Antivirus ClamAV (optionnel - actif si le service est joignable)
+try:
+    import pyclamd
+    _PYCLAMD_AVAILABLE = True
+except ImportError:
+    _PYCLAMD_AVAILABLE = False
+
+_CLAMAV_HOST = os.environ.get('CLAMAV_HOST', 'clamav')
+_CLAMAV_PORT = int(os.environ.get('CLAMAV_PORT', '3310'))
+
+
+def _clamav_scan(data: bytes) -> tuple[bool, str]:
+    """Scanne les donnees avec ClamAV via le socket reseau.
+
+    Retourne (safe, message) :
+    - (True, '') si sain ou si ClamAV est indisponible (mode degrade transparent)
+    - (False, 'Nom du virus') si une menace est detectee
+    """
+    if not _PYCLAMD_AVAILABLE:
+        return True, ''
+    try:
+        cd = pyclamd.ClamdNetworkSocket(host=_CLAMAV_HOST, port=_CLAMAV_PORT, timeout=15)
+        result = cd.scan_stream(data)
+        if result is None:
+            return True, ''
+        status, virus_name = result.get('stream', ('OK', ''))
+        if status == 'FOUND':
+            return False, virus_name or 'Virus inconnu'
+        return True, ''
+    except Exception as exc:
+        app.logger.warning('ClamAV indisponible, scan ignore : %s', exc)
+        return True, ''
+
+
+def _clamav_available() -> bool:
+    """Verifie si le daemon ClamAV est joignable (pour affichage admin)."""
+    if not _PYCLAMD_AVAILABLE:
+        return False
+    try:
+        cd = pyclamd.ClamdNetworkSocket(host=_CLAMAV_HOST, port=_CLAMAV_PORT, timeout=3)
+        return cd.ping()
+    except Exception:
+        return False
 
 
 def _get_s3_settings():
@@ -1048,6 +1093,10 @@ def upload_file():
 
     try:
         raw_data = file.read()
+        safe, threat = _clamav_scan(raw_data)
+        if not safe:
+            audit_log('upload_blocked', details=f"{file.filename} - menace : {threat}")
+            return {'success': False, 'message': f'Fichier refusé : menace détectée ({threat}).'}
         storage_write(file_id, _encrypt(raw_data))
     except Exception as exc:
         app.logger.error("Erreur écriture fichier %s : %s", file_id, exc)
@@ -2180,6 +2229,14 @@ def drop_zone(drop_token):
 
             file_id     = str(uuid.uuid4())
             expiry_time = get_expiry_time(settings['default_expiry'])
+            safe, threat = _clamav_scan(raw_data)
+            if not safe:
+                audit_log('drop_upload_blocked', details=f"{file.filename} - menace : {threat}")
+                flash(f'Fichier refusé : menace détectée ({threat}).', 'danger')
+                return render_template('drop.html', recipient=recipient_name,
+                                       drop_token=drop_token, success=False,
+                                       expired=False, exhausted=False,
+                                       remaining=remaining, settings=settings)
             try:
                 storage_write(file_id, _encrypt(raw_data))
             except Exception:
@@ -2511,7 +2568,8 @@ def admin_panel():
     stats = _compute_admin_stats()
     return render_template('admin.html', users=users, form=form, sso_form=sso_form,
                            s3_form=s3_form, legal_form=legal_form, settings=settings,
-                           logs=logs, stats=stats)
+                           logs=logs, stats=stats,
+                           clamav_active=_clamav_available())
 
 
 @app.route('/admin/settings', methods=['POST'])

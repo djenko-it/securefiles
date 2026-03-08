@@ -7,9 +7,40 @@ services:
       - "127.0.0.1:5000:5000"   # accessible uniquement depuis localhost (proxy HTTPS en frontal)
     env_file:
       - .env
+    environment:
+      # Si le service clamav ci-dessous est activé, décommentez la ligne suivante :
+      # CLAMAV_HOST: clamav
+      CLAMAV_PORT: "3310"
     volumes:
       - app_data:/app/data       # DB SQLite + fichiers uploadés (persistants)
     restart: unless-stopped
+    depends_on: []
+    # depends_on:
+    #   clamav:
+    #     condition: service_healthy
+
+  # ── Antivirus ClamAV (optionnel) ───────────────────────────────────────────
+  # Pour activer l'analyse antivirus à chaque upload :
+  #   1. Décommentez tout le bloc clamav ci-dessous
+  #   2. Décommentez CLAMAV_HOST dans la section environment du service web
+  #   3. Décommentez le depends_on avec condition: service_healthy
+  #   4. Relancez : docker compose up -d --build
+  #
+  # clamav:
+  #   image: clamav/clamav:latest
+  #   restart: unless-stopped
+  #   volumes:
+  #     - clamav_data:/var/lib/clamav   # base de signatures (persistante)
+  #   environment:
+  #     CLAMAV_NO_CLAMD: "false"
+  #     CLAMAV_NO_FRESHCLAM: "false"
+  #   healthcheck:
+  #     test: ["CMD", "clamdcheck.sh"]
+  #     interval: 60s
+  #     timeout: 10s
+  #     retries: 3
+  #     start_period: 120s  # la mise à jour des signatures prend du temps au 1er démarrage
 
 volumes:
   app_data:
+  # clamav_data:   # à décommenter si le service clamav est activé

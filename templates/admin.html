@@ -666,6 +666,27 @@
           </form>
         </div>
       </div>
+
+      <!-- ── Statut ClamAV ─────────────────────────────────────────────────── -->
+      <div class="card shadow-sm mt-3">
+        <div class="card-body p-4">
+          <p class="text-uppercase fw-semibold text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em">
+            <i class="fas fa-shield-virus me-1"></i>Antivirus ClamAV
+          </p>
+          {% if clamav_active %}
+          <div class="d-flex align-items-center gap-2 text-success">
+            <i class="fas fa-circle-check"></i>
+            <span>ClamAV actif — tous les fichiers sont analysés à l'upload.</span>
+          </div>
+          {% else %}
+          <div class="d-flex align-items-center gap-2 text-muted">
+            <i class="fas fa-circle-xmark"></i>
+            <span>ClamAV non disponible — les fichiers ne sont pas analysés.
+              Pour l'activer, décommentez le service <code>clamav</code> dans <code>docker-compose.yml</code>.</span>
+          </div>
+          {% endif %}
+        </div>
+      </div>
     </div>
 
     <!-- ── Onglet Mentions légales / CGU ──────────────────────────────────── -->
