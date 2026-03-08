@@ -654,9 +654,15 @@
               {% endif %}
             </div>
 
-            <button type="submit" class="btn btn-primary mt-2">
-              <i class="fas fa-floppy-disk me-2"></i>{{ s3_form.submit.label.text }}
-            </button>
+            <div class="d-flex align-items-center gap-3 mt-2 flex-wrap">
+              <button type="submit" class="btn btn-primary">
+                <i class="fas fa-floppy-disk me-2"></i>{{ s3_form.submit.label.text }}
+              </button>
+              <button type="button" class="btn btn-outline-secondary" id="btnTestS3">
+                <i class="fas fa-plug me-2"></i>Tester la connexion
+              </button>
+              <span id="s3TestResult" style="display:none" class="small fw-semibold"></span>
+            </div>
           </form>
         </div>
       </div>
@@ -844,6 +850,46 @@
   }
   if (storageBackendSelect) {
     storageBackendSelect.addEventListener('change', updateS3Fields);
+  }
+
+  // Bouton "Tester la connexion S3"
+  const btnTestS3    = document.getElementById('btnTestS3');
+  const s3TestResult = document.getElementById('s3TestResult');
+  if (btnTestS3) {
+    btnTestS3.addEventListener('click', async () => {
+      const form = btnTestS3.closest('form');
+      const payload = {
+        s3_bucket:       form.querySelector('[name="s3_bucket"]')?.value.trim()       || '',
+        s3_region:       form.querySelector('[name="s3_region"]')?.value.trim()       || '',
+        s3_endpoint_url: form.querySelector('[name="s3_endpoint_url"]')?.value.trim() || '',
+        s3_access_key:   form.querySelector('[name="s3_access_key"]')?.value.trim()   || '',
+        s3_secret_key:   form.querySelector('[name="s3_secret_key"]')?.value.trim()   || '',
+      };
+      btnTestS3.disabled = true;
+      btnTestS3.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Test…';
+      s3TestResult.style.display = 'none';
+      try {
+        const resp = await fetch('{{ url_for("admin_test_s3") }}', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('input[name="csrf_token"]')?.value || '',
+          },
+          body: JSON.stringify(payload),
+        });
+        const data = await resp.json();
+        s3TestResult.textContent = data.message;
+        s3TestResult.className   = 'small fw-semibold ' + (data.ok ? 'text-success' : 'text-danger');
+        s3TestResult.style.display = '';
+      } catch (e) {
+        s3TestResult.textContent = 'Erreur réseau.';
+        s3TestResult.className   = 'small fw-semibold text-danger';
+        s3TestResult.style.display = '';
+      } finally {
+        btnTestS3.disabled = false;
+        btnTestS3.innerHTML = '<i class="fas fa-plug me-2"></i>Tester la connexion';
+      }
+    });
   }
 
   // Filtre côté client pour le journal d'audit

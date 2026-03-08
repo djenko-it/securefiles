@@ -2816,6 +2816,54 @@ def admin_save_s3():
     return redirect(url_for('admin_panel') + '#s3')
 
 
+@app.route('/admin/s3/test', methods=['POST'])
+@login_required
+@admin_required
+def admin_test_s3():
+    """Test la connexion S3 avec les paramètres envoyés depuis le formulaire (avant sauvegarde)."""
+    if not _BOTO3_AVAILABLE:
+        return jsonify({'ok': False, 'message': 'boto3 non installé sur ce serveur.'})
+
+    data = request.get_json(silent=True) or {}
+
+    bucket       = (data.get('s3_bucket') or '').strip()
+    region       = (data.get('s3_region') or '').strip() or None
+    endpoint_url = (data.get('s3_endpoint_url') or '').strip() or None
+    access_key   = (data.get('s3_access_key') or '').strip() or None
+    secret_raw   = (data.get('s3_secret_key') or '').strip()
+
+    if not bucket:
+        return jsonify({'ok': False, 'message': 'Nom du bucket manquant.'})
+
+    # Si le secret est vide, on utilise le secret déjà sauvegardé
+    if secret_raw:
+        secret_key = secret_raw
+    else:
+        existing = get_settings()
+        secret_key = _decrypt_secret(existing.get('s3_secret_key', '')) or None
+
+    try:
+        kwargs = {
+            'aws_access_key_id':     access_key,
+            'aws_secret_access_key': secret_key,
+            'region_name':           region,
+        }
+        if endpoint_url:
+            kwargs['endpoint_url'] = endpoint_url
+        client = boto3.client('s3', **kwargs)
+        client.head_bucket(Bucket=bucket)
+        return jsonify({'ok': True, 'message': f'Connexion réussie au bucket « {bucket} ».'})
+    except Exception as exc:
+        msg = str(exc)
+        # Extraire le message lisible depuis les erreurs boto3
+        if hasattr(exc, 'response'):
+            code = exc.response.get('Error', {}).get('Code', '')
+            msg  = exc.response.get('Error', {}).get('Message', msg)
+            if code:
+                msg = f'[{code}] {msg}'
+        return jsonify({'ok': False, 'message': msg})
+
+
 @app.route('/admin/legal', methods=['POST'])
 @login_required
 @admin_required
