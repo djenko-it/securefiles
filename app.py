@@ -80,18 +80,9 @@ logging.basicConfig(level=logging.INFO)
 babel = Babel()
 
 def _get_locale():
-    # 1. Préférence sauvegardée en base pour l'utilisateur connecté
-    try:
-        from flask_login import current_user as _cu
-        if _cu.is_authenticated and _cu.lang in ('fr', 'en'):
-            return _cu.lang
-    except Exception:
-        pass
-    # 2. Préférence en session (utilisateurs anonymes)
     lang = session.get('lang')
     if lang in ('fr', 'en'):
         return lang
-    # 3. Best match depuis l'en-tête Accept-Language
     return request.accept_languages.best_match(['fr', 'en'], default='fr')
 
 babel.init_app(app, locale_selector=_get_locale)
@@ -838,6 +829,9 @@ def init_db():
 def before_request():
     g.csp_nonce = secrets.token_urlsafe(16)
     g.db = get_db()
+    # Synchroniser la préférence de langue DB → session
+    if current_user.is_authenticated and getattr(current_user, 'lang', None) in ('fr', 'en'):
+        session['lang'] = current_user.lang
     if request.path.startswith('/static'):
         return
     settings = get_settings()
