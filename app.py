@@ -80,11 +80,18 @@ logging.basicConfig(level=logging.INFO)
 babel = Babel()
 
 def _get_locale():
-    # 1. Preference stored in session (user clicked a language switcher)
+    # 1. Préférence sauvegardée en base pour l'utilisateur connecté
+    try:
+        from flask_login import current_user as _cu
+        if _cu.is_authenticated and _cu.lang in ('fr', 'en'):
+            return _cu.lang
+    except Exception:
+        pass
+    # 2. Préférence en session (utilisateurs anonymes)
     lang = session.get('lang')
     if lang in ('fr', 'en'):
         return lang
-    # 2. Best match from Accept-Language header
+    # 3. Best match depuis l'en-tête Accept-Language
     return request.accept_languages.best_match(['fr', 'en'], default='fr')
 
 babel.init_app(app, locale_selector=_get_locale)
@@ -112,6 +119,9 @@ def inject_branding():
 def set_lang(lang):
     if lang in ('fr', 'en'):
         session['lang'] = lang
+        if current_user.is_authenticated:
+            get_db().execute('UPDATE users SET lang = ? WHERE id = ?', (lang, current_user.id))
+            get_db().commit()
     next_url = request.args.get('next') or request.referrer or url_for('index')
     return redirect(next_url)
 
@@ -521,7 +531,7 @@ class User(UserMixin):
                  webauthn_public_key=None, webauthn_sign_count=0,
                  webauthn_label=None,
                  theme='light', avatar_color='#4361ee', drop_enabled=True,
-                 sso_user=False):
+                 sso_user=False, lang=None):
         self.id                     = id
         self.username               = username
         self.password               = password
@@ -536,6 +546,7 @@ class User(UserMixin):
         self.avatar_color           = avatar_color or '#4361ee'
         self.drop_enabled           = bool(drop_enabled) if drop_enabled is not None else True
         self.sso_user               = bool(sso_user)
+        self.lang                   = lang if lang in ('fr', 'en') else None
 
     @property
     def has_mfa(self):
@@ -556,7 +567,7 @@ class User(UserMixin):
 
 _USER_COLS = ('id, username, password, drop_token, is_admin, '
               'totp_secret, webauthn_credential_id, webauthn_public_key, '
-              'webauthn_sign_count, webauthn_label, theme, avatar_color, drop_enabled, sso_user')
+              'webauthn_sign_count, webauthn_label, theme, avatar_color, drop_enabled, sso_user, lang')
 
 
 def _load_user_by(column, value):
@@ -817,6 +828,7 @@ def init_db():
             ('totp_backup_codes',      'TEXT'),
             ('reset_token_hash',       'TEXT'),
             ('reset_token_expiry',     'TEXT'),
+            ('lang',                   'TEXT'),
         ]:
             if col not in existing_users:
                 conn.execute(f'ALTER TABLE users ADD COLUMN {col} {ddl}')
