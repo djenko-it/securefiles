@@ -1,0 +1,635 @@
+# French translations for SecureFiles
+msgid ""
+msgstr ""
+"Project-Id-Version: SecureFiles\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-03-09 00:00+0000\n"
+"PO-Revision-Date: 2026-03-09 00:00+0000\n"
+"Last-Translator: \n"
+"Language: fr\n"
+"Language-Team: French\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+# ── app.py messages ──────────────────────────────────────────────────────────
+
+msgid "Please log in to access this page."
+msgstr "Veuillez vous connecter pour accéder à cette page."
+
+msgid "Registrations are disabled."
+msgstr "Les inscriptions sont désactivées."
+
+msgid "Account created! You can now log in."
+msgstr "Compte créé ! Vous pouvez vous connecter."
+
+msgid "This username is already taken."
+msgstr "Ce nom d'utilisateur est déjà pris."
+
+msgid "Account locked. Try again in %(n)s minute(s)."
+msgstr "Compte verrouillé. Réessayez dans %(n)s minute(s)."
+
+msgid "Account locked for %(n)s minutes after too many failed attempts."
+msgstr "Compte verrouillé pendant %(n)s minutes après trop de tentatives."
+
+msgid "Incorrect credentials."
+msgstr "Identifiants incorrects."
+
+msgid "Invalid or already used link."
+msgstr "Lien invalide ou déjà utilisé."
+
+msgid "This link has expired. Ask the administrator for a new one."
+msgstr "Ce lien a expiré. Demandez un nouveau lien à l'administrateur."
+
+msgid "Password updated. You can now log in."
+msgstr "Mot de passe modifié. Vous pouvez vous connecter."
+
+msgid "Internal MFA error. Please contact the administrator."
+msgstr "Erreur interne MFA. Contactez l'administrateur."
+
+msgid "Invalid TOTP code."
+msgstr "Code TOTP invalide."
+
+msgid "Current password is incorrect."
+msgstr "Mot de passe actuel incorrect."
+
+msgid "Password updated."
+msgstr "Mot de passe modifié."
+
+msgid "Session expired, please try again."
+msgstr "Session expirée, recommencez."
+
+msgid "Invalid code. Please try again."
+msgstr "Code invalide. Réessayez."
+
+msgid "TOTP disabled."
+msgstr "TOTP désactivé."
+
+msgid "No recovery codes to display."
+msgstr "Aucun code de récupération à afficher."
+
+msgid "Enable TOTP first to generate recovery codes."
+msgstr "Activez d'abord le TOTP pour générer des codes de récupération."
+
+msgid "Invalid recovery code."
+msgstr "Code de récupération invalide."
+
+msgid "Security key deleted."
+msgstr "Clé de sécurité supprimée."
+
+msgid "Incorrect confirmation. Type exactly \"supprimer\" to confirm."
+msgstr "Confirmation incorrecte. Tapez exactement « supprimer » pour valider."
+
+msgid "Your account and all your data have been permanently deleted."
+msgstr "Votre compte et l'ensemble de vos données ont été supprimés définitivement."
+
+msgid "The recipient has no storage space left."
+msgstr "Le destinataire n'a plus d'espace de stockage disponible."
+
+msgid "The recipient has reached their file quota."
+msgstr "Le destinataire a atteint son quota de fichiers."
+
+msgid "File rejected: threat detected (%(threat)s)."
+msgstr "Fichier refusé : menace détectée (%(threat)s)."
+
+msgid "Internal error while saving the file."
+msgstr "Erreur interne lors de l'enregistrement."
+
+msgid "File type not allowed."
+msgstr "Type de fichier non autorisé."
+
+msgid "Settings saved."
+msgstr "Paramètres sauvegardés."
+
+msgid "You cannot delete your own account."
+msgstr "Impossible de supprimer votre propre compte."
+
+msgid "You cannot change your own admin rights."
+msgstr "Impossible de modifier vos propres droits."
+
+msgid "User not found."
+msgstr "Utilisateur introuvable."
+
+msgid "Cannot reset the password of an SSO account."
+msgstr "Impossible de réinitialiser le mot de passe d'un compte SSO."
+
+msgid "Unable to contact the SSO provider."
+msgstr "Impossible de contacter le fournisseur SSO."
+
+msgid "SSO configuration saved."
+msgstr "Configuration SSO sauvegardée."
+
+msgid "Storage configuration saved."
+msgstr "Configuration du stockage sauvegardée."
+
+msgid "Legal notices and Terms of Service saved."
+msgstr "Mentions légales et CGU sauvegardées."
+
+msgid "Two-factor authentication (2FA) is required. Please enable it on your profile."
+msgstr "La double authentification (2FA) est obligatoire. Veuillez l'activer sur votre profil."
+
+msgid "Incorrect password."
+msgstr "Mot de passe incorrect."
+
+msgid "No file or file type not allowed."
+msgstr "Fichier absent ou type non autorisé."
+
+msgid "File too large (max %(n)s MB)."
+msgstr "Fichier trop grand (max %(n)s Mo)."
+
+msgid "Quota reached (%(n)s files maximum)."
+msgstr "Quota atteint (%(n)s fichiers maximum)."
+
+msgid "Storage quota exceeded (%(n)s %(unit)s maximum)."
+msgstr "Quota de stockage dépassé (%(n)s %(unit)s maximum)."
+
+msgid "Invalid custom date format."
+msgstr "Format de date personnalisée invalide."
+
+msgid "The expiry date must be in the future."
+msgstr "La date d'expiration doit être dans le futur."
+
+msgid "The expiry date cannot exceed 1 year."
+msgstr "La date d'expiration ne peut pas dépasser 1 an."
+
+msgid "Download count must be ≥ 1."
+msgstr "Le nombre de téléchargements doit être ≥ 1."
+
+msgid "Invalid download count."
+msgstr "Nombre de téléchargements invalide."
+
+msgid "At least 2 files required."
+msgstr "Au moins 2 fichiers requis."
+
+msgid "File not found."
+msgstr "Fichier introuvable."
+
+msgid "Bucket name is required."
+msgstr "Nom du bucket manquant."
+
+msgid "Successfully connected to bucket \"%(bucket)s\"."
+msgstr "Connexion réussie au bucket « %(bucket)s »."
+
+msgid "File too large (server limit exceeded)."
+msgstr "Fichier trop grand (limite serveur dépassée)."
+
+msgid "boto3 is not installed on this server."
+msgstr "boto3 non installé sur ce serveur."
+
+# ── Template strings ─────────────────────────────────────────────────────────
+
+msgid "Login"
+msgstr "Connexion"
+
+msgid "Sign up"
+msgstr "Inscription"
+
+msgid "Username"
+msgstr "Nom d'utilisateur"
+
+msgid "Password"
+msgstr "Mot de passe"
+
+msgid "Confirm password"
+msgstr "Confirmer le mot de passe"
+
+msgid "No account yet?"
+msgstr "Pas encore de compte ?"
+
+msgid "Sign in"
+msgstr "S'inscrire"
+
+msgid "Already have an account?"
+msgstr "Déjà un compte ?"
+
+msgid "Log in"
+msgstr "Se connecter"
+
+msgid "Create an account"
+msgstr "Créer un compte"
+
+msgid "Log in via %(provider)s"
+msgstr "Se connecter via %(provider)s"
+
+msgid "Legal notices"
+msgstr "Mentions légales"
+
+msgid "Terms of Service"
+msgstr "CGU"
+
+msgid "My shares"
+msgstr "Mes partages"
+
+msgid "My profile"
+msgstr "Mon profil"
+
+msgid "Log out"
+msgstr "Se déconnecter"
+
+msgid "New"
+msgstr "Nouveau"
+
+msgid "Dashboard"
+msgstr "Tableau de bord"
+
+msgid "Drop files here or click to browse"
+msgstr "Glissez un ou plusieurs fichiers ici ou cliquez pour parcourir"
+
+msgid "Max size: %(n)s GB per file"
+msgstr "Taille maximale : %(n)s Go par fichier"
+
+msgid "Max size: %(n)s MB per file"
+msgstr "Taille maximale : %(n)s Mo par fichier"
+
+msgid "Drop here"
+msgstr "Déposez ici"
+
+msgid "Each link is unique. The file is deleted after expiry."
+msgstr "Chaque lien est unique. Le fichier est supprimé après expiration."
+
+msgid "Share options"
+msgstr "Options du partage"
+
+msgid "Password (optional)"
+msgstr "Mot de passe (optionnel)"
+
+msgid "Leave empty for no password"
+msgstr "Laisser vide pour aucun mot de passe"
+
+msgid "Validity period"
+msgstr "Durée de validité"
+
+msgid "Limit downloads"
+msgstr "Limiter les téléchargements"
+
+msgid "End-to-end encryption"
+msgstr "Chiffrement de bout en bout"
+
+msgid "Required"
+msgstr "Obligatoire"
+
+msgid "The key never leaves your browser. The server cannot read the content."
+msgstr "La clé ne quitte jamais votre navigateur. Le serveur ne peut pas lire le contenu."
+
+msgid "Send"
+msgstr "Envoyer"
+
+msgid "File(s) ready!"
+msgstr "Fichier(s) prêt(s) !"
+
+msgid "Copy and share this link:"
+msgstr "Copiez et partagez ce lien :"
+
+msgid "Copy"
+msgstr "Copier"
+
+msgid "Link copied to clipboard"
+msgstr "Lien copié dans le presse-papier"
+
+msgid "QR Code"
+msgstr "QR Code"
+
+msgid "Scan to open on mobile"
+msgstr "Scannez pour ouvrir le lien sur mobile"
+
+msgid "Individual links:"
+msgstr "Liens individuels :"
+
+msgid "Copy all"
+msgstr "Copier tout"
+
+msgid "Links copied!"
+msgstr "Liens copiés !"
+
+msgid "Access denied"
+msgstr "Accès refusé"
+
+msgid "You do not have the necessary permissions to access this page."
+msgstr "Vous n'avez pas les permissions nécessaires pour accéder à cette page."
+
+msgid "Back to home"
+msgstr "Retour à l'accueil"
+
+msgid "Page not found"
+msgstr "Page introuvable"
+
+msgid "The page you are looking for does not exist or has been moved."
+msgstr "La page que vous cherchez n'existe pas ou a été déplacée."
+
+msgid "Server error"
+msgstr "Erreur serveur"
+
+msgid "An unexpected error occurred. Please try again later or contact the administrator."
+msgstr "Une erreur inattendue s'est produite. Réessayez dans quelques instants ou contactez l'administrateur si le problème persiste."
+
+msgid "File available"
+msgstr "Fichier disponible"
+
+msgid "File name"
+msgstr "Nom du fichier"
+
+msgid "Expires on"
+msgstr "Expire le"
+
+msgid "Downloads remaining"
+msgstr "Téléchargements restants"
+
+msgid "This file is end-to-end encrypted. The key never passed through the server."
+msgstr "Ce fichier est chiffré de bout en bout. La clé n'a jamais transité par le serveur."
+
+msgid "Download"
+msgstr "Télécharger"
+
+msgid "Decrypt & download"
+msgstr "Déchiffrer & télécharger"
+
+msgid "Decrypting..."
+msgstr "Déchiffrement en cours…"
+
+msgid "Expired link"
+msgstr "Lien expiré"
+
+msgid "This download link has expired. Ask the sender for a new link."
+msgstr "Ce lien de téléchargement a expiré. Demandez un nouveau lien à l'expéditeur."
+
+msgid "File not found"
+msgstr "Fichier non trouvé"
+
+msgid "This file does not exist, has expired, or has reached its maximum download count."
+msgstr "Ce fichier n'existe pas, a expiré ou a déjà atteint son nombre maximal de téléchargements."
+
+msgid "Protected file"
+msgstr "Fichier protégé"
+
+msgid "Enter the password to access this file."
+msgstr "Entrez le mot de passe pour accéder à ce fichier."
+
+msgid "Two-step verification"
+msgstr "Vérification en deux étapes"
+
+msgid "Confirm your identity to continue."
+msgstr "Confirmez votre identité pour continuer."
+
+msgid "Authentication app"
+msgstr "Application d'authentification"
+
+msgid "Verify"
+msgstr "Vérifier"
+
+msgid "Security key"
+msgstr "Clé de sécurité"
+
+msgid "Use my security key"
+msgstr "Utiliser ma clé de sécurité"
+
+msgid "Use a recovery code"
+msgstr "Utiliser un code de récupération"
+
+msgid "Back to login"
+msgstr "Retour à la connexion"
+
+msgid "Recovery codes"
+msgstr "Codes de récupération"
+
+msgid "These codes allow you to access your account if you lose your authentication app."
+msgstr "Ces codes permettent d'accéder à votre compte si vous perdez votre application d'authentification."
+
+msgid "Each code can only be used once."
+msgstr "Chaque code ne peut être utilisé qu'une seule fois."
+
+msgid "Keep these codes in a safe place. They will never be shown again."
+msgstr "Conservez ces codes en lieu sûr. Ils ne seront plus jamais affichés."
+
+msgid "Print"
+msgstr "Imprimer"
+
+msgid "I have saved my codes"
+msgstr "J'ai sauvegardé mes codes"
+
+msgid "Appearance"
+msgstr "Apparence"
+
+msgid "Theme"
+msgstr "Thème"
+
+msgid "Switch to dark"
+msgstr "Passer en sombre"
+
+msgid "Switch to light"
+msgstr "Passer en clair"
+
+msgid "Avatar color"
+msgstr "Couleur de l'avatar"
+
+msgid "Current password"
+msgstr "Mot de passe actuel"
+
+msgid "New password"
+msgstr "Nouveau mot de passe"
+
+msgid "Confirm"
+msgstr "Confirmer"
+
+msgid "Update"
+msgstr "Modifier"
+
+msgid "Authentication app (TOTP)"
+msgstr "Application d'authentification (TOTP)"
+
+msgid "Enabled"
+msgstr "Activé"
+
+msgid "Disabled"
+msgstr "Désactivé"
+
+msgid "Your authentication app is configured."
+msgstr "Votre application d'authentification est configurée."
+
+msgid "Disable"
+msgstr "Désactiver"
+
+msgid "Add a layer of security with an app like Google Authenticator or Authy."
+msgstr "Ajoutez une couche de sécurité avec une application comme Google Authenticator ou Authy."
+
+msgid "Configure"
+msgstr "Configurer"
+
+msgid "6-digit code from the app"
+msgstr "Code à 6 chiffres de l'application"
+
+msgid "Validate"
+msgstr "Valider"
+
+msgid "Remaining"
+msgstr "Restant"
+
+msgid "Use these codes if you lose access to your authentication app."
+msgstr "Utilisez ces codes si vous perdez accès à votre application d'authentification."
+
+msgid "Regenerate codes"
+msgstr "Régénérer les codes"
+
+msgid "Security key (WebAuthn)"
+msgstr "Clé de sécurité (WebAuthn)"
+
+msgid "Active"
+msgstr "Actif"
+
+msgid "My personal data"
+msgstr "Mes données personnelles"
+
+msgid "Export my data (JSON)"
+msgstr "Exporter mes données (JSON)"
+
+msgid "Delete my account"
+msgstr "Supprimer mon compte"
+
+msgid "Irreversible action."
+msgstr "Action irréversible."
+
+msgid "Storage"
+msgstr "Stockage"
+
+msgid "Files"
+msgstr "Fichiers"
+
+msgid "Received files"
+msgstr "Fichiers reçus"
+
+msgid "Sender"
+msgstr "Expéditeur"
+
+msgid "Drop links"
+msgstr "Liens de dépôt"
+
+msgid "New link"
+msgstr "Nouveau lien"
+
+msgid "Name"
+msgstr "Nom"
+
+msgid "Expires"
+msgstr "Expire le"
+
+msgid "Uses"
+msgstr "Utilisations"
+
+msgid "Link"
+msgstr "Lien"
+
+msgid "Expired"
+msgstr "Expiré"
+
+msgid "Exhausted"
+msgstr "Épuisé"
+
+msgid "No drop links. Create one to let someone send you files without an account."
+msgstr "Aucun lien de dépôt. Créez-en un pour permettre à quelqu'un de vous envoyer des fichiers sans compte."
+
+msgid "New drop link"
+msgstr "Nouveau lien de dépôt"
+
+msgid "Name (optional)"
+msgstr "Nom (optionnel)"
+
+msgid "Expires in"
+msgstr "Expire dans"
+
+msgid "1 hour"
+msgstr "1 heure"
+
+msgid "24 hours"
+msgstr "24 heures"
+
+msgid "7 days"
+msgstr "7 jours"
+
+msgid "30 days"
+msgstr "30 jours"
+
+msgid "Max files accepted"
+msgstr "Nombre max de fichiers acceptés"
+
+msgid "1 file"
+msgstr "1 fichier"
+
+msgid "Unlimited"
+msgstr "Illimité"
+
+msgid "Cancel"
+msgstr "Annuler"
+
+msgid "Create link"
+msgstr "Créer le lien"
+
+msgid "No shares yet."
+msgstr "Aucun partage pour le moment."
+
+msgid "Send a file"
+msgstr "Envoyer un fichier"
+
+msgid "File"
+msgstr "Fichier"
+
+msgid "Administration"
+msgstr "Administration"
+
+msgid "Users"
+msgstr "Utilisateurs"
+
+msgid "Settings"
+msgstr "Paramètres"
+
+msgid "Audit log"
+msgstr "Journal d'audit"
+
+msgid "Drop a file"
+msgstr "Déposer un fichier"
+
+msgid "Quota reached"
+msgstr "Quota atteint"
+
+msgid "File sent!"
+msgstr "Fichier envoyé !"
+
+msgid "Send another file"
+msgstr "Envoyer un autre fichier"
+
+msgid "Your name (optional)"
+msgstr "Votre nom (optionnel)"
+
+msgid "File to send"
+msgstr "Fichier à envoyer"
+
+msgid "Archive available"
+msgstr "Archive disponible"
+
+msgid "Content"
+msgstr "Contenu"
+
+msgid "Download archive (.zip)"
+msgstr "Télécharger l'archive (.zip)"
+
+msgid "Access archive"
+msgstr "Accéder à l'archive"
+
+msgid "Maintenance"
+msgstr "Maintenance"
+
+msgid "%(app_name)s is under maintenance"
+msgstr "%(app_name)s est en maintenance"
+
+msgid "The site is temporarily under maintenance. Please come back later."
+msgstr "Le site est temporairement en maintenance. Merci de revenir plus tard."
+
+msgid "Back"
+msgstr "Retour"
+
+msgid "Return"
+msgstr "Retour"
+
+msgid "Disconnect"
+msgstr "Déconnexion"
+
+msgid "Connection"
+msgstr "Connexion"

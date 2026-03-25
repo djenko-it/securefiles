@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="fr" data-bs-theme="{{ user_theme }}">
+<html lang="{{ current_lang }}" data-bs-theme="{{ user_theme }}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{ settings.app_name }} — Archive</title>
+  <title>{{ settings.app_name }} — {{ _('Archive available') }}</title>
   <link href="/static/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css">
   <link href="/static/css/custom.css" rel="stylesheet">
@@ -16,17 +16,17 @@
       <div class="d-flex align-items-center gap-2">
         {%- if current_user.is_authenticated %}
           <a href="{{ url_for('dashboard') }}" class="btn btn-sm btn-outline-light">
-            <i class="fas fa-table-list me-1"></i>Mes partages
+            <i class="fas fa-table-list me-1"></i>{{ _('My shares') }}
           </a>
-          <a href="{{ url_for('logout') }}" class="text-secondary small ms-1">Déconnexion</a>
+          <a href="{{ url_for('logout') }}" class="text-secondary small ms-1">{{ _('Disconnect') }}</a>
         {%- else %}
           {% if settings.sso_force == '1' %}
             <a href="{{ url_for('sso_login') }}" class="btn btn-sm btn-outline-light">
               <i class="fas fa-key me-1"></i>{{ settings.sso_provider_name }}
             </a>
           {% else %}
-            <a href="{{ url_for('login') }}" class="btn btn-sm btn-outline-light">Connexion</a>
-            <a href="{{ url_for('register') }}" class="btn btn-sm btn-primary">Inscription</a>
+            <a href="{{ url_for('login') }}" class="btn btn-sm btn-outline-light">{{ _('Login') }}</a>
+            <a href="{{ url_for('register') }}" class="btn btn-sm btn-primary">{{ _('Sign up') }}</a>
           {% endif %}
         {%- endif %}
       </div>
@@ -39,7 +39,7 @@
 
         <div class="text-center mb-4">
           <i class="fas fa-file-zipper fa-3x mb-3" style="color: var(--accent); opacity:.8;"></i>
-          <h1 class="h4 fw-semibold">Archive disponible</h1>
+          <h1 class="h4 fw-semibold">{{ _('Archive available') }}</h1>
         </div>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -54,11 +54,11 @@
 
         <div class="mb-4">
           <div class="info-row">
-            <span class="lbl"><i class="fas fa-layer-group me-2 text-muted"></i>Contenu</span>
+            <span class="lbl"><i class="fas fa-layer-group me-2 text-muted"></i>{{ _('Content') }}</span>
             <span>{{ file_count }} fichier{{ 's' if file_count > 1 else '' }}</span>
           </div>
           <div class="info-row">
-            <span class="lbl"><i class="fas fa-clock me-2 text-muted"></i>Expire le</span>
+            <span class="lbl"><i class="fas fa-clock me-2 text-muted"></i>{{ _('Expires on') }}</span>
             <span>{{ expiry_time }}</span>
           </div>
         </div>
@@ -68,12 +68,12 @@
         <form method="post">
           {{ form.hidden_tag() }}
           <div class="mb-4">
-            <label class="form-label-sm">Mot de passe</label>
+            <label class="form-label-sm">{{ _('Password') }}</label>
             {{ form.password(class="form-control", placeholder="••••••••", autofocus=True) }}
           </div>
           <div class="d-grid">
             <button type="submit" class="btn btn-primary btn-lg">
-              <i class="fas fa-unlock me-2"></i>Accéder à l'archive
+              <i class="fas fa-unlock me-2"></i>{{ _('Access archive') }}
             </button>
           </div>
         </form>
@@ -101,7 +101,7 @@
         <!-- Bouton téléchargement -->
         <div class="d-grid">
           <a href="{{ url_for('bundle_zip', bundle_id=bundle_id) }}" class="btn btn-primary btn-lg">
-            <i class="fas fa-file-zipper me-2"></i>Télécharger l'archive (.zip)
+            <i class="fas fa-file-zipper me-2"></i>{{ _('Download archive (.zip)') }}
           </a>
         </div>
         {% endif %}
@@ -113,9 +113,9 @@
   <footer>
     <a href="mailto:{{ settings.contact_email }}">{{ settings.contact_email }}</a>
     &nbsp;·&nbsp;
-    <a href="{{ url_for('mentions_legales') }}">Mentions légales</a>
+    <a href="{{ url_for('mentions_legales') }}">{{ _('Legal notices') }}</a>
     &nbsp;·&nbsp;
-    <a href="{{ url_for('cgu') }}">CGU</a>
+    <a href="{{ url_for('cgu') }}">{{ _('Terms of Service') }}</a>
   </footer>
 
   <script nonce="{{ csp_nonce }}" src="/static/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>

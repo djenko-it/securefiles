@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="fr" data-bs-theme="{{ user_theme }}">
+<html lang="{{ current_lang }}" data-bs-theme="{{ user_theme }}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{ settings.app_name }} — Administration</title>
+  <title>{{ settings.app_name }} — {{ _('Administration') }}</title>
   <link href="/static/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css">
   <link href="/static/css/custom.css" rel="stylesheet">
@@ -27,15 +27,15 @@
         <i class="fas fa-screwdriver-wrench me-1"></i>Admin
       </a>
       <a href="{{ url_for('dashboard') }}" class="btn btn-sm btn-outline-light">
-        <i class="fas fa-table-list me-1"></i>Mes partages
+        <i class="fas fa-table-list me-1"></i>{{ _('My shares') }}
       </a>
       <div class="dropdown">
         <a class="user-avatar" style="background:{{ user_avatar_color }}" role="button"
            data-bs-toggle="dropdown" aria-expanded="false">{{ user_avatar_letter }}</a>
         <ul class="dropdown-menu dropdown-menu-end">
-          <li><a class="dropdown-item" href="{{ url_for('profile') }}"><i class="fas fa-user me-2"></i>Mon profil</a></li>
+          <li><a class="dropdown-item" href="{{ url_for('profile') }}"><i class="fas fa-user me-2"></i>{{ _('My profile') }}</a></li>
           <li><hr class="dropdown-divider"></li>
-          <li><a class="dropdown-item text-danger" href="{{ url_for('logout') }}"><i class="fas fa-right-from-bracket me-2"></i>Se déconnecter</a></li>
+          <li><a class="dropdown-item text-danger" href="{{ url_for('logout') }}"><i class="fas fa-right-from-bracket me-2"></i>{{ _('Log out') }}</a></li>
         </ul>
       </div>
     </div>
@@ -53,27 +53,27 @@
   {% endwith %}
 
   <h1 class="h4 fw-semibold mb-4">
-    <i class="fas fa-screwdriver-wrench me-2 text-warning"></i>Administration
+    <i class="fas fa-screwdriver-wrench me-2 text-warning"></i>{{ _('Administration') }}
   </h1>
 
   <ul class="nav nav-tabs mb-4" id="adminTabs" role="tablist">
     <li class="nav-item">
       <button class="nav-link active" id="tab-users-btn" data-bs-toggle="tab"
               data-bs-target="#tab-users" type="button" role="tab">
-        <i class="fas fa-users me-1"></i>Utilisateurs
+        <i class="fas fa-users me-1"></i>{{ _('Users') }}
         <span class="badge bg-secondary ms-1">{{ users | length }}</span>
       </button>
     </li>
     <li class="nav-item">
       <button class="nav-link" id="tab-settings-btn" data-bs-toggle="tab"
               data-bs-target="#tab-settings" type="button" role="tab">
-        <i class="fas fa-sliders me-1"></i>Paramètres
+        <i class="fas fa-sliders me-1"></i>{{ _('Settings') }}
       </button>
     </li>
     <li class="nav-item">
       <button class="nav-link" id="tab-logs-btn" data-bs-toggle="tab"
               data-bs-target="#tab-logs" type="button" role="tab">
-        <i class="fas fa-scroll me-1"></i>Journal d'audit
+        <i class="fas fa-scroll me-1"></i>{{ _('Audit log') }}
         <span class="badge bg-secondary ms-1">{{ logs | length }}</span>
       </button>
     </li>
@@ -82,14 +82,14 @@
               data-bs-target="#tab-sso" type="button" role="tab">
         <i class="fas fa-key me-1"></i>SSO
         {% if settings.sso_enabled == '1' %}
-          <span class="badge bg-success ms-1" style="font-size:.65rem">actif</span>
+          <span class="badge bg-success ms-1" style="font-size:.65rem">{{ _('Active') }}</span>
         {% endif %}
       </button>
     </li>
     <li class="nav-item">
       <button class="nav-link" id="tab-s3-btn" data-bs-toggle="tab"
               data-bs-target="#tab-s3" type="button" role="tab">
-        <i class="fas fa-cloud me-1"></i>Stockage
+        <i class="fas fa-cloud me-1"></i>{{ _('Storage') }}
         {% if settings.storage_backend == 's3' %}
           <span class="badge bg-info text-dark ms-1" style="font-size:.65rem">S3</span>
         {% endif %}
@@ -98,13 +98,13 @@
     <li class="nav-item">
       <button class="nav-link" id="tab-legal-btn" data-bs-toggle="tab"
               data-bs-target="#tab-legal" type="button" role="tab">
-        <i class="fas fa-scale-balanced me-1"></i>Mentions légales / CGU
+        <i class="fas fa-scale-balanced me-1"></i>{{ _('Legal notices / ToS') }}
       </button>
     </li>
     <li class="nav-item">
       <button class="nav-link" id="tab-analytics-btn" data-bs-toggle="tab"
               data-bs-target="#tab-analytics" type="button" role="tab">
-        <i class="fas fa-chart-line me-1"></i>Tableau de bord
+        <i class="fas fa-chart-line me-1"></i>{{ _('Dashboard') }}
       </button>
     </li>
   </ul>
@@ -119,12 +119,12 @@
             <table class="table table-hover mb-0">
               <thead class="table-light">
                 <tr>
-                  <th class="ps-4">Utilisateur</th>
-                  <th>Type</th>
-                  <th>Inscription</th>
-                  <th class="text-center">Fichiers</th>
-                  <th class="text-center">Stockage</th>
-                  <th class="text-end pe-4">Actions</th>
+                  <th class="ps-4">{{ _('User') }}</th>
+                  <th>{{ _('Type') }}</th>
+                  <th>{{ _('Registered') }}</th>
+                  <th class="text-center">{{ _('Files') }}</th>
+                  <th class="text-center">{{ _('Storage') }}</th>
+                  <th class="text-end pe-4">{{ _('Actions') }}</th>
                 </tr>
               </thead>
               <tbody>
@@ -132,11 +132,11 @@
                 <tr>
                   <td class="ps-4 fw-semibold">
                     {% if u.is_admin %}
-                      <i class="fas fa-crown crown-gold me-1" title="Administrateur"></i>
+                      <i class="fas fa-crown crown-gold me-1" title="{{ _('Administrator') }}"></i>
                     {% endif %}
                     {{ u.username }}
                     {% if u.id == current_user.id %}
-                      <span class="badge bg-primary ms-1" style="font-size:.7rem">vous</span>
+                      <span class="badge bg-primary ms-1" style="font-size:.7rem">{{ _('you') }}</span>
                     {% endif %}
                   </td>
                   <td>
@@ -158,10 +158,10 @@
                       <form method="post"
                             action="{{ url_for('admin_toggle_admin', user_id=u.id) }}"
                             class="d-inline"
-                            onsubmit="return confirm('Modifier les droits admin de {{ u.username }} ?')">
+                            onsubmit="return confirm('{{ _('Change admin rights for') }} {{ u.username }} ?')">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button class="btn btn-sm {% if u.is_admin %}btn-warning{% else %}btn-outline-secondary{% endif %}"
-                                title="{{ 'Retirer les droits admin' if u.is_admin else 'Promouvoir administrateur' }}">
+                                title="{{ _('Remove admin rights') if u.is_admin else _('Promote to administrator') }}">
                           <i class="fas fa-crown"></i>
                         </button>
                       </form>
@@ -169,9 +169,9 @@
                       <form method="post"
                             action="{{ url_for('admin_reset_password', user_id=u.id) }}"
                             class="d-inline"
-                            onsubmit="return confirm('Réinitialiser le mot de passe de {{ u.username }} ? Un mot de passe temporaire sera affiché.')">
+                            onsubmit="return confirm('{{ _('Reset password for') }} {{ u.username }} ? {{ _('A temporary password will be shown.') }}')">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <button class="btn btn-sm btn-outline-warning ms-1" title="Réinitialiser le mot de passe">
+                        <button class="btn btn-sm btn-outline-warning ms-1" title="{{ _('Reset password') }}">
                           <i class="fas fa-key"></i>
                         </button>
                       </form>
@@ -179,9 +179,9 @@
                       <form method="post"
                             action="{{ url_for('admin_delete_user', user_id=u.id) }}"
                             class="d-inline"
-                            onsubmit="return confirm('Supprimer {{ u.username }} et tous ses fichiers ? Cette action est irréversible.')">
+                            onsubmit="return confirm('{{ _('Delete') }} {{ u.username }} {{ _(\'and all their files? This action is irreversible.\') }}')">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <button class="btn btn-sm btn-outline-danger ms-1" title="Supprimer">
+                        <button class="btn btn-sm btn-outline-danger ms-1" title="{{ _('Delete') }}">
                           <i class="fas fa-trash"></i>
                         </button>
                       </form>
@@ -192,7 +192,7 @@
                 </tr>
                 {% else %}
                 <tr>
-                  <td colspan="6" class="text-center text-muted py-4">Aucun utilisateur.</td>
+                  <td colspan="6" class="text-center text-muted py-4">{{ _('No users.') }}</td>
                 </tr>
                 {% endfor %}
               </tbody>
@@ -210,7 +210,7 @@
             {{ form.hidden_tag() }}
 
             <p class="text-uppercase fw-semibold text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em">
-              <i class="fas fa-tag me-1"></i>Identité
+              <i class="fas fa-tag me-1"></i>{{ _('Identity') }}
             </p>
             <div class="row g-3 mb-4">
               <div class="col-md-6">
@@ -223,14 +223,14 @@
               </div>
               <div class="col-12">
                 <label class="form-label">{{ form.welcome_banner.label.text }}</label>
-                {{ form.welcome_banner(class="form-control", rows="2", placeholder="Message affiché sur la page d'accueil (laisser vide pour désactiver)") }}
-                <div class="form-text">Supports le texte brut. Laisser vide pour ne pas afficher de bannière.</div>
+                {{ form.welcome_banner(class="form-control", rows="2", placeholder="{{ _('Message displayed on the home page (leave empty to disable)') }}") }}
+                <div class="form-text">{{ _('Supports plain text. Leave empty to show no banner.') }}</div>
               </div>
             </div>
 
             <hr class="my-3">
             <p class="text-uppercase fw-semibold text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em">
-              <i class="fas fa-file me-1"></i>Fichiers
+              <i class="fas fa-file me-1"></i>{{ _('Files') }}
             </p>
             <div class="row g-3 mb-4">
               <div class="col-md-4">
@@ -247,13 +247,13 @@
               <div class="col-md-4">
                 <label class="form-label">{{ form.blocked_extensions.label.text }}</label>
                 {{ form.blocked_extensions(class="form-control", placeholder="exe, bat, sh…") }}
-                <div class="form-text">Séparées par des virgules.</div>
+                <div class="form-text">{{ _('Separated by commas.') }}</div>
               </div>
             </div>
 
             <hr class="my-3">
             <p class="text-uppercase fw-semibold text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em">
-              <i class="fas fa-gauge me-1"></i>Quotas par utilisateur
+              <i class="fas fa-gauge me-1"></i>{{ _('Per-user quotas') }}
             </p>
             <div class="row g-3 mb-4">
               <div class="col-md-6">

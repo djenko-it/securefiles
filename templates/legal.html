@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr" data-bs-theme="{{ user_theme }}">
+<html lang="{{ current_lang }}" data-bs-theme="{{ user_theme }}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -24,7 +24,7 @@
         </div>
         <hr class="mt-4">
         <a href="/" class="btn btn-sm btn-outline-secondary">
-          <i class="fas fa-arrow-left me-1"></i>Retour
+          <i class="fas fa-arrow-left me-1"></i>{{ _('Back') }}
         </a>
       </div>
     </div>
@@ -34,9 +34,9 @@
     {{ settings.app_name }} &mdash;
     <a href="mailto:{{ settings.contact_email }}">{{ settings.contact_email }}</a>
     &nbsp;·&nbsp;
-    <a href="{{ url_for('mentions_legales') }}">Mentions légales</a>
+    <a href="{{ url_for('mentions_legales') }}">{{ _('Legal notices') }}</a>
     &nbsp;·&nbsp;
-    <a href="{{ url_for('cgu') }}">CGU</a>
+    <a href="{{ url_for('cgu') }}">{{ _('Terms of Service') }}</a>
   </footer>
 
   <script nonce="{{ csp_nonce }}" src="/static/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>

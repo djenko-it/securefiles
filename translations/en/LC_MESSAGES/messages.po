@@ -1,0 +1,642 @@
+# English translations for SecureFiles
+# These are the source strings (English is the base language)
+msgid ""
+msgstr ""
+"Project-Id-Version: SecureFiles\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-03-09 00:00+0000\n"
+"PO-Revision-Date: 2026-03-09 00:00+0000\n"
+"Last-Translator: \n"
+"Language: en\n"
+"Language-Team: English\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+# ── app.py messages ──────────────────────────────────────────────────────────
+
+msgid "Please log in to access this page."
+msgstr "Please log in to access this page."
+
+msgid "Registrations are disabled."
+msgstr "Registrations are disabled."
+
+msgid "Account created! You can now log in."
+msgstr "Account created! You can now log in."
+
+msgid "This username is already taken."
+msgstr "This username is already taken."
+
+msgid "Account locked. Try again in %(n)s minute(s)."
+msgstr "Account locked. Try again in %(n)s minute(s)."
+
+msgid "Account locked for %(n)s minutes after too many failed attempts."
+msgstr "Account locked for %(n)s minutes after too many failed attempts."
+
+msgid "Incorrect credentials."
+msgstr "Incorrect credentials."
+
+msgid "Invalid or already used link."
+msgstr "Invalid or already used link."
+
+msgid "This link has expired. Ask the administrator for a new one."
+msgstr "This link has expired. Ask the administrator for a new one."
+
+msgid "Password updated. You can now log in."
+msgstr "Password updated. You can now log in."
+
+msgid "Internal MFA error. Please contact the administrator."
+msgstr "Internal MFA error. Please contact the administrator."
+
+msgid "Invalid TOTP code."
+msgstr "Invalid TOTP code."
+
+msgid "Current password is incorrect."
+msgstr "Current password is incorrect."
+
+msgid "Password updated."
+msgstr "Password updated."
+
+msgid "Session expired, please try again."
+msgstr "Session expired, please try again."
+
+msgid "Invalid code. Please try again."
+msgstr "Invalid code. Please try again."
+
+msgid "TOTP disabled."
+msgstr "TOTP disabled."
+
+msgid "No recovery codes to display."
+msgstr "No recovery codes to display."
+
+msgid "Enable TOTP first to generate recovery codes."
+msgstr "Enable TOTP first to generate recovery codes."
+
+msgid "Invalid recovery code."
+msgstr "Invalid recovery code."
+
+msgid "Security key deleted."
+msgstr "Security key deleted."
+
+msgid "Incorrect confirmation. Type exactly \"supprimer\" to confirm."
+msgstr "Incorrect confirmation. Type exactly \"supprimer\" to confirm."
+
+msgid "Your account and all your data have been permanently deleted."
+msgstr "Your account and all your data have been permanently deleted."
+
+msgid "The recipient has no storage space left."
+msgstr "The recipient has no storage space left."
+
+msgid "The recipient has reached their file quota."
+msgstr "The recipient has reached their file quota."
+
+msgid "File rejected: threat detected (%(threat)s)."
+msgstr "File rejected: threat detected (%(threat)s)."
+
+msgid "Internal error while saving the file."
+msgstr "Internal error while saving the file."
+
+msgid "File type not allowed."
+msgstr "File type not allowed."
+
+msgid "Settings saved."
+msgstr "Settings saved."
+
+msgid "You cannot delete your own account."
+msgstr "You cannot delete your own account."
+
+msgid "You cannot change your own admin rights."
+msgstr "You cannot change your own admin rights."
+
+msgid "User not found."
+msgstr "User not found."
+
+msgid "Cannot reset the password of an SSO account."
+msgstr "Cannot reset the password of an SSO account."
+
+msgid "Unable to contact the SSO provider."
+msgstr "Unable to contact the SSO provider."
+
+msgid "SSO configuration saved."
+msgstr "SSO configuration saved."
+
+msgid "Storage configuration saved."
+msgstr "Storage configuration saved."
+
+msgid "Legal notices and Terms of Service saved."
+msgstr "Legal notices and Terms of Service saved."
+
+msgid "Two-factor authentication (2FA) is required. Please enable it on your profile."
+msgstr "Two-factor authentication (2FA) is required. Please enable it on your profile."
+
+msgid "Incorrect password."
+msgstr "Incorrect password."
+
+msgid "No file or file type not allowed."
+msgstr "No file or file type not allowed."
+
+msgid "File too large (max %(n)s MB)."
+msgstr "File too large (max %(n)s MB)."
+
+msgid "Quota reached (%(n)s files maximum)."
+msgstr "Quota reached (%(n)s files maximum)."
+
+msgid "Storage quota exceeded (%(n)s %(unit)s maximum)."
+msgstr "Storage quota exceeded (%(n)s %(unit)s maximum)."
+
+msgid "Invalid custom date format."
+msgstr "Invalid custom date format."
+
+msgid "The expiry date must be in the future."
+msgstr "The expiry date must be in the future."
+
+msgid "The expiry date cannot exceed 1 year."
+msgstr "The expiry date cannot exceed 1 year."
+
+msgid "Download count must be ≥ 1."
+msgstr "Download count must be ≥ 1."
+
+msgid "Invalid download count."
+msgstr "Invalid download count."
+
+msgid "At least 2 files required."
+msgstr "At least 2 files required."
+
+msgid "File not found."
+msgstr "File not found."
+
+msgid "Bucket name is required."
+msgstr "Bucket name is required."
+
+msgid "Successfully connected to bucket \"%(bucket)s\"."
+msgstr "Successfully connected to bucket \"%(bucket)s\"."
+
+msgid "File too large (server limit exceeded)."
+msgstr "File too large (server limit exceeded)."
+
+msgid "boto3 is not installed on this server."
+msgstr "boto3 is not installed on this server."
+
+# ── Template strings ─────────────────────────────────────────────────────────
+
+msgid "Login"
+msgstr "Login"
+
+msgid "Sign up"
+msgstr "Sign up"
+
+msgid "Username"
+msgstr "Username"
+
+msgid "Password"
+msgstr "Password"
+
+msgid "Confirm password"
+msgstr "Confirm password"
+
+msgid "No account yet?"
+msgstr "No account yet?"
+
+msgid "Sign in"
+msgstr "Sign in"
+
+msgid "Already have an account?"
+msgstr "Already have an account?"
+
+msgid "Log in"
+msgstr "Log in"
+
+msgid "Create an account"
+msgstr "Create an account"
+
+msgid "Log in via %(provider)s"
+msgstr "Log in via %(provider)s"
+
+msgid "Legal notices"
+msgstr "Legal notices"
+
+msgid "Terms of Service"
+msgstr "Terms of Service"
+
+msgid "My shares"
+msgstr "My shares"
+
+msgid "My profile"
+msgstr "My profile"
+
+msgid "Log out"
+msgstr "Log out"
+
+msgid "New"
+msgstr "New"
+
+msgid "Dashboard"
+msgstr "Dashboard"
+
+msgid "Drop files here or click to browse"
+msgstr "Drop files here or click to browse"
+
+msgid "Max size: %(n)s GB per file"
+msgstr "Max size: %(n)s GB per file"
+
+msgid "Max size: %(n)s MB per file"
+msgstr "Max size: %(n)s MB per file"
+
+msgid "Drop here"
+msgstr "Drop here"
+
+msgid "Each link is unique. The file is deleted after expiry."
+msgstr "Each link is unique. The file is deleted after expiry."
+
+msgid "Share options"
+msgstr "Share options"
+
+msgid "Password (optional)"
+msgstr "Password (optional)"
+
+msgid "Leave empty for no password"
+msgstr "Leave empty for no password"
+
+msgid "Validity period"
+msgstr "Validity period"
+
+msgid "Limit downloads"
+msgstr "Limit downloads"
+
+msgid "End-to-end encryption"
+msgstr "End-to-end encryption"
+
+msgid "Required"
+msgstr "Required"
+
+msgid "The key never leaves your browser. The server cannot read the content."
+msgstr "The key never leaves your browser. The server cannot read the content."
+
+msgid "Send"
+msgstr "Send"
+
+msgid "File(s) ready!"
+msgstr "File(s) ready!"
+
+msgid "Copy and share this link:"
+msgstr "Copy and share this link:"
+
+msgid "Copy"
+msgstr "Copy"
+
+msgid "Link copied to clipboard"
+msgstr "Link copied to clipboard"
+
+msgid "QR Code"
+msgstr "QR Code"
+
+msgid "Scan to open on mobile"
+msgstr "Scan to open on mobile"
+
+msgid "Individual links:"
+msgstr "Individual links:"
+
+msgid "Copy all"
+msgstr "Copy all"
+
+msgid "Links copied!"
+msgstr "Links copied!"
+
+msgid "Access denied"
+msgstr "Access denied"
+
+msgid "You do not have the necessary permissions to access this page."
+msgstr "You do not have the necessary permissions to access this page."
+
+msgid "Back to home"
+msgstr "Back to home"
+
+msgid "Page not found"
+msgstr "Page not found"
+
+msgid "The page you are looking for does not exist or has been moved."
+msgstr "The page you are looking for does not exist or has been moved."
+
+msgid "Server error"
+msgstr "Server error"
+
+msgid "An unexpected error occurred. Please try again later or contact the administrator."
+msgstr "An unexpected error occurred. Please try again later or contact the administrator."
+
+msgid "File available"
+msgstr "File available"
+
+msgid "File name"
+msgstr "File name"
+
+msgid "Expires on"
+msgstr "Expires on"
+
+msgid "Downloads remaining"
+msgstr "Downloads remaining"
+
+msgid "This file is end-to-end encrypted. The key never passed through the server."
+msgstr "This file is end-to-end encrypted. The key never passed through the server."
+
+msgid "Download"
+msgstr "Download"
+
+msgid "Decrypt & download"
+msgstr "Decrypt & download"
+
+msgid "Decrypting..."
+msgstr "Decrypting..."
+
+msgid "Expired link"
+msgstr "Expired link"
+
+msgid "This download link has expired. Ask the sender for a new link."
+msgstr "This download link has expired. Ask the sender for a new link."
+
+msgid "File not found"
+msgstr "File not found"
+
+msgid "This file does not exist, has expired, or has reached its maximum download count."
+msgstr "This file does not exist, has expired, or has reached its maximum download count."
+
+msgid "Protected file"
+msgstr "Protected file"
+
+msgid "Enter the password to access this file."
+msgstr "Enter the password to access this file."
+
+msgid "Two-step verification"
+msgstr "Two-step verification"
+
+msgid "Confirm your identity to continue."
+msgstr "Confirm your identity to continue."
+
+msgid "Authentication app"
+msgstr "Authentication app"
+
+msgid "Verify"
+msgstr "Verify"
+
+msgid "Security key"
+msgstr "Security key"
+
+msgid "Use my security key"
+msgstr "Use my security key"
+
+msgid "Use a recovery code"
+msgstr "Use a recovery code"
+
+msgid "Back to login"
+msgstr "Back to login"
+
+msgid "Recovery codes"
+msgstr "Recovery codes"
+
+msgid "These codes allow you to access your account if you lose your authentication app."
+msgstr "These codes allow you to access your account if you lose your authentication app."
+
+msgid "Each code can only be used once."
+msgstr "Each code can only be used once."
+
+msgid "Keep these codes in a safe place. They will never be shown again."
+msgstr "Keep these codes in a safe place. They will never be shown again."
+
+msgid "Print"
+msgstr "Print"
+
+msgid "I have saved my codes"
+msgstr "I have saved my codes"
+
+msgid "Appearance"
+msgstr "Appearance"
+
+msgid "Theme"
+msgstr "Theme"
+
+msgid "Switch to dark"
+msgstr "Switch to dark"
+
+msgid "Switch to light"
+msgstr "Switch to light"
+
+msgid "Avatar color"
+msgstr "Avatar color"
+
+msgid "Current password"
+msgstr "Current password"
+
+msgid "New password"
+msgstr "New password"
+
+msgid "Confirm"
+msgstr "Confirm"
+
+msgid "Update"
+msgstr "Update"
+
+msgid "Authentication app (TOTP)"
+msgstr "Authentication app (TOTP)"
+
+msgid "Enabled"
+msgstr "Enabled"
+
+msgid "Disabled"
+msgstr "Disabled"
+
+msgid "Your authentication app is configured."
+msgstr "Your authentication app is configured."
+
+msgid "Disable"
+msgstr "Disable"
+
+msgid "Add a layer of security with an app like Google Authenticator or Authy."
+msgstr "Add a layer of security with an app like Google Authenticator or Authy."
+
+msgid "Configure"
+msgstr "Configure"
+
+msgid "6-digit code from the app"
+msgstr "6-digit code from the app"
+
+msgid "Validate"
+msgstr "Validate"
+
+msgid "Remaining"
+msgstr "Remaining"
+
+msgid "Use these codes if you lose access to your authentication app."
+msgstr "Use these codes if you lose access to your authentication app."
+
+msgid "Regenerate codes"
+msgstr "Regenerate codes"
+
+msgid "Security key (WebAuthn)"
+msgstr "Security key (WebAuthn)"
+
+msgid "Active"
+msgstr "Active"
+
+msgid "My personal data"
+msgstr "My personal data"
+
+msgid "Export my data (JSON)"
+msgstr "Export my data (JSON)"
+
+msgid "Delete my account"
+msgstr "Delete my account"
+
+msgid "Irreversible action."
+msgstr "Irreversible action."
+
+msgid "Storage"
+msgstr "Storage"
+
+msgid "Files"
+msgstr "Files"
+
+msgid "Received files"
+msgstr "Received files"
+
+msgid "Sender"
+msgstr "Sender"
+
+msgid "Drop links"
+msgstr "Drop links"
+
+msgid "New link"
+msgstr "New link"
+
+msgid "Name"
+msgstr "Name"
+
+msgid "Expires"
+msgstr "Expires"
+
+msgid "Uses"
+msgstr "Uses"
+
+msgid "Link"
+msgstr "Link"
+
+msgid "Expired"
+msgstr "Expired"
+
+msgid "Exhausted"
+msgstr "Exhausted"
+
+msgid "No drop links. Create one to let someone send you files without an account."
+msgstr "No drop links. Create one to let someone send you files without an account."
+
+msgid "New drop link"
+msgstr "New drop link"
+
+msgid "Name (optional)"
+msgstr "Name (optional)"
+
+msgid "Expires in"
+msgstr "Expires in"
+
+msgid "1 hour"
+msgstr "1 hour"
+
+msgid "24 hours"
+msgstr "24 hours"
+
+msgid "7 days"
+msgstr "7 days"
+
+msgid "30 days"
+msgstr "30 days"
+
+msgid "Max files accepted"
+msgstr "Max files accepted"
+
+msgid "1 file"
+msgstr "1 file"
+
+msgid "Unlimited"
+msgstr "Unlimited"
+
+msgid "Cancel"
+msgstr "Cancel"
+
+msgid "Create link"
+msgstr "Create link"
+
+msgid "My shares"
+msgstr "My shares"
+
+msgid "No shares yet."
+msgstr "No shares yet."
+
+msgid "Send a file"
+msgstr "Send a file"
+
+msgid "File"
+msgstr "File"
+
+msgid "Administration"
+msgstr "Administration"
+
+msgid "Users"
+msgstr "Users"
+
+msgid "Settings"
+msgstr "Settings"
+
+msgid "Audit log"
+msgstr "Audit log"
+
+msgid "Drop a file"
+msgstr "Drop a file"
+
+msgid "Expired link"
+msgstr "Expired link"
+
+msgid "Quota reached"
+msgstr "Quota reached"
+
+msgid "File sent!"
+msgstr "File sent!"
+
+msgid "Send another file"
+msgstr "Send another file"
+
+msgid "Your name (optional)"
+msgstr "Your name (optional)"
+
+msgid "File to send"
+msgstr "File to send"
+
+msgid "Archive available"
+msgstr "Archive available"
+
+msgid "Content"
+msgstr "Content"
+
+msgid "Download archive (.zip)"
+msgstr "Download archive (.zip)"
+
+msgid "Access archive"
+msgstr "Access archive"
+
+msgid "Maintenance"
+msgstr "Maintenance"
+
+msgid "%(app_name)s is under maintenance"
+msgstr "%(app_name)s is under maintenance"
+
+msgid "The site is temporarily under maintenance. Please come back later."
+msgstr "The site is temporarily under maintenance. Please come back later."
+
+msgid "Back"
+msgstr "Back"
+
+msgid "Return"
+msgstr "Return"
+
+msgid "Disconnect"
+msgstr "Disconnect"
+
+msgid "Connection"
+msgstr "Connection"

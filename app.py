@@ -23,6 +23,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from cryptography.fernet import Fernet, InvalidToken
 from flask import (Flask, abort, flash, g, jsonify, redirect, render_template,
                    request, send_file, session, url_for)
+from flask_babel import Babel, _, lazy_gettext as _l
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_login import (LoginManager, UserMixin, current_user, login_required,
@@ -76,6 +77,18 @@ app.config.update(
 csrf = CSRFProtect(app)
 logging.basicConfig(level=logging.INFO)
 
+babel = Babel()
+
+def _get_locale():
+    # 1. Preference stored in session (user clicked a language switcher)
+    lang = session.get('lang')
+    if lang in ('fr', 'en'):
+        return lang
+    # 2. Best match from Accept-Language header
+    return request.accept_languages.best_match(['fr', 'en'], default='fr')
+
+babel.init_app(app, locale_selector=_get_locale)
+
 limiter = Limiter(
     get_remote_address,
     app=app,
@@ -85,13 +98,21 @@ limiter = Limiter(
 
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
-login_manager.login_message = 'Veuillez vous connecter pour accéder à cette page.'
+login_manager.login_message = _l('Please log in to access this page.')
 login_manager.login_message_category = 'warning'
 
 
 @app.context_processor
 def inject_branding():
-    return {'has_logo': os.path.exists(LOGO_PATH)}
+    from flask_babel import get_locale
+    return {'has_logo': os.path.exists(LOGO_PATH), 'current_lang': str(get_locale())}
+
+
+@app.route('/set-lang/<lang>')
+def set_lang(lang):
+    if lang in ('fr', 'en'):
+        session['lang'] = lang
+    return redirect(request.referrer or url_for('index'))
 
 
 DATABASE      = '/app/data/messages.db'
@@ -827,8 +848,7 @@ def before_request():
             and not current_user.has_mfa):
         _exempt_mfa = ('/profile', '/mfa', '/logout', '/admin', '/health', '/auth/sso')
         if not any(request.path.startswith(p) for p in _exempt_mfa):
-            flash('La double authentification (2FA) est obligatoire. '
-                  'Veuillez l\'activer sur votre profil.', 'warning')
+            flash(_('Two-factor authentication (2FA) is required. Please enable it on your profile.'), 'warning')
             return redirect(url_for('profile'))
 
 
@@ -1020,7 +1040,7 @@ def index():
 def upload_file():
     file = request.files.get('file')
     if not file or not allowed_file(file.filename):
-        return {'success': False, 'message': 'Fichier absent ou type non autorisé.'}
+        return {'success': False, 'message': _('No file or file type not allowed.')}
 
     settings = get_settings()
 
@@ -1030,7 +1050,7 @@ def upload_file():
     max_bytes = int(settings['max_file_size_mb']) * 1024 * 1024
     if size_bytes > max_bytes:
         return {'success': False,
-                'message': f"Fichier trop grand (max {settings['max_file_size_mb']} Mo)."}
+                'message': _('File too large (max %(n)s MB).', n=settings['max_file_size_mb'])}
 
     max_files = int(settings['max_files_per_user'])
     if max_files > 0:
@@ -1039,7 +1059,7 @@ def upload_file():
         ).fetchone()[0]
         if count >= max_files:
             return {'success': False,
-                    'message': f"Quota atteint ({max_files} fichiers maximum)."}
+                    'message': _('Quota reached (%(n)s files maximum).', n=max_files)}
 
     max_storage = int(settings['max_storage_mb'])
     if max_storage > 0:
@@ -1052,7 +1072,7 @@ def upload_file():
             _s_disp = max_storage // 1024 if _s_unit == 'go' else max_storage
             _s_label = 'Go' if _s_unit == 'go' else 'Mo'
             return {'success': False,
-                    'message': f"Quota de stockage dépassé ({_s_disp} {_s_label} maximum)."}
+                    'message': _('Storage quota exceeded (%(n)s %(unit)s maximum).', n=_s_disp, unit=_s_label)}
 
     file_id      = str(uuid.uuid4())
     expiry_str   = request.form.get('expiry', settings['default_expiry'])
@@ -1061,11 +1081,11 @@ def upload_file():
         try:
             expiry_time = datetime.strptime(custom_val, '%Y-%m-%dT%H:%M')
         except ValueError:
-            return {'success': False, 'message': 'Format de date personnalisée invalide.'}
+            return {'success': False, 'message': _('Invalid custom date format.')}
         if expiry_time <= datetime.now():
-            return {'success': False, 'message': 'La date d\'expiration doit être dans le futur.'}
+            return {'success': False, 'message': _('The expiry date must be in the future.')}
         if expiry_time > datetime.now() + timedelta(days=365):
-            return {'success': False, 'message': 'La date d\'expiration ne peut pas dépasser 1 an.'}
+            return {'success': False, 'message': _('The expiry date cannot exceed 1 year.')}
     else:
         expiry_time = get_expiry_time(expiry_str)
     max_downloads = request.form.get('max_downloads', 'unlimited')
@@ -1073,10 +1093,10 @@ def upload_file():
         try:
             max_dl_int = int(max_downloads)
             if max_dl_int < 1:
-                return {'success': False, 'message': 'Le nombre de téléchargements doit être ≥ 1.'}
+                return {'success': False, 'message': _('Download count must be ≥ 1.')}
             max_downloads = str(max_dl_int)
         except ValueError:
-            return {'success': False, 'message': 'Nombre de téléchargements invalide.'}
+            return {'success': False, 'message': _('Invalid download count.')}
     password        = request.form.get('password', '')
     hashed_password = generate_password_hash(password) if password else None
 
@@ -1085,11 +1105,11 @@ def upload_file():
         safe, threat = _clamav_scan(raw_data)
         if not safe:
             audit_log('upload_blocked', details=f"{file.filename} - menace : {threat}")
-            return {'success': False, 'message': f'Fichier refusé : menace détectée ({threat}).'}
+            return {'success': False, 'message': _('File rejected: threat detected (%(threat)s).', threat=threat)}
         storage_write(file_id, _encrypt(raw_data))
     except Exception as exc:
         app.logger.error("Erreur écriture fichier %s : %s", file_id, exc)
-        return {'success': False, 'message': 'Erreur interne lors de l\'enregistrement.'}
+        return {'success': False, 'message': _('Internal error while saving the file.')}
 
     g.db.execute(
         'INSERT INTO files (id, filename, original_filename, expiry, max_downloads, password, owner_id)'
@@ -1139,7 +1159,7 @@ def download_file(file_id):
 
     if form.validate_on_submit():
         if hashed_password and not check_password_hash(hashed_password, form.password.data):
-            flash('Mot de passe incorrect.', 'danger')
+            flash(_('Incorrect password.'), 'danger')
             return render_template('password_required.html', file_id=file_id,
                                    form=form, settings=get_settings())
         if hashed_password:
@@ -1270,7 +1290,7 @@ def bundle_create():
     data = request.get_json(silent=True) or {}
     file_ids = data.get('file_ids', [])
     if not isinstance(file_ids, list) or len(file_ids) < 2:
-        return jsonify({'success': False, 'message': 'Au moins 2 fichiers requis.'})
+        return jsonify({'success': False, 'message': _('At least 2 files required.')})
 
     hashed_password = None
     for fid in file_ids:
@@ -1279,7 +1299,7 @@ def bundle_create():
             (fid, current_user.id),
         ).fetchone()
         if not row:
-            return jsonify({'success': False, 'message': 'Fichier introuvable.'})
+            return jsonify({'success': False, 'message': _('File not found.')})
         if hashed_password is None:
             hashed_password = row[1]
 
@@ -1332,7 +1352,7 @@ def bundle_download(bundle_id):
     form = PasswordForm()
     if form.validate_on_submit():
         if hashed_password and not check_password_hash(hashed_password, form.password.data):
-            flash('Mot de passe incorrect.', 'danger')
+            flash(_('Incorrect password.'), 'danger')
             return render_template('bundle.html',
                                    bundle_id=bundle_id, form=form, needs_password=True,
                                    file_count=len(valid_files),
@@ -1421,7 +1441,7 @@ def register():
     if settings.get('sso_force') == '1':
         return redirect(url_for('sso_login'))
     if settings['allow_registration'] == '0':
-        flash("Les inscriptions sont désactivées.", 'warning')
+        flash(_('Registrations are disabled.'), 'warning')
         return redirect(url_for('login'))
     form = RegisterForm()
     if form.validate_on_submit():
@@ -1435,10 +1455,10 @@ def register():
             )
             g.db.commit()
             audit_log('register', details=form.username.data.strip())
-            flash('Compte créé ! Vous pouvez vous connecter.', 'success')
+            flash(_('Account created! You can now log in.'), 'success')
             return redirect(url_for('login'))
         except sqlite3.IntegrityError:
-            flash("Ce nom d'utilisateur est déjà pris.", 'danger')
+            flash(_('This username is already taken.'), 'danger')
     return render_template('register.html', form=form, settings=settings)
 
 
@@ -1472,7 +1492,7 @@ def login():
                     if datetime.now() < lock_time:
                         remaining = max(1, int((lock_time - datetime.now()).total_seconds() / 60) + 1)
                         audit_log('login_blocked', target=uname)
-                        flash(f'Compte verrouillé. Réessayez dans {remaining} minute(s).', 'danger')
+                        flash(_('Account locked. Try again in %(n)s minute(s).', n=remaining), 'danger')
                         return render_template('login.html', form=form, settings=settings)
                 except ValueError:
                     pass  # date corrompue, on laisse passer
@@ -1512,8 +1532,7 @@ def login():
                 g.db.commit()
                 audit_log('login_locked', target=uname,
                           details=f'Verrou {LOGIN_LOCKOUT_MINUTES} min après {attempts} échecs')
-                flash(f'Compte verrouillé pendant {LOGIN_LOCKOUT_MINUTES} minutes '
-                      f'après trop de tentatives.', 'danger')
+                flash(_('Account locked for %(n)s minutes after too many failed attempts.', n=LOGIN_LOCKOUT_MINUTES), 'danger')
                 return render_template('login.html', form=form, settings=settings)
             g.db.execute(
                 'UPDATE users SET failed_attempts = ? WHERE id = ?',
@@ -1521,7 +1540,7 @@ def login():
             )
             g.db.commit()
         audit_log('login_failed', target=uname)
-        flash('Identifiants incorrects.', 'danger')
+        flash(_('Incorrect credentials.'), 'danger')
     return render_template('login.html', form=form, settings=settings)
 
 
@@ -1533,13 +1552,13 @@ def reset_password(token):
         (token_hash,),
     ).fetchone()
     if not row:
-        flash("Lien invalide ou déjà utilisé.", 'danger')
+        flash(_('Invalid or already used link.'), 'danger')
         return redirect(url_for('login'))
     user_id, username, expiry_str = row
     if datetime.utcnow() > datetime.fromisoformat(expiry_str):
         g.db.execute('UPDATE users SET reset_token_hash = NULL, reset_token_expiry = NULL WHERE id = ?', (user_id,))
         g.db.commit()
-        flash("Ce lien a expiré. Demandez un nouveau lien à l'administrateur.", 'danger')
+        flash(_('This link has expired. Ask the administrator for a new one.'), 'danger')
         return redirect(url_for('login'))
     form = SetPasswordForm()
     if form.validate_on_submit():
@@ -1549,7 +1568,7 @@ def reset_password(token):
         )
         g.db.commit()
         audit_log('reset_password', target=username, details='Mot de passe réinitialisé via lien admin')
-        flash("Mot de passe modifié. Vous pouvez vous connecter.", 'success')
+        flash(_('Password updated. You can now log in.'), 'success')
         return redirect(url_for('login'))
     return render_template('reset_password.html', form=form, username=username, settings=get_settings())
 
@@ -1591,7 +1610,7 @@ def mfa_totp_verify():
         secret = _decrypt_secret(user.totp_secret)
     except Exception:
         app.logger.error("Impossible de déchiffrer le secret TOTP pour user %s", user.id)
-        flash('Erreur interne MFA. Contactez l\'administrateur.', 'danger')
+        flash(_('Internal MFA error. Please contact the administrator.'), 'danger')
         return redirect(url_for('mfa_verify'))
     if secret and pyotp.TOTP(secret).verify(code, valid_window=1):
         session.clear()
@@ -1599,7 +1618,7 @@ def mfa_totp_verify():
         audit_log('login', details='via TOTP')
         return redirect(url_for('dashboard'))
     audit_log('mfa_failed', target=user.username, details='TOTP invalide')
-    flash('Code TOTP invalide.', 'danger')
+    flash(_('Invalid TOTP code.'), 'danger')
     return redirect(url_for('mfa_verify'))
 
 
@@ -1698,13 +1717,13 @@ def profile_change_password():
     form = ChangePasswordForm()
     if form.validate_on_submit():
         if not check_password_hash(current_user.password, form.current.data):
-            flash('Mot de passe actuel incorrect.', 'danger')
+            flash(_('Current password is incorrect.'), 'danger')
         else:
             g.db.execute('UPDATE users SET password = ? WHERE id = ?',
                          (generate_password_hash(form.password.data), current_user.id))
             g.db.commit()
             audit_log('password_change')
-            flash('Mot de passe modifié.', 'success')
+            flash(_('Password updated.'), 'success')
     else:
         for field, errors in form.errors.items():
             for err in errors:
@@ -1754,7 +1773,7 @@ def profile_totp_confirm():
     secret = session.pop('_totp_setup_secret', None)
     code   = request.form.get('totp_code', '').strip()
     if not secret:
-        flash('Session expirée, recommencez.', 'danger')
+        flash(_('Session expired, please try again.'), 'danger')
         return redirect(url_for('profile'))
     if pyotp.TOTP(secret).verify(code, valid_window=1):
         display_codes, hashes_json = _generate_backup_codes()
@@ -1766,7 +1785,7 @@ def profile_totp_confirm():
         audit_log('totp_enable')
         session['_backup_codes_display'] = display_codes
         return redirect(url_for('profile_totp_backup_show'))
-    flash('Code invalide. Réessayez.', 'danger')
+    flash(_('Invalid code. Please try again.'), 'danger')
     return redirect(url_for('profile'))
 
 
@@ -1779,7 +1798,7 @@ def profile_totp_disable():
     )
     g.db.commit()
     audit_log('totp_disable')
-    flash('TOTP désactivé.', 'success')
+    flash(_('TOTP disabled.'), 'success')
     return redirect(url_for('profile'))
 
 
@@ -1789,7 +1808,7 @@ def profile_totp_disable():
 def profile_totp_backup_show():
     codes = session.pop('_backup_codes_display', None)
     if not codes:
-        flash('Aucun code de récupération à afficher.', 'warning')
+        flash(_('No recovery codes to display.'), 'warning')
         return redirect(url_for('profile'))
     return render_template('backup_codes.html', codes=codes, settings=get_settings())
 
@@ -1798,7 +1817,7 @@ def profile_totp_backup_show():
 @login_required
 def profile_totp_backup_regenerate():
     if not current_user.has_totp:
-        flash('Activez d\'abord le TOTP pour générer des codes de récupération.', 'warning')
+        flash(_('Enable TOTP first to generate recovery codes.'), 'warning')
         return redirect(url_for('profile'))
     display_codes, hashes_json = _generate_backup_codes()
     g.db.execute(
@@ -1837,7 +1856,7 @@ def mfa_backup_verify():
                 audit_log('login', details=f'via code de récupération ({len(hashes)} restants)')
                 return redirect(url_for('dashboard'))
     audit_log('mfa_failed', target=user.username, details='Code de récupération invalide')
-    flash('Code de récupération invalide.', 'danger')
+    flash(_('Invalid recovery code.'), 'danger')
     return redirect(url_for('mfa_verify'))
 
 
@@ -1921,7 +1940,7 @@ def webauthn_delete():
     )
     g.db.commit()
     audit_log('webauthn_delete', details='Clé de sécurité supprimée')
-    flash('Clé de sécurité supprimée.', 'success')
+    flash(_('Security key deleted.'), 'success')
     return redirect(url_for('profile'))
 
 
@@ -2082,7 +2101,7 @@ def profile_delete_account():
 
     confirm = request.form.get('confirm_word', '').strip().lower()
     if confirm != 'supprimer':
-        flash('Confirmation incorrecte. Tapez exactement « supprimer » pour valider.', 'danger')
+        flash(_('Incorrect confirmation. Type exactly "supprimer" to confirm.'), 'danger')
         return redirect(url_for('profile'))
 
     uid = current_user.id
@@ -2101,7 +2120,7 @@ def profile_delete_account():
 
     audit_log('account_self_deleted', details=f'Compte {current_user.username} auto-supprimé')
     logout_user()
-    flash('Votre compte et l\'ensemble de vos données ont été supprimés définitivement.', 'success')
+    flash(_('Your account and all your data have been permanently deleted.'), 'success')
     return redirect(url_for('login'))
 
 
@@ -2197,7 +2216,7 @@ def drop_zone(drop_token):
                                           (recipient_id,)).fetchall()
                 used_bytes = sum(storage_get_size(fid) for (fid,) in all_ids)
                 if used_bytes + len(raw_data) > max_storage_mb * 1048576:
-                    flash("Le destinataire n'a plus d'espace de stockage disponible.", 'danger')
+                    flash(_('The recipient has no storage space left.'), 'danger')
                     return render_template('drop.html', recipient=recipient_name,
                                            drop_token=drop_token, success=False,
                                            expired=False, exhausted=False,
@@ -2210,7 +2229,7 @@ def drop_zone(drop_token):
                     'SELECT COUNT(*) FROM files WHERE owner_id = ?', (recipient_id,)
                 ).fetchone()[0]
                 if file_count >= max_files_user:
-                    flash("Le destinataire a atteint son quota de fichiers.", 'danger')
+                    flash(_('The recipient has reached their file quota.'), 'danger')
                     return render_template('drop.html', recipient=recipient_name,
                                            drop_token=drop_token, success=False,
                                            expired=False, exhausted=False,
@@ -2221,7 +2240,7 @@ def drop_zone(drop_token):
             safe, threat = _clamav_scan(raw_data)
             if not safe:
                 audit_log('drop_upload_blocked', details=f"{file.filename} - menace : {threat}")
-                flash(f'Fichier refusé : menace détectée ({threat}).', 'danger')
+                flash(_('File rejected: threat detected (%(threat)s).', threat=threat), 'danger')
                 return render_template('drop.html', recipient=recipient_name,
                                        drop_token=drop_token, success=False,
                                        expired=False, exhausted=False,
@@ -2229,7 +2248,7 @@ def drop_zone(drop_token):
             try:
                 storage_write(file_id, _encrypt(raw_data))
             except Exception:
-                flash("Erreur interne lors de l'enregistrement.", 'danger')
+                flash(_('Internal error while saving the file.'), 'danger')
                 return render_template('drop.html', recipient=recipient_name,
                                        drop_token=drop_token, success=False,
                                        expired=False, exhausted=False,
@@ -2251,7 +2270,7 @@ def drop_zone(drop_token):
             success   = True
             remaining = max(0, remaining - 1) if remaining is not None else None
         else:
-            flash('Type de fichier non autorisé.', 'danger')
+            flash(_('File type not allowed.'), 'danger')
 
     return render_template('drop.html', recipient=recipient_name, drop_token=drop_token,
                            success=success, expired=False, exhausted=False,
@@ -2624,7 +2643,7 @@ def admin_save_settings():
         g.db.commit()
         purge_old_audit_logs()
         audit_log('admin_settings', details='Paramètres mis à jour')
-        flash('Paramètres sauvegardés.', 'success')
+        flash(_('Settings saved.'), 'success')
     else:
         for field, errors in form.errors.items():
             for err in errors:
@@ -2637,7 +2656,7 @@ def admin_save_settings():
 @admin_required
 def admin_delete_user(user_id):
     if user_id == current_user.id:
-        flash("Impossible de supprimer votre propre compte.", 'danger')
+        flash(_('You cannot delete your own account.'), 'danger')
         return redirect(url_for('admin_panel'))
     row = g.db.execute('SELECT username FROM users WHERE id = ?', (user_id,)).fetchone()
     if not row:
@@ -2658,7 +2677,7 @@ def admin_delete_user(user_id):
 @admin_required
 def admin_toggle_admin(user_id):
     if user_id == current_user.id:
-        flash("Impossible de modifier vos propres droits.", 'danger')
+        flash(_('You cannot change your own admin rights.'), 'danger')
         return redirect(url_for('admin_panel'))
     row = g.db.execute('SELECT username, is_admin FROM users WHERE id = ?', (user_id,)).fetchone()
     if row:
@@ -2676,11 +2695,11 @@ def admin_toggle_admin(user_id):
 def admin_reset_password(user_id):
     row = g.db.execute('SELECT username, sso_user FROM users WHERE id = ?', (user_id,)).fetchone()
     if not row:
-        flash("Utilisateur introuvable.", 'danger')
+        flash(_('User not found.'), 'danger')
         return redirect(url_for('admin_panel'))
     username, is_sso = row[0], bool(row[1])
     if is_sso:
-        flash("Impossible de réinitialiser le mot de passe d'un compte SSO.", 'danger')
+        flash(_('Cannot reset the password of an SSO account.'), 'danger')
         return redirect(url_for('admin_panel'))
     token       = secrets.token_urlsafe(32)
     token_hash  = hashlib.sha256(token.encode()).hexdigest()
@@ -2710,7 +2729,7 @@ def sso_login():
     try:
         discovery = requests.get(settings['sso_discovery_url'], timeout=5).json()
     except Exception:
-        flash("Impossible de contacter le fournisseur SSO.", 'danger')
+        flash(_('Unable to contact the SSO provider.'), 'danger')
         return redirect(url_for('login'))
     state = secrets.token_urlsafe(16)
     nonce = secrets.token_urlsafe(16)
@@ -2830,7 +2849,7 @@ def admin_save_sso():
             g.db.execute('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', (key, value))
         g.db.commit()
         audit_log('admin_settings', details='Paramètres SSO mis à jour')
-        flash('Configuration SSO sauvegardée.', 'success')
+        flash(_('SSO configuration saved.'), 'success')
     else:
         for field, errors in form.errors.items():
             for err in errors:
@@ -2859,7 +2878,7 @@ def admin_save_s3():
             g.db.execute('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', (key, value))
         g.db.commit()
         audit_log('admin_settings', details='Paramètres stockage S3 mis à jour')
-        flash('Configuration du stockage sauvegardée.', 'success')
+        flash(_('Storage configuration saved.'), 'success')
     else:
         for field, errors in form.errors.items():
             for err in errors:
@@ -2873,7 +2892,7 @@ def admin_save_s3():
 def admin_test_s3():
     """Test la connexion S3 avec les paramètres envoyés depuis le formulaire (avant sauvegarde)."""
     if not _BOTO3_AVAILABLE:
-        return jsonify({'ok': False, 'message': 'boto3 non installé sur ce serveur.'})
+        return jsonify({'ok': False, 'message': _('boto3 is not installed on this server.')})
 
     data = request.get_json(silent=True) or {}
 
@@ -2884,7 +2903,7 @@ def admin_test_s3():
     secret_raw   = (data.get('s3_secret_key') or '').strip()
 
     if not bucket:
-        return jsonify({'ok': False, 'message': 'Nom du bucket manquant.'})
+        return jsonify({'ok': False, 'message': _('Bucket name is required.')})
 
     # Si le secret est vide, on utilise le secret déjà sauvegardé
     if secret_raw:
@@ -2903,7 +2922,7 @@ def admin_test_s3():
             kwargs['endpoint_url'] = endpoint_url
         client = boto3.client('s3', **kwargs)
         client.head_bucket(Bucket=bucket)
-        return jsonify({'ok': True, 'message': f'Connexion réussie au bucket « {bucket} ».'})
+        return jsonify({'ok': True, 'message': _('Successfully connected to bucket "%(bucket)s".', bucket=bucket)})
     except Exception as exc:
         msg = str(exc)
         # Extraire le message lisible depuis les erreurs boto3
@@ -2927,7 +2946,7 @@ def admin_save_legal():
                          (key, value or ''))
         g.db.commit()
         audit_log('admin_legal', details='Mentions légales / CGU mis à jour')
-        flash('Mentions légales et CGU sauvegardées.', 'success')
+        flash(_('Legal notices and Terms of Service saved.'), 'success')
     else:
         for field, errors in form.errors.items():
             for err in errors:
@@ -2953,7 +2972,7 @@ def _error_theme():
 
 @app.errorhandler(413)
 def request_entity_too_large(e):
-    return jsonify({'success': False, 'message': 'Fichier trop grand (limite serveur dépassée).'}), 413
+    return jsonify({'success': False, 'message': _('File too large (server limit exceeded).')}), 413
 
 
 @app.errorhandler(404)

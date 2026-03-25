@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr" data-bs-theme="{{ user_theme }}">
+<html lang="{{ current_lang }}" data-bs-theme="{{ user_theme }}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -16,17 +16,17 @@
       <div class="d-flex align-items-center gap-2">
         {%- if current_user.is_authenticated %}
           <a href="{{ url_for('dashboard') }}" class="btn btn-sm btn-outline-light">
-            <i class="fas fa-table-list me-1"></i>Mes partages
+            <i class="fas fa-table-list me-1"></i>{{ _('My shares') }}
           </a>
-          <a href="{{ url_for('logout') }}" class="text-secondary small ms-1">Déconnexion</a>
+          <a href="{{ url_for('logout') }}" class="text-secondary small ms-1">{{ _('Disconnect') }}</a>
         {%- else %}
           {% if settings.sso_force == '1' %}
             <a href="{{ url_for('sso_login') }}" class="btn btn-sm btn-outline-light">
               <i class="fas fa-key me-1"></i>{{ settings.sso_provider_name }}
             </a>
           {% else %}
-            <a href="{{ url_for('login') }}" class="btn btn-sm btn-outline-light">Connexion</a>
-            <a href="{{ url_for('register') }}" class="btn btn-sm btn-primary">Inscription</a>
+            <a href="{{ url_for('login') }}" class="btn btn-sm btn-outline-light">{{ _('Login') }}</a>
+            <a href="{{ url_for('register') }}" class="btn btn-sm btn-primary">{{ _('Sign up') }}</a>
           {% endif %}
         {%- endif %}
       </div>
@@ -38,20 +38,20 @@
       <div class="card-body p-4 p-md-5">
         <div class="text-center mb-4">
           <i class="fas fa-file-arrow-down fa-3x mb-3" style="color: var(--accent); opacity:.8;"></i>
-          <h1 class="h4 fw-semibold">Fichier disponible</h1>
+          <h1 class="h4 fw-semibold">{{ _('File available') }}</h1>
         </div>
 
         <div class="mb-4">
           <div class="info-row">
-            <span class="lbl"><i class="fas fa-file me-2 text-muted"></i>Nom du fichier</span>
+            <span class="lbl"><i class="fas fa-file me-2 text-muted"></i>{{ _('File name') }}</span>
             <span class="fw-medium text-truncate">{{ original_filename }}</span>
           </div>
           <div class="info-row">
-            <span class="lbl"><i class="fas fa-clock me-2 text-muted"></i>Expire le</span>
+            <span class="lbl"><i class="fas fa-clock me-2 text-muted"></i>{{ _('Expires on') }}</span>
             <span>{{ expiry_time }}</span>
           </div>
           <div class="info-row">
-            <span class="lbl"><i class="fas fa-download me-2 text-muted"></i>Téléchargements restants</span>
+            <span class="lbl"><i class="fas fa-download me-2 text-muted"></i>{{ _('Downloads remaining') }}</span>
             <span>{{ remaining_downloads }}</span>
           </div>
         </div>
@@ -73,8 +73,7 @@
           <div class="alert alert-success d-flex align-items-start gap-2 mb-3 py-2">
             <i class="fas fa-shield-halved mt-1 flex-shrink-0"></i>
             <span style="font-size:.87rem;">
-              Ce fichier est <strong>chiffré de bout en bout</strong>.
-              La clé n'a jamais transité par le serveur.
+              {{ _('This file is end-to-end encrypted. The key never passed through the server.') }}
             </span>
           </div>
         </div>
@@ -83,7 +82,7 @@
         <div id="download-direct-section">
           <div class="d-grid">
             <a href="{{ url_for('download_direct', file_id=file_id) }}" class="btn btn-primary btn-lg">
-              <i class="fas fa-download me-2"></i>Télécharger
+              <i class="fas fa-download me-2"></i>{{ _('Download') }}
             </a>
           </div>
         </div>
@@ -92,11 +91,11 @@
         <div id="e2e-decrypt-section" style="display:none;">
           <div class="d-grid">
             <button id="decrypt-btn" type="button" class="btn btn-success btn-lg">
-              <i class="fas fa-unlock me-2"></i>Déchiffrer &amp; télécharger
+              <i class="fas fa-unlock me-2"></i>{{ _('Decrypt & download') }}
             </button>
           </div>
           <div id="decrypt-progress" class="text-center text-muted small mt-2" style="display:none;">
-            <i class="fas fa-spinner fa-spin me-1"></i>Déchiffrement en cours…
+            <i class="fas fa-spinner fa-spin me-1"></i>{{ _('Decrypting...') }}
           </div>
           <div id="decrypt-error" class="alert alert-danger mt-2 mb-0" style="display:none;"></div>
         </div>
@@ -108,9 +107,9 @@
   <footer>
     <a href="mailto:{{ settings.contact_email }}">{{ settings.contact_email }}</a>
     &nbsp;·&nbsp;
-    <a href="{{ url_for('mentions_legales') }}">Mentions légales</a>
+    <a href="{{ url_for('mentions_legales') }}">{{ _('Legal notices') }}</a>
     &nbsp;·&nbsp;
-    <a href="{{ url_for('cgu') }}">CGU</a>
+    <a href="{{ url_for('cgu') }}">{{ _('Terms of Service') }}</a>
   </footer>
 
   <script nonce="{{ csp_nonce }}" src="/static/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>

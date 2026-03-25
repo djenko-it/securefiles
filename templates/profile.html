@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="fr" data-bs-theme="{{ user_theme }}">
+<html lang="{{ current_lang }}" data-bs-theme="{{ user_theme }}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{ settings.app_name }} — Mon profil</title>
+  <title>{{ settings.app_name }} — {{ _('My profile') }}</title>
   <link href="/static/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css">
   <link href="/static/css/custom.css" rel="stylesheet">
@@ -21,15 +21,15 @@
       </a>
       {% endif %}
       <a href="{{ url_for('dashboard') }}" class="btn btn-sm btn-outline-light">
-        <i class="fas fa-table-list me-1"></i>Mes partages
+        <i class="fas fa-table-list me-1"></i>{{ _('My shares') }}
       </a>
       <div class="dropdown">
         <a class="user-avatar" style="background:{{ user_avatar_color }}" role="button"
            data-bs-toggle="dropdown" aria-expanded="false">{{ user_avatar_letter }}</a>
         <ul class="dropdown-menu dropdown-menu-end">
-          <li><a class="dropdown-item" href="{{ url_for('profile') }}"><i class="fas fa-user me-2"></i>Mon profil</a></li>
+          <li><a class="dropdown-item" href="{{ url_for('profile') }}"><i class="fas fa-user me-2"></i>{{ _('My profile') }}</a></li>
           <li><hr class="dropdown-divider"></li>
-          <li><a class="dropdown-item text-danger" href="{{ url_for('logout') }}"><i class="fas fa-right-from-bracket me-2"></i>Se déconnecter</a></li>
+          <li><a class="dropdown-item text-danger" href="{{ url_for('logout') }}"><i class="fas fa-right-from-bracket me-2"></i>{{ _('Log out') }}</a></li>
         </ul>
       </div>
     </div>
@@ -58,24 +58,24 @@
   <!-- ── Thème ── -->
   <div class="card mb-3">
     <div class="card-body p-4">
-      <p class="section-title"><i class="fas fa-palette me-2"></i>Apparence</p>
+      <p class="section-title"><i class="fas fa-palette me-2"></i>{{ _('Appearance') }}</p>
       <div class="d-flex align-items-center justify-content-between mb-3">
-        <span>Thème</span>
+        <span>{{ _('Theme') }}</span>
         <form method="post" action="{{ url_for('profile_change_theme') }}" class="d-flex gap-2">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           {% if current_user.theme == 'light' %}
             <button name="theme" value="dark" class="btn btn-sm btn-outline-secondary">
-              <i class="fas fa-moon me-1"></i>Passer en sombre
+              <i class="fas fa-moon me-1"></i>{{ _('Switch to dark') }}
             </button>
           {% else %}
             <button name="theme" value="light" class="btn btn-sm btn-outline-secondary">
-              <i class="fas fa-sun me-1"></i>Passer en clair
+              <i class="fas fa-sun me-1"></i>{{ _('Switch to light') }}
             </button>
           {% endif %}
         </form>
       </div>
       <div>
-        <span class="d-block mb-2">Couleur de l'avatar</span>
+        <span class="d-block mb-2">{{ _('Avatar color') }}</span>
         <form method="post" action="{{ url_for('profile_change_avatar_color') }}" class="d-flex flex-wrap gap-2">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           {% for c in avatar_colors %}
@@ -91,25 +91,25 @@
   <!-- ── Mot de passe ── -->
   <div class="card mb-3">
     <div class="card-body p-4">
-      <p class="section-title"><i class="fas fa-key me-2"></i>Mot de passe</p>
+      <p class="section-title"><i class="fas fa-key me-2"></i>{{ _('Password') }}</p>
       <form method="post" action="{{ url_for('profile_change_password') }}">
         {{ form.hidden_tag() }}
         <div class="row g-3">
           <div class="col-12">
-            <label class="form-label-sm">Mot de passe actuel</label>
+            <label class="form-label-sm">{{ _('Current password') }}</label>
             {{ form.current(class="form-control") }}
           </div>
           <div class="col-md-6">
-            <label class="form-label-sm">Nouveau mot de passe</label>
+            <label class="form-label-sm">{{ _('New password') }}</label>
             {{ form.password(class="form-control", placeholder="10 caractères minimum") }}
           </div>
           <div class="col-md-6">
-            <label class="form-label-sm">Confirmer</label>
+            <label class="form-label-sm">{{ _('Confirm') }}</label>
             {{ form.confirm(class="form-control") }}
           </div>
         </div>
         <button type="submit" class="btn btn-primary btn-sm mt-3">
-          <i class="fas fa-check me-1"></i>Modifier
+          <i class="fas fa-check me-1"></i>{{ _('Update') }}
         </button>
       </form>
     </div>
@@ -119,27 +119,27 @@
   <div class="card mb-3">
     <div class="card-body p-4">
       <div class="d-flex justify-content-between align-items-center mb-3">
-        <p class="section-title mb-0"><i class="fas fa-mobile-screen me-2"></i>Application d'authentification (TOTP)</p>
+        <p class="section-title mb-0"><i class="fas fa-mobile-screen me-2"></i>{{ _('Authentication app (TOTP)') }}</p>
         {% if current_user.has_totp %}
-          <span class="badge bg-success">Activé</span>
+          <span class="badge bg-success">{{ _('Enabled') }}</span>
         {% else %}
-          <span class="badge bg-secondary">Désactivé</span>
+          <span class="badge bg-secondary">{{ _('Disabled') }}</span>
         {% endif %}
       </div>
 
       {% if current_user.has_totp %}
-        <p class="text-muted small mb-2">Votre application d'authentification est configurée.</p>
+        <p class="text-muted small mb-2">{{ _('Your authentication app is configured.') }}</p>
         <form method="post" action="{{ url_for('profile_totp_disable') }}"
               onsubmit="return confirm('Désactiver le TOTP ? Vous ne pourrez plus utiliser votre app pour la double authentification.')">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button class="btn btn-sm btn-outline-danger">
-            <i class="fas fa-xmark me-1"></i>Désactiver
+            <i class="fas fa-xmark me-1"></i>{{ _('Disable') }}
           </button>
         </form>
       {% else %}
-        <p class="text-muted small mb-2">Ajoutez une couche de sécurité avec une application comme Google Authenticator ou Authy.</p>
+        <p class="text-muted small mb-2">{{ _('Add a layer of security with an app like Google Authenticator or Authy.') }}</p>
         <button id="totp-setup-btn" class="btn btn-sm btn-primary">
-          <i class="fas fa-plus me-1"></i>Configurer
+          <i class="fas fa-plus me-1"></i>{{ _('Configure') }}
         </button>
 
         <div id="totp-setup-zone" class="mt-3" style="display:none">
@@ -149,11 +149,11 @@
           </div>
           <form method="post" action="{{ url_for('profile_totp_confirm') }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <label class="form-label-sm">Code à 6 chiffres de l'application</label>
+            <label class="form-label-sm">{{ _('6-digit code from the app') }}</label>
             <div class="input-group" style="max-width:260px">
               <input type="text" name="totp_code" class="form-control font-monospace text-center"
                      maxlength="6" pattern="\d{6}" placeholder="000000" required autofocus>
-              <button class="btn btn-primary" type="submit">Valider</button>
+              <button class="btn btn-primary" type="submit">{{ _('Validate') }}</button>
             </div>
           </form>
         </div>
@@ -166,13 +166,13 @@
   <div class="card mb-3">
     <div class="card-body p-4">
       <div class="d-flex justify-content-between align-items-center mb-3">
-        <p class="section-title mb-0"><i class="fas fa-key me-2"></i>Codes de récupération</p>
+        <p class="section-title mb-0"><i class="fas fa-key me-2"></i>{{ _('Recovery codes') }}</p>
         <span class="badge {{ 'bg-success' if backup_remaining > 0 else 'bg-danger' }}">
           {{ backup_remaining }} restant{{ 's' if backup_remaining != 1 }}
         </span>
       </div>
       <p class="text-muted small mb-3">
-        Utilisez ces codes si vous perdez accès à votre application d'authentification.
+        {{ _('Use these codes if you lose access to your authentication app.') }}
         Chaque code n'est utilisable qu'une seule fois.
         {% if backup_remaining == 0 %}
           <strong class="text-danger">Vous n'avez plus de codes — régénérez-en immédiatement.</strong>
@@ -182,7 +182,7 @@
             onsubmit="return confirm('Générer de nouveaux codes invalidera les anciens. Continuer ?')">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button class="btn btn-sm btn-outline-warning">
-          <i class="fas fa-rotate me-1"></i>Régénérer les codes
+          <i class="fas fa-rotate me-1"></i>{{ _('Regenerate codes') }}
         </button>
       </form>
     </div>
@@ -194,11 +194,11 @@
   <div class="card mb-3">
     <div class="card-body p-4">
       <div class="d-flex justify-content-between align-items-center mb-3">
-        <p class="section-title mb-0"><i class="fas fa-fingerprint me-2"></i>Clé de sécurité (WebAuthn)</p>
+        <p class="section-title mb-0"><i class="fas fa-fingerprint me-2"></i>{{ _('Security key (WebAuthn)') }}</p>
         {% if current_user.has_webauthn %}
-          <span class="badge bg-success">Activée</span>
+          <span class="badge bg-success">{{ _('Enabled') }}</span>
         {% else %}
-          <span class="badge bg-secondary">Désactivée</span>
+          <span class="badge bg-secondary">{{ _('Disabled') }}</span>
         {% endif %}
       </div>
 
@@ -240,14 +240,14 @@
   <div class="card mb-3">
     <div class="card-body p-4">
       <div class="d-flex align-items-center mb-3">
-        <p class="section-title mb-0"><i class="fas fa-file-export me-2"></i>Mes données personnelles</p>
+        <p class="section-title mb-0"><i class="fas fa-file-export me-2"></i>{{ _('My personal data') }}</p>
       </div>
       <p class="text-muted small mb-3">
         Conformément au RGPD (art. 20), vous pouvez télécharger l'ensemble de vos données personnelles
         (compte, fichiers partagés, journaux d'activité).
       </p>
       <a href="{{ url_for('profile_export') }}" class="btn btn-sm btn-outline-secondary">
-        <i class="fas fa-download me-1"></i>Exporter mes données (JSON)
+        <i class="fas fa-download me-1"></i>{{ _('Export my data (JSON)') }}
       </a>
     </div>
   </div>
@@ -257,7 +257,7 @@
   <div class="card mb-3 border-danger">
     <div class="card-body p-4">
       <div class="d-flex align-items-center mb-3">
-        <p class="section-title mb-0 text-danger"><i class="fas fa-triangle-exclamation me-2"></i>Supprimer mon compte</p>
+        <p class="section-title mb-0 text-danger"><i class="fas fa-triangle-exclamation me-2"></i>{{ _('Delete my account') }}</p>
       </div>
       <div class="alert alert-danger py-2 small mb-3">
         <strong>Action irréversible.</strong> La suppression de votre compte entraîne la suppression définitive

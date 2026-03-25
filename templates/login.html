@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="fr" data-bs-theme="{{ user_theme }}">
+<html lang="{{ current_lang }}" data-bs-theme="{{ user_theme }}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{ settings.app_name }} — Connexion</title>
+  <title>{{ settings.app_name }} — {{ _('Login') }}</title>
   <link href="/static/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css">
   <link href="/static/css/custom.css" rel="stylesheet">
@@ -13,7 +13,14 @@
   <nav class="navbar navbar-dark mb-4">
     <div class="container">
       <a class="navbar-brand" href="/">{% if has_logo %}<img src="/logo" height="32" class="me-2 align-middle" alt="{{ settings.app_name }}">{% else %}<i class="fas fa-shield-halved me-2"></i>{% endif %}{{ settings.app_name }}</a>
-      <a href="{{ url_for('register') }}" class="btn btn-sm btn-primary">Inscription</a>
+      <div class="d-flex align-items-center gap-2">
+        {% if current_lang == 'fr' %}
+          <a href="{{ url_for('set_lang', lang='en') }}" class="btn btn-sm btn-outline-light">EN</a>
+        {% else %}
+          <a href="{{ url_for('set_lang', lang='fr') }}" class="btn btn-sm btn-outline-light">FR</a>
+        {% endif %}
+        <a href="{{ url_for('register') }}" class="btn btn-sm btn-primary">{{ _('Sign up') }}</a>
+      </div>
     </div>
   </nav>
 
@@ -22,7 +29,7 @@
       <div class="card-body p-4 p-md-5">
         <div class="text-center mb-4">
           <i class="fas fa-right-to-bracket fa-2x mb-3" style="color: var(--accent);"></i>
-          <h1 class="h4 fw-semibold">Connexion</h1>
+          <h1 class="h4 fw-semibold">{{ _('Login') }}</h1>
         </div>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -36,11 +43,11 @@
         <form method="post">
           {{ form.hidden_tag() }}
           <div class="mb-3">
-            <label class="form-label-sm">Nom d'utilisateur</label>
+            <label class="form-label-sm">{{ _('Username') }}</label>
             {{ form.username(class="form-control", autofocus=True) }}
           </div>
           <div class="mb-4">
-            <label class="form-label-sm">Mot de passe</label>
+            <label class="form-label-sm">{{ _('Password') }}</label>
             {{ form.password(class="form-control") }}
           </div>
           <div class="d-grid">
@@ -56,14 +63,14 @@
         </div>
         <div class="d-grid">
           <a href="{{ url_for('sso_login') }}" class="btn btn-outline-secondary">
-            <i class="fas fa-key me-2"></i>Se connecter via {{ settings.sso_provider_name }}
+            <i class="fas fa-key me-2"></i>{{ _('Log in via %(provider)s', provider=settings.sso_provider_name) }}
           </a>
         </div>
         {% endif %}
 
         <div class="text-center mt-3">
-          <small class="text-muted">Pas encore de compte ?
-            <a href="{{ url_for('register') }}">S'inscrire</a>
+          <small class="text-muted">{{ _('No account yet?') }}
+            <a href="{{ url_for('register') }}">{{ _('Sign in') }}</a>
           </small>
         </div>
       </div>
@@ -73,9 +80,9 @@
   <footer>
     <a href="mailto:{{ settings.contact_email }}">{{ settings.contact_email }}</a>
     &nbsp;·&nbsp;
-    <a href="{{ url_for('mentions_legales') }}">Mentions légales</a>
+    <a href="{{ url_for('mentions_legales') }}">{{ _('Legal notices') }}</a>
     &nbsp;·&nbsp;
-    <a href="{{ url_for('cgu') }}">CGU</a>
+    <a href="{{ url_for('cgu') }}">{{ _('Terms of Service') }}</a>
   </footer>
   <script nonce="{{ csp_nonce }}" src="/static/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
 </body>
