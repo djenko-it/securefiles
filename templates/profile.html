@@ -76,16 +76,15 @@
       </div>
       <div class="d-flex align-items-center justify-content-between mb-3">
         <span>{{ _('Language') }}</span>
-        <form method="get" action="" id="lang-form" class="d-flex gap-2 align-items-center">
+        <div class="d-flex gap-2 align-items-center">
           <select id="lang-select" class="form-select form-select-sm w-auto">
             <option value="{{ url_for('set_lang', lang='fr') }}" {{ 'selected' if current_lang == 'fr' }}>Français</option>
             <option value="{{ url_for('set_lang', lang='en') }}" {{ 'selected' if current_lang == 'en' }}>English</option>
           </select>
-          <button type="button" class="btn btn-sm btn-primary"
-                  onclick="window.location.href=document.getElementById('lang-select').value+'?next='+encodeURIComponent(window.location.href)">
+          <button id="lang-apply-btn" class="btn btn-sm btn-primary">
             <i class="fas fa-check"></i>
           </button>
-        </form>
+        </div>
       </div>
 
       <div>
@@ -312,6 +311,12 @@
 
 <script nonce="{{ csp_nonce }}" src="/static/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
 <script nonce="{{ csp_nonce }}" src="/static/vendor/qrcode-generator/qrcode.min.js"></script>
+<script nonce="{{ csp_nonce }}">
+document.getElementById('lang-apply-btn').addEventListener('click', function () {
+  var url = document.getElementById('lang-select').value;
+  window.location.href = url + '?next=' + encodeURIComponent(window.location.href);
+});
+</script>
 <script nonce="{{ csp_nonce }}">
 const csrfToken = '{{ csrf_token() }}';
 
