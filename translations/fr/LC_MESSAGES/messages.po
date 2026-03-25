@@ -409,6 +409,9 @@ msgstr "J'ai sauvegardé mes codes"
 msgid "Appearance"
 msgstr "Apparence"
 
+msgid "Language"
+msgstr "Langue"
+
 msgid "Theme"
 msgstr "Thème"
 

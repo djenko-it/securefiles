@@ -74,6 +74,20 @@
           {% endif %}
         </form>
       </div>
+      <div class="d-flex align-items-center justify-content-between mb-3">
+        <span>{{ _('Language') }}</span>
+        <div class="d-flex gap-2">
+          <a href="{{ url_for('set_lang', lang='fr') }}"
+             class="btn btn-sm {{ 'btn-primary' if current_lang == 'fr' else 'btn-outline-secondary' }}">
+            🇫🇷 Français
+          </a>
+          <a href="{{ url_for('set_lang', lang='en') }}"
+             class="btn btn-sm {{ 'btn-primary' if current_lang == 'en' else 'btn-outline-secondary' }}">
+            🇬🇧 English
+          </a>
+        </div>
+      </div>
+
       <div>
         <span class="d-block mb-2">{{ _('Avatar color') }}</span>
         <form method="post" action="{{ url_for('profile_change_avatar_color') }}" class="d-flex flex-wrap gap-2">

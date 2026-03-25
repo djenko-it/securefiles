@@ -410,6 +410,9 @@ msgstr "I have saved my codes"
 msgid "Appearance"
 msgstr "Appearance"
 
+msgid "Language"
+msgstr "Language"
+
 msgid "Theme"
 msgstr "Theme"
 
