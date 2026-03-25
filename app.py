@@ -1328,7 +1328,7 @@ def bundle_download(bundle_id):
     except (ValueError, TypeError):
         return redirect(url_for('file_not_found'))
 
-    valid_files = []
+    valid_pairs = []   # (fid, fname)
     earliest_expiry = None
     for fid in file_ids:
         frow = g.db.execute(
@@ -1342,9 +1342,12 @@ def bundle_download(bundle_id):
             continue
         if max_downloads != 'unlimited' and int(max_downloads) - views <= 0:
             continue
-        valid_files.append(fname)
+        valid_pairs.append((fid, fname))
         if earliest_expiry is None or expiry_time < earliest_expiry:
             earliest_expiry = expiry_time
+
+    valid_files     = [p[1] for p in valid_pairs]
+    valid_file_ids  = [p[0] for p in valid_pairs]
 
     if not valid_files:
         return redirect(url_for('file_expired'))
@@ -1355,7 +1358,7 @@ def bundle_download(bundle_id):
             flash(_('Incorrect password.'), 'danger')
             return render_template('bundle.html',
                                    bundle_id=bundle_id, form=form, needs_password=True,
-                                   file_count=len(valid_files),
+                                   file_count=len(valid_files), file_ids=[],
                                    expiry_time=earliest_expiry.strftime('%Y-%m-%d %H:%M:%S'),
                                    settings=get_settings())
         if hashed_password:
@@ -1367,7 +1370,7 @@ def bundle_download(bundle_id):
             session.pop(f'auth_bundle_{bundle_id}', None)
             return render_template('bundle.html',
                                    bundle_id=bundle_id, form=form, needs_password=True,
-                                   file_count=len(valid_files),
+                                   file_count=len(valid_files), file_ids=[],
                                    expiry_time=earliest_expiry.strftime('%Y-%m-%d %H:%M:%S'),
                                    settings=get_settings())
 
@@ -1375,6 +1378,7 @@ def bundle_download(bundle_id):
                            bundle_id=bundle_id, form=None, needs_password=False,
                            file_count=len(valid_files),
                            file_names=valid_files,
+                           file_ids=valid_file_ids,
                            expiry_time=earliest_expiry.strftime('%Y-%m-%d %H:%M:%S'),
                            settings=get_settings())
 

@@ -119,5 +119,66 @@
   </footer>
 
   <script nonce="{{ csp_nonce }}" src="/static/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+  {% if not needs_password %}
+  <script nonce="{{ csp_nonce }}">
+  (function () {
+    const hash = window.location.hash
+    if (!hash.startsWith('#k=')) return
+
+    const key      = hash.slice(3)
+    const fileIds  = {{ file_ids | tojson }}
+    const fileNames = {{ file_names | tojson }}
+    if (!fileIds || !fileIds.length) return
+
+    // Masquer le bouton ZIP
+    const zipBtn = document.querySelector('a[href$="/zip"]')
+    if (zipBtn) zipBtn.closest('.d-grid').style.display = 'none'
+
+    // Badge E2E
+    const titleEl = document.querySelector('h1')
+    if (titleEl) {
+      titleEl.insertAdjacentHTML('afterend',
+        '<p class="text-center mb-3">' +
+        '<span class="badge bg-success"><i class="fas fa-shield-halved me-1"></i>Chiffrement de bout en bout</span>' +
+        '</p>'
+      )
+    }
+
+    // Liens individuels
+    const linksHtml = fileIds.map(function (fid, i) {
+      const name = fileNames[i] || fid
+      const link = '/download/' + fid + '#k=' + key
+      const safe = link.replace(/"/g, '&quot;')
+      return '<div class="mb-2">' +
+        '<small class="text-muted d-block mb-1 text-truncate">' +
+        '<i class="fas fa-file me-1"></i>' + name + '</small>' +
+        '<div class="input-group input-group-sm">' +
+        '<input type="text" class="form-control font-monospace" value="' + safe + '" readonly>' +
+        '<button class="btn btn-outline-secondary copy-e2e-btn" data-url="' + safe + '" type="button" title="Copier"><i class="fas fa-copy"></i></button>' +
+        '<a href="' + safe + '" class="btn btn-outline-primary" title="Télécharger"><i class="fas fa-download"></i></a>' +
+        '</div></div>'
+    }).join('')
+
+    const zipGrid = document.querySelector('.d-grid') || document.querySelector('main .card-body')
+    if (zipGrid) {
+      zipGrid.insertAdjacentHTML('beforebegin',
+        '<div class="mb-4">' +
+        '<p class="text-muted small mb-2"><i class="fas fa-lock me-1 text-success"></i>Téléchargez chaque fichier individuellement :</p>' +
+        linksHtml + '</div>'
+      )
+    }
+
+    // Copier
+    document.querySelectorAll('.copy-e2e-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        navigator.clipboard.writeText(this.dataset.url).then(function () {
+          btn.innerHTML = '<i class="fas fa-check text-success"></i>'
+          setTimeout(function () { btn.innerHTML = '<i class="fas fa-copy"></i>' }, 2000)
+        })
+      })
+    })
+  })()
+  </script>
+  {% endif %}
 </body>
 </html>

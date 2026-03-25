@@ -324,8 +324,8 @@
           .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
       }
 
-      async function encryptE2E(file) {
-        const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt'])
+      async function encryptE2E(file, existingKey) {
+        const key = existingKey || await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt'])
         const iv  = crypto.getRandomValues(new Uint8Array(12))
         const ct  = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, await file.arrayBuffer())
         const out = new Uint8Array(12 + ct.byteLength)
@@ -369,6 +369,14 @@
         const maxDl     = document.getElementById('max-dl-value').value
         const csrfToken = document.querySelector('#upload-form [name="csrf_token"]').value
 
+        // Clé E2E partagée pour tous les fichiers d'un même envoi multi-fichiers
+        let sharedE2ECryptoKey = null
+        if (e2e && selectedFiles.length > 1) {
+          sharedE2ECryptoKey = await crypto.subtle.generateKey(
+            { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']
+          )
+        }
+
         uploadBtn.disabled = true
         const progress    = document.getElementById('upload-progress')
         const statusEl    = document.getElementById('upload-status')
@@ -396,7 +404,7 @@
           let e2eKey = null
           if (e2e) {
             try {
-              const enc = await encryptE2E(file)
+              const enc = await encryptE2E(file, sharedE2ECryptoKey)
               fd.append('file', new File([enc.blob], file.name, { type: file.type }))
               e2eKey = enc.keyB64
             } catch (err) {
@@ -480,6 +488,36 @@
         // Cas multi-fichiers tous réussis sans E2E → bundle ZIP
         const allOk  = results.every(r => r.success)
         const hasE2E = results.some(r => r.link && r.link.includes('#k='))
+
+        // Cas multi-fichiers E2E → bundle avec clé partagée dans le fragment
+        if (allOk && hasE2E && results.length > 1) {
+          single.style.display = 'none'
+          multi.style.display  = 'block'
+          const container = document.getElementById('multi-links')
+          container.innerHTML = '<div class="py-2 text-muted small"><i class="fas fa-spinner fa-spin me-2"></i>Création du lien unique E2E…</div>'
+          document.getElementById('copy-all-wrapper').style.display = 'none'
+          linkModal.show()
+          try {
+            const fileIds   = results.map(r => { const u = new URL(r.link); return u.pathname.split('/').pop() })
+            const sharedKey = results[0].link.split('#k=')[1]
+            const resp = await fetch('/bundle/create', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+              body: JSON.stringify({ file_ids: fileIds, csrf_token: csrfToken }),
+            })
+            if (resp.ok) {
+              const data = await resp.json()
+              if (data.success) {
+                renderBundle(container, data.link + '#k=' + sharedKey, results, true)
+                return
+              }
+            }
+          } catch (err) { console.error('bundle/create E2E exception:', err) }
+          renderIndividual(container, results)
+          document.getElementById('copy-all-wrapper').style.display = 'flex'
+          return
+        }
+
         if (allOk && !hasE2E) {
           single.style.display = 'none'
           multi.style.display  = 'block'
@@ -523,11 +561,15 @@
         linkModal.show()
       }
 
-      function renderBundle(container, bundleLink, results) {
+      function renderBundle(container, bundleLink, results, isE2E) {
         const safe = bundleLink.replace(/"/g, '&quot;')
+        const icon  = isE2E ? 'fa-shield-halved' : 'fa-file-zipper'
+        const label = isE2E
+          ? 'Lien unique E2E <span class="badge bg-success ms-1" style="font-size:.6rem">E2E</span> :'
+          : 'Lien archive ZIP :'
         container.innerHTML =
           '<div class="mb-3">' +
-          '<p class="text-muted small mb-1"><i class="fas fa-file-zipper me-1"></i>Lien archive ZIP :</p>' +
+          '<p class="text-muted small mb-1"><i class="fas ' + icon + ' me-1"></i>' + label + '</p>' +
           '<div class="input-group">' +
           '<input type="text" class="form-control font-monospace small" id="bundle-link-input" value="' + safe + '" readonly>' +
           '<button class="btn btn-outline-primary" id="copy-bundle-btn" type="button" title="Copier"><i class="fas fa-copy"></i></button>' +
