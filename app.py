@@ -112,7 +112,8 @@ def inject_branding():
 def set_lang(lang):
     if lang in ('fr', 'en'):
         session['lang'] = lang
-    return redirect(request.referrer or url_for('index'))
+    next_url = request.args.get('next') or request.referrer or url_for('index')
+    return redirect(next_url)
 
 
 DATABASE      = '/app/data/messages.db'
