@@ -179,7 +179,7 @@
                       <form method="post"
                             action="{{ url_for('admin_delete_user', user_id=u.id) }}"
                             class="d-inline"
-                            onsubmit="return confirm('{{ _('Delete') }} {{ u.username }} {{ _(\'and all their files? This action is irreversible.\') }}')">
+                            onsubmit="return confirm('{{ _('Delete') }} {{ u.username }} {{ _('and all their files? This action is irreversible.') }}')">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button class="btn btn-sm btn-outline-danger ms-1" title="{{ _('Delete') }}">
                           <i class="fas fa-trash"></i>
