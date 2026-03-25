@@ -77,9 +77,9 @@
       <div class="d-flex align-items-center justify-content-between mb-3">
         <span>{{ _('Language') }}</span>
         <div class="d-flex gap-2 align-items-center">
-          <select id="lang-select" class="form-select form-select-sm w-auto">
-            <option value="{{ url_for('set_lang', lang='fr') }}" {{ 'selected' if current_lang == 'fr' }}>Français</option>
-            <option value="{{ url_for('set_lang', lang='en') }}" {{ 'selected' if current_lang == 'en' }}>English</option>
+          <select id="lang-select" class="form-select form-select-sm" style="width:auto;padding-right:2.25rem">
+            <option value="{{ url_for('set_lang', lang='fr') }}"{% if current_lang == 'fr' %} selected{% endif %}>Français</option>
+            <option value="{{ url_for('set_lang', lang='en') }}"{% if current_lang == 'en' %} selected{% endif %}>English</option>
           </select>
           <button id="lang-apply-btn" class="btn btn-sm btn-primary">
             <i class="fas fa-check"></i>
