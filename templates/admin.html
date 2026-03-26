@@ -260,9 +260,9 @@
                 <label class="form-label">{{ form.max_files_per_user.label.text }}</label>
                 <div class="input-group">
                   {{ form.max_files_per_user(class="form-control") }}
-                  <span class="input-group-text">fichiers</span>
+                  <span class="input-group-text">{{ _('files') }}</span>
                 </div>
-                <div class="form-text">0 = pas de limite.</div>
+                <div class="form-text">{{ _('0 = no limit.') }}</div>
               </div>
               <div class="col-md-6">
                 <label class="form-label">{{ form.max_storage_value.label.text }}</label>
@@ -270,86 +270,86 @@
                   {{ form.max_storage_value(class="form-control") }}
                   {{ form.max_storage_unit(class="form-select", style="max-width:5rem") }}
                 </div>
-                <div class="form-text">0 = pas de limite.</div>
+                <div class="form-text">{{ _('0 = no limit.') }}</div>
               </div>
             </div>
 
             <hr class="my-3">
             <p class="text-uppercase fw-semibold text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em">
-              <i class="fas fa-lock me-1"></i>Accès
+              <i class="fas fa-lock me-1"></i>{{ _('Access') }}
             </p>
             <div class="mb-4">
               <div class="form-check form-switch">
                 {{ form.allow_registration(class="form-check-input", role="switch", id="allowReg") }}
                 <label class="form-check-label" for="allowReg">{{ form.allow_registration.label.text }}</label>
               </div>
-              <div class="form-text">Si désactivé, seuls les admins peuvent créer de nouveaux comptes.</div>
+              <div class="form-text">{{ _('If disabled, only admins can create new accounts.') }}</div>
             </div>
 
             <hr class="my-3">
             <p class="text-uppercase fw-semibold text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em">
-              <i class="fas fa-shield-halved me-1"></i>Chiffrement de bout en bout (E2E)
+              <i class="fas fa-shield-halved me-1"></i>{{ _('End-to-end encryption (E2E)') }}
             </p>
             <div class="row g-3 mb-4">
               <div class="col-md-8">
                 <label class="form-label">{{ form.e2e_mode.label.text }}</label>
                 {{ form.e2e_mode(class="form-select") }}
                 <div class="form-text">
-                  <strong>Optionnel</strong> : le toggle est visible, l'utilisateur décide.
-                  <strong>Désactivé</strong> : l'option est masquée (aucun chiffrement E2E possible).
-                  <strong>Obligatoire</strong> : le chiffrement est forcé et verrouillé pour tous les partages.
+                  <strong>{{ _('Optional') }}</strong>: {{ _('the toggle is visible, the user decides.') }}
+                  <strong>{{ _('Disabled') }}</strong>: {{ _('the option is hidden (no E2E encryption possible).') }}
+                  <strong>{{ _('Required') }}</strong>: {{ _('encryption is forced and locked for all shares.') }}
                 </div>
               </div>
             </div>
 
             <hr class="my-3">
             <p class="text-uppercase fw-semibold text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em">
-              <i class="fas fa-scroll me-1"></i>Journal d'audit
+              <i class="fas fa-scroll me-1"></i>{{ _('Audit log') }}
             </p>
             <div class="row g-3 mb-4">
               <div class="col-md-4">
                 <label class="form-label">{{ form.audit_log_retention_days.label.text }}</label>
                 <div class="input-group">
                   {{ form.audit_log_retention_days(class="form-control") }}
-                  <span class="input-group-text">jours</span>
+                  <span class="input-group-text">{{ _('days') }}</span>
                 </div>
-                <div class="form-text">0 = conserver indéfiniment. La purge s'effectue à la sauvegarde et toutes les 24h.</div>
+                <div class="form-text">{{ _('0 = keep indefinitely. Cleanup runs on save and every 24h.') }}</div>
               </div>
             </div>
 
             <hr class="my-3">
             <p class="text-uppercase fw-semibold text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em">
-              <i class="fas fa-triangle-exclamation me-1"></i>Mode maintenance
+              <i class="fas fa-triangle-exclamation me-1"></i>{{ _('Maintenance mode') }}
             </p>
             <div class="mb-3">
               <div class="form-check form-switch">
                 {{ form.maintenance_mode(class="form-check-input", role="switch", id="maintenanceMode") }}
                 <label class="form-check-label" for="maintenanceMode">{{ form.maintenance_mode.label.text }}</label>
               </div>
-              <div class="form-text">Affiche une page de maintenance à tous les utilisateurs non-admins. Les routes <code>/login</code>, <code>/logout</code> et SSO restent accessibles.</div>
+              <div class="form-text">{{ _('Shows a maintenance page to all non-admin users. /login, /logout and SSO routes remain accessible.') }}</div>
             </div>
             <div class="row g-3 mb-4">
               <div class="col-md-8">
                 <label class="form-label">{{ form.maintenance_message.label.text }}</label>
-                {{ form.maintenance_message(class="form-control", rows="2", placeholder="Le site est temporairement en maintenance…") }}
+                {{ form.maintenance_message(class="form-control", rows="2", placeholder=_('The site is temporarily under maintenance…')) }}
               </div>
             </div>
 
             <hr class="my-3">
             <p class="text-uppercase fw-semibold text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em">
-              <i class="fas fa-shield-halved me-1"></i>Sécurité — 2FA
+              <i class="fas fa-shield-halved me-1"></i>{{ _('Security — 2FA') }}
             </p>
             <div class="mb-4">
               <div class="form-check form-switch">
                 {{ form.mfa_required(class="form-check-input", role="switch", id="mfaRequired") }}
                 <label class="form-check-label" for="mfaRequired">{{ form.mfa_required.label.text }}</label>
               </div>
-              <div class="form-text">Si activé, tout utilisateur sans 2FA configuré est redirigé vers son profil pour en activer un. Les comptes SSO sont exemptés (authentification déléguée au fournisseur d'identité).</div>
+              <div class="form-text">{{ _('If enabled, any user without 2FA configured is redirected to their profile to set one up. SSO accounts are exempt (authentication delegated to the identity provider).') }}</div>
             </div>
 
             <hr class="my-3">
             <p class="text-uppercase fw-semibold text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em">
-              <i class="fas fa-user-minus me-1"></i>Gestion du compte utilisateur
+              <i class="fas fa-user-minus me-1"></i>{{ _('User account management') }}
             </p>
             <div class="mb-4">
               <div class="form-check form-switch">
@@ -357,39 +357,37 @@
                 <label class="form-check-label" for="allowAccountDeletion">{{ form.allow_account_deletion.label.text }}</label>
               </div>
               <div class="form-text">
-                Si activé, chaque utilisateur voit dans son profil une option pour supprimer définitivement
-                son compte, ses fichiers et ses journaux d'activité (RGPD art. 17 — droit à l'effacement).
-                Désactivé par défaut.
+                {{ _('If enabled, each user sees an option in their profile to permanently delete their account, files and activity logs (GDPR art. 17 — right to erasure). Disabled by default.') }}
               </div>
             </div>
 
             <hr class="my-3">
             <p class="text-uppercase fw-semibold text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em">
-              <i class="fas fa-palette me-1"></i>Identité visuelle
+              <i class="fas fa-palette me-1"></i>{{ _('Visual identity') }}
             </p>
 
             <!-- Logo -->
             <div class="mb-4">
-              <label class="form-label fw-semibold">Logo de l'application</label>
+              <label class="form-label fw-semibold">{{ _('Application logo') }}</label>
               {% if has_logo %}
               <div class="mb-2 d-flex align-items-center gap-3">
-                <img src="/logo?{{ range(9999)|random }}" height="40" alt="Logo actuel" class="rounded border">
+                <img src="/logo?{{ range(9999)|random }}" height="40" alt="{{ _('Current logo') }}" class="rounded border">
                 <div class="form-check">
                   <input class="form-check-input" type="checkbox" name="remove_logo" id="removeLogo" value="1">
                   <label class="form-check-label text-danger small" for="removeLogo">
-                    <i class="fas fa-trash me-1"></i>Supprimer le logo
+                    <i class="fas fa-trash me-1"></i>{{ _('Remove logo') }}
                   </label>
                 </div>
               </div>
               {% endif %}
               <input type="file" class="form-control form-control-sm" name="logo" id="logoInput"
                      accept="image/png,image/jpeg,image/svg+xml,image/webp" style="max-width:340px">
-              <div class="form-text">PNG, JPG, SVG ou WebP. Hauteur recommandée : 32–48 px.</div>
+              <div class="form-text">{{ _('PNG, JPG, SVG or WebP. Recommended height: 32–48 px.') }}</div>
             </div>
 
             <!-- Couleur d'accent -->
             <div class="mb-4">
-              <label class="form-label fw-semibold">Couleur d'accent</label>
+              <label class="form-label fw-semibold">{{ _('Accent color') }}</label>
               <div class="d-flex flex-wrap gap-2 align-items-center mb-2" id="color-swatches">
                 {% for c in ['#4361ee','#e63946','#f77f00','#ffbe0b','#06d6a0','#2ec4b6','#8338ec','#3a86ff','#212529'] %}
                 <button type="button"
@@ -399,7 +397,7 @@
                 {% endfor %}
                 <!-- Couleur personnalisée -->
                 <label class="color-swatch-btn swatch-custom{% if settings.accent_color not in ['#4361ee','#e63946','#f77f00','#ffbe0b','#06d6a0','#2ec4b6','#8338ec','#3a86ff','#212529'] %} swatch-active{% endif %}"
-                       title="Couleur personnalisée" style="position:relative">
+                       title="{{ _('Custom color') }}" style="position:relative">
                   <input type="color" id="customColorPicker"
                          value="{{ settings.accent_color }}"
                          style="opacity:0;width:100%;height:100%;position:absolute;top:0;left:0;cursor:pointer;border:0">
@@ -409,8 +407,8 @@
               <input type="hidden" name="accent_color" id="accentColorInput"
                      value="{{ settings.accent_color }}">
               <div class="form-text">
-                Couleur appliquée à la barre de navigation, aux boutons et aux liens.
-                <a href="{{ url_for('branding_css') }}" target="_blank" class="ms-1">Prévisualiser le CSS généré</a>
+                {{ _('Color applied to the navigation bar, buttons and links.') }}
+                <a href="{{ url_for('branding_css') }}" target="_blank" class="ms-1">{{ _('Preview generated CSS') }}</a>
               </div>
             </div>
 

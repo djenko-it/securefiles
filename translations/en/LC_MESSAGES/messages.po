@@ -652,3 +652,174 @@ msgstr "Disconnect"
 
 msgid "Connection"
 msgstr "Connection"
+
+msgid "Application name"
+msgstr "Application name"
+
+msgid "Contact email"
+msgstr "Contact email"
+
+msgid "Banner / welcome message"
+msgstr "Banner / welcome message"
+
+msgid "Max file size"
+msgstr "Max file size"
+
+msgid "Unit"
+msgstr "Unit"
+
+msgid "MB"
+msgstr "MB"
+
+msgid "GB"
+msgstr "GB"
+
+msgid "Blocked extensions (comma-separated)"
+msgstr "Blocked extensions (comma-separated)"
+
+msgid "Allow registrations"
+msgstr "Allow registrations"
+
+msgid "Default expiry"
+msgstr "Default expiry"
+
+msgid "3 hours"
+msgstr "3 hours"
+
+msgid "1 day"
+msgstr "1 day"
+
+msgid "1 week"
+msgstr "1 week"
+
+msgid "1 month"
+msgstr "1 month"
+
+msgid "File quota / user (0 = unlimited)"
+msgstr "File quota / user (0 = unlimited)"
+
+msgid "Storage quota / user (0 = unlimited)"
+msgstr "Storage quota / user (0 = unlimited)"
+
+msgid "Storage unit"
+msgstr "Storage unit"
+
+msgid "Audit log retention (days, 0 = unlimited)"
+msgstr "Audit log retention (days, 0 = unlimited)"
+
+msgid "End-to-end encryption"
+msgstr "End-to-end encryption"
+
+msgid "Optional — user chooses"
+msgstr "Optional — user chooses"
+
+msgid "Disabled — option hidden"
+msgstr "Disabled — option hidden"
+
+msgid "Required — forced for all shares"
+msgstr "Required — forced for all shares"
+
+msgid "Enable maintenance mode"
+msgstr "Enable maintenance mode"
+
+msgid "Maintenance message"
+msgstr "Maintenance message"
+
+msgid "2FA required for all accounts (except SSO)"
+msgstr "2FA required for all accounts (except SSO)"
+
+msgid "Allow users to delete their own account"
+msgstr "Allow users to delete their own account"
+
+msgid "Accent color"
+msgstr "Accent color"
+
+msgid "Save"
+msgstr "Save"
+
+msgid "files"
+msgstr "files"
+
+msgid "0 = no limit."
+msgstr "0 = no limit."
+
+msgid "Access"
+msgstr "Access"
+
+msgid "If disabled, only admins can create new accounts."
+msgstr "If disabled, only admins can create new accounts."
+
+msgid "End-to-end encryption (E2E)"
+msgstr "End-to-end encryption (E2E)"
+
+msgid "Optional"
+msgstr "Optional"
+
+msgid "the toggle is visible, the user decides."
+msgstr "the toggle is visible, the user decides."
+
+msgid "Disabled"
+msgstr "Disabled"
+
+msgid "the option is hidden (no E2E encryption possible)."
+msgstr "the option is hidden (no E2E encryption possible)."
+
+msgid "Required"
+msgstr "Required"
+
+msgid "encryption is forced and locked for all shares."
+msgstr "encryption is forced and locked for all shares."
+
+msgid "Audit log"
+msgstr "Audit log"
+
+msgid "days"
+msgstr "days"
+
+msgid "0 = keep indefinitely. Cleanup runs on save and every 24h."
+msgstr "0 = keep indefinitely. Cleanup runs on save and every 24h."
+
+msgid "Maintenance mode"
+msgstr "Maintenance mode"
+
+msgid "Shows a maintenance page to all non-admin users. /login, /logout and SSO routes remain accessible."
+msgstr "Shows a maintenance page to all non-admin users. /login, /logout and SSO routes remain accessible."
+
+msgid "The site is temporarily under maintenance…"
+msgstr "The site is temporarily under maintenance…"
+
+msgid "Security — 2FA"
+msgstr "Security — 2FA"
+
+msgid "If enabled, any user without 2FA configured is redirected to their profile to set one up. SSO accounts are exempt (authentication delegated to the identity provider)."
+msgstr "If enabled, any user without 2FA configured is redirected to their profile to set one up. SSO accounts are exempt (authentication delegated to the identity provider)."
+
+msgid "User account management"
+msgstr "User account management"
+
+msgid "If enabled, each user sees an option in their profile to permanently delete their account, files and activity logs (GDPR art. 17 — right to erasure). Disabled by default."
+msgstr "If enabled, each user sees an option in their profile to permanently delete their account, files and activity logs (GDPR art. 17 — right to erasure). Disabled by default."
+
+msgid "Visual identity"
+msgstr "Visual identity"
+
+msgid "Application logo"
+msgstr "Application logo"
+
+msgid "Current logo"
+msgstr "Current logo"
+
+msgid "Remove logo"
+msgstr "Remove logo"
+
+msgid "PNG, JPG, SVG or WebP. Recommended height: 32–48 px."
+msgstr "PNG, JPG, SVG or WebP. Recommended height: 32–48 px."
+
+msgid "Custom color"
+msgstr "Custom color"
+
+msgid "Color applied to the navigation bar, buttons and links."
+msgstr "Color applied to the navigation bar, buttons and links."
+
+msgid "Preview generated CSS"
+msgstr "Preview generated CSS"

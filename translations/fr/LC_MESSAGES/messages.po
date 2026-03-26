@@ -645,3 +645,174 @@ msgstr "Déconnexion"
 
 msgid "Connection"
 msgstr "Connexion"
+
+msgid "Application name"
+msgstr "Nom de l'application"
+
+msgid "Contact email"
+msgstr "E-mail de contact"
+
+msgid "Banner / welcome message"
+msgstr "Bannière / message d'accueil"
+
+msgid "Max file size"
+msgstr "Taille max des fichiers"
+
+msgid "Unit"
+msgstr "Unité"
+
+msgid "MB"
+msgstr "Mo"
+
+msgid "GB"
+msgstr "Go"
+
+msgid "Blocked extensions (comma-separated)"
+msgstr "Extensions bloquées (virgules)"
+
+msgid "Allow registrations"
+msgstr "Autoriser les inscriptions"
+
+msgid "Default expiry"
+msgstr "Expiration par défaut"
+
+msgid "3 hours"
+msgstr "3 heures"
+
+msgid "1 day"
+msgstr "1 jour"
+
+msgid "1 week"
+msgstr "1 semaine"
+
+msgid "1 month"
+msgstr "1 mois"
+
+msgid "File quota / user (0 = unlimited)"
+msgstr "Quota fichiers / utilisateur (0 = illimité)"
+
+msgid "Storage quota / user (0 = unlimited)"
+msgstr "Quota stockage / utilisateur (0 = illimité)"
+
+msgid "Storage unit"
+msgstr "Unité stockage"
+
+msgid "Audit log retention (days, 0 = unlimited)"
+msgstr "Rétention des logs d'audit (jours, 0 = illimité)"
+
+msgid "End-to-end encryption"
+msgstr "Chiffrement de bout en bout"
+
+msgid "Optional — user chooses"
+msgstr "Optionnel — l'utilisateur choisit"
+
+msgid "Disabled — option hidden"
+msgstr "Désactivé — option masquée"
+
+msgid "Required — forced for all shares"
+msgstr "Obligatoire — forcé pour tous les partages"
+
+msgid "Enable maintenance mode"
+msgstr "Activer le mode maintenance"
+
+msgid "Maintenance message"
+msgstr "Message de maintenance"
+
+msgid "2FA required for all accounts (except SSO)"
+msgstr "2FA obligatoire pour tous les comptes (hors SSO)"
+
+msgid "Allow users to delete their own account"
+msgstr "Autoriser les utilisateurs à supprimer leur propre compte"
+
+msgid "Accent color"
+msgstr "Couleur d'accent"
+
+msgid "Save"
+msgstr "Sauvegarder"
+
+msgid "files"
+msgstr "fichiers"
+
+msgid "0 = no limit."
+msgstr "0 = pas de limite."
+
+msgid "Access"
+msgstr "Accès"
+
+msgid "If disabled, only admins can create new accounts."
+msgstr "Si désactivé, seuls les admins peuvent créer de nouveaux comptes."
+
+msgid "End-to-end encryption (E2E)"
+msgstr "Chiffrement de bout en bout (E2E)"
+
+msgid "Optional"
+msgstr "Optionnel"
+
+msgid "the toggle is visible, the user decides."
+msgstr "le toggle est visible, l'utilisateur décide."
+
+msgid "Disabled"
+msgstr "Désactivé"
+
+msgid "the option is hidden (no E2E encryption possible)."
+msgstr "l'option est masquée (aucun chiffrement E2E possible)."
+
+msgid "Required"
+msgstr "Obligatoire"
+
+msgid "encryption is forced and locked for all shares."
+msgstr "le chiffrement est forcé et verrouillé pour tous les partages."
+
+msgid "Audit log"
+msgstr "Journal d'audit"
+
+msgid "days"
+msgstr "jours"
+
+msgid "0 = keep indefinitely. Cleanup runs on save and every 24h."
+msgstr "0 = conserver indéfiniment. La purge s'effectue à la sauvegarde et toutes les 24h."
+
+msgid "Maintenance mode"
+msgstr "Mode maintenance"
+
+msgid "Shows a maintenance page to all non-admin users. /login, /logout and SSO routes remain accessible."
+msgstr "Affiche une page de maintenance à tous les utilisateurs non-admins. Les routes /login, /logout et SSO restent accessibles."
+
+msgid "The site is temporarily under maintenance…"
+msgstr "Le site est temporairement en maintenance…"
+
+msgid "Security — 2FA"
+msgstr "Sécurité — 2FA"
+
+msgid "If enabled, any user without 2FA configured is redirected to their profile to set one up. SSO accounts are exempt (authentication delegated to the identity provider)."
+msgstr "Si activé, tout utilisateur sans 2FA configuré est redirigé vers son profil pour en activer un. Les comptes SSO sont exemptés (authentification déléguée au fournisseur d'identité)."
+
+msgid "User account management"
+msgstr "Gestion du compte utilisateur"
+
+msgid "If enabled, each user sees an option in their profile to permanently delete their account, files and activity logs (GDPR art. 17 — right to erasure). Disabled by default."
+msgstr "Si activé, chaque utilisateur voit dans son profil une option pour supprimer définitivement son compte, ses fichiers et ses journaux d'activité (RGPD art. 17 — droit à l'effacement). Désactivé par défaut."
+
+msgid "Visual identity"
+msgstr "Identité visuelle"
+
+msgid "Application logo"
+msgstr "Logo de l'application"
+
+msgid "Current logo"
+msgstr "Logo actuel"
+
+msgid "Remove logo"
+msgstr "Supprimer le logo"
+
+msgid "PNG, JPG, SVG or WebP. Recommended height: 32–48 px."
+msgstr "PNG, JPG, SVG ou WebP. Hauteur recommandée : 32–48 px."
+
+msgid "Custom color"
+msgstr "Couleur personnalisée"
+
+msgid "Color applied to the navigation bar, buttons and links."
+msgstr "Couleur appliquée à la barre de navigation, aux boutons et aux liens."
+
+msgid "Preview generated CSS"
+msgstr "Prévisualiser le CSS généré"

@@ -648,40 +648,40 @@ class ChangePasswordForm(FlaskForm):
 
 
 class AdminSettingsForm(FlaskForm):
-    app_name                 = StringField('Nom de l\'application',
+    app_name                 = StringField(_l('Application name'),
                                            validators=[DataRequired(), Length(max=64)])
-    contact_email            = StringField('E-mail de contact',
+    contact_email            = StringField(_l('Contact email'),
                                            validators=[DataRequired(), Length(max=128)])
-    welcome_banner           = TextAreaField('Bannière / message d\'accueil',
+    welcome_banner           = TextAreaField(_l('Banner / welcome message'),
                                              validators=[Optional(), Length(max=512)])
-    max_file_size_value      = IntegerField('Taille max des fichiers',
+    max_file_size_value      = IntegerField(_l('Max file size'),
                                             validators=[DataRequired(), NumberRange(min=1, max=1048576)])
-    max_file_size_unit       = SelectField('Unité', choices=[('mo', 'Mo'), ('go', 'Go')])
-    blocked_extensions       = StringField('Extensions bloquées (virgules)',
+    max_file_size_unit       = SelectField(_l('Unit'), choices=[('mo', _l('MB')), ('go', _l('GB'))])
+    blocked_extensions       = StringField(_l('Blocked extensions (comma-separated)'),
                                            validators=[Optional(), Length(max=256)])
-    allow_registration       = BooleanField('Autoriser les inscriptions')
-    default_expiry           = SelectField('Expiration par défaut', choices=[
-        ('3h', '3 heures'), ('1d', '1 jour'), ('1w', '1 semaine'), ('1m', '1 mois'),
+    allow_registration       = BooleanField(_l('Allow registrations'))
+    default_expiry           = SelectField(_l('Default expiry'), choices=[
+        ('3h', _l('3 hours')), ('1d', _l('1 day')), ('1w', _l('1 week')), ('1m', _l('1 month')),
     ])
-    max_files_per_user       = IntegerField('Quota fichiers / utilisateur (0 = illimité)',
+    max_files_per_user       = IntegerField(_l('File quota / user (0 = unlimited)'),
                                             validators=[NumberRange(min=0)])
-    max_storage_value        = IntegerField('Quota stockage / utilisateur (0 = illimité)',
+    max_storage_value        = IntegerField(_l('Storage quota / user (0 = unlimited)'),
                                             validators=[NumberRange(min=0)])
-    max_storage_unit         = SelectField('Unité stockage', choices=[('mo', 'Mo'), ('go', 'Go')])
-    audit_log_retention_days = IntegerField('Rétention des logs d\'audit (jours, 0 = illimité)',
+    max_storage_unit         = SelectField(_l('Storage unit'), choices=[('mo', _l('MB')), ('go', _l('GB'))])
+    audit_log_retention_days = IntegerField(_l('Audit log retention (days, 0 = unlimited)'),
                                             validators=[NumberRange(min=0)])
-    e2e_mode                 = SelectField('Chiffrement de bout en bout', choices=[
-        ('optional', 'Optionnel — l\'utilisateur choisit'),
-        ('disabled', 'Désactivé — option masquée'),
-        ('required', 'Obligatoire — forcé pour tous les partages'),
+    e2e_mode                 = SelectField(_l('End-to-end encryption'), choices=[
+        ('optional', _l('Optional — user chooses')),
+        ('disabled', _l('Disabled — option hidden')),
+        ('required', _l('Required — forced for all shares')),
     ])
-    maintenance_mode         = BooleanField('Activer le mode maintenance')
-    maintenance_message      = TextAreaField('Message de maintenance',
+    maintenance_mode         = BooleanField(_l('Enable maintenance mode'))
+    maintenance_message      = TextAreaField(_l('Maintenance message'),
                                              validators=[Optional(), Length(max=512)])
-    mfa_required             = BooleanField('2FA obligatoire pour tous les comptes (hors SSO)')
-    allow_account_deletion   = BooleanField('Autoriser les utilisateurs à supprimer leur propre compte')
-    accent_color             = StringField('Couleur d\'accent', validators=[Optional(), Length(max=7)])
-    submit                   = SubmitField('Sauvegarder')
+    mfa_required             = BooleanField(_l('2FA required for all accounts (except SSO)'))
+    allow_account_deletion   = BooleanField(_l('Allow users to delete their own account'))
+    accent_color             = StringField(_l('Accent color'), validators=[Optional(), Length(max=7)])
+    submit                   = SubmitField(_l('Save'))
 
 
 class SSOSettingsForm(FlaskForm):
