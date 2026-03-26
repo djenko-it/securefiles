@@ -245,6 +245,15 @@ msgstr "Max size: %(n)s MB per file"
 msgid "Drop here"
 msgstr "Drop here"
 
+msgid "Drag one or more files here or click to browse"
+msgstr "Drag one or more files here or click to browse"
+
+msgid "Maximum size: %(size)s MB per file"
+msgstr "Maximum size: %(size)s MB per file"
+
+msgid "Maximum size: %(size)s GB per file"
+msgstr "Maximum size: %(size)s GB per file"
+
 msgid "Each link is unique. The file is deleted after expiry."
 msgstr "Each link is unique. The file is deleted after expiry."
 
