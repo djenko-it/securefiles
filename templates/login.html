@@ -1,26 +1,77 @@
 {% extends "base.html" %}
 {% block title %}{{ settings.app_name }} — {{ _('Login') }}{% endblock %}
 
-{% block navbar_right %}
-<div class="d-flex align-items-center gap-2">
-  {% if current_lang == 'fr' %}
-    <a href="{{ url_for('set_lang', lang='en') }}" class="btn btn-sm btn-outline-light">EN</a>
-  {% else %}
-    <a href="{{ url_for('set_lang', lang='fr') }}" class="btn btn-sm btn-outline-light">FR</a>
-  {% endif %}
-  <a href="{{ url_for('register') }}" class="btn btn-sm btn-primary">{{ _('Sign up') }}</a>
-</div>
+{% block navbar %}{% endblock %}
+{% block footer %}{% endblock %}
+
+{% block head %}
+<style>
+  body { margin: 0; padding: 0; }
+
+  .login-bg {
+    min-height: 100vh;
+    background:
+      radial-gradient(circle, rgba(255,255,255,0.10) 1px, transparent 1px),
+      linear-gradient(150deg, #f97316 0%, #ef4444 100%);
+    background-size: 22px 22px, 100% 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+  }
+
+  .login-card-outer {
+    padding: 10px;
+    border-radius: 26px;
+    background: rgba(255, 255, 255, 0.20);
+    box-shadow:
+      0 0 0 1px rgba(255,255,255,0.30),
+      0 24px 64px rgba(0,0,0,0.22);
+  }
+
+  .login-card {
+    background: #ffffff;
+    border-radius: 18px;
+    padding: 2.5rem 2.25rem 2rem;
+    width: 380px;
+    max-width: calc(100vw - 2rem);
+  }
+
+  [data-bs-theme="dark"] .login-card {
+    background: #1c1c2e;
+  }
+
+  .login-card .form-control {
+    border-radius: 10px;
+  }
+
+  .login-card .btn-primary {
+    border-radius: 10px;
+  }
+
+  .login-lang {
+    position: absolute;
+    top: 1.25rem;
+    right: 1.5rem;
+  }
+</style>
 {% endblock %}
 
 {% block body %}
-<main class="container pb-5" style="max-width: 420px;">
-  <div class="card">
-    <div class="card-body p-4 p-md-5">
+<div class="login-bg">
+  <div class="login-card-outer">
+    <div class="login-card">
+
+      <!-- Logo -->
       <div class="text-center mb-4">
-        <i class="fas fa-right-to-bracket fa-2x mb-3" style="color: var(--accent);"></i>
-        <h1 class="h4 fw-semibold">{{ _('Login') }}</h1>
+        {% if has_logo %}
+          <img src="/logo" height="44" alt="{{ settings.app_name }}" class="mb-1">
+        {% else %}
+          <i class="fas fa-shield-halved" style="font-size:2.4rem; color:#f97316;"></i>
+        {% endif %}
       </div>
 
+      <!-- Flash messages -->
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
           {% for cat, msg in messages %}
@@ -29,40 +80,50 @@
         {% endif %}
       {% endwith %}
 
+      <!-- Form -->
       <form method="post">
         {{ form.hidden_tag() }}
         <div class="mb-3">
-          <label class="form-label-sm">{{ _('Username') }}</label>
+          <label class="form-label fw-semibold small">{{ _('Username') }}</label>
           {{ form.username(class="form-control", autofocus=True) }}
         </div>
         <div class="mb-4">
-          <label class="form-label-sm">{{ _('Password') }}</label>
+          <label class="form-label fw-semibold small">{{ _('Password') }}</label>
           {{ form.password(class="form-control") }}
         </div>
         <div class="d-grid">
-          {{ form.submit(class="btn btn-primary btn-lg") }}
+          {{ form.submit(class="btn btn-primary btn-lg w-100") }}
         </div>
       </form>
 
       {% if settings.sso_enabled == '1' %}
       <div class="d-flex align-items-center my-3 gap-2">
         <hr class="flex-grow-1 my-0">
-        <span class="text-muted small">ou</span>
+        <span class="text-muted small">{{ _('or') }}</span>
         <hr class="flex-grow-1 my-0">
       </div>
       <div class="d-grid">
-        <a href="{{ url_for('sso_login') }}" class="btn btn-outline-secondary">
+        <a href="{{ url_for('sso_login') }}" class="btn btn-outline-secondary" style="border-radius:10px;">
           <i class="fas fa-key me-2"></i>{{ _('Log in via %(provider)s', provider=settings.sso_provider_name) }}
         </a>
       </div>
       {% endif %}
 
-      <div class="text-center mt-3">
-        <small class="text-muted">{{ _('No account yet?') }}
-          <a href="{{ url_for('register') }}">{{ _('Sign in') }}</a>
+      <!-- Footer links -->
+      <div class="d-flex justify-content-between mt-4">
+        <small>
+          <a href="{{ url_for('register') }}" class="text-muted text-decoration-none">{{ _('No account yet?') }}</a>
+        </small>
+        <small>
+          {% if current_lang == 'fr' %}
+            <a href="{{ url_for('set_lang', lang='en') }}" class="text-muted text-decoration-none">EN</a>
+          {% else %}
+            <a href="{{ url_for('set_lang', lang='fr') }}" class="text-muted text-decoration-none">FR</a>
+          {% endif %}
         </small>
       </div>
+
     </div>
   </div>
-</main>
+</div>
 {% endblock %}
