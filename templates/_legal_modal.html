@@ -1,0 +1,41 @@
+<!-- Legal modal (shared between login and register) -->
+<div class="modal fade" id="legalModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="legalModalTitle"></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="legalModalBody">
+        <div class="text-center py-4 text-muted">
+          <i class="fas fa-spinner fa-spin"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script nonce="{{ csp_nonce }}">
+  const _legalCache = {}
+  document.querySelectorAll('.legal-modal-link').forEach(function(link) {
+    link.addEventListener('click', function(e) {
+      e.preventDefault()
+      const url = this.href
+      const title = this.dataset.title
+      document.getElementById('legalModalTitle').textContent = title
+      document.getElementById('legalModalBody').innerHTML =
+        '<div class="text-center py-4 text-muted"><i class="fas fa-spinner fa-spin"></i></div>'
+      bootstrap.Modal.getOrCreateInstance(document.getElementById('legalModal')).show()
+      if (_legalCache[url]) {
+        document.getElementById('legalModalBody').innerHTML = _legalCache[url]
+        return
+      }
+      fetch(url).then(function(r) { return r.text() }).then(function(html) {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+        const content = doc.querySelector('.legal-content')
+        _legalCache[url] = content ? content.innerHTML : ''
+        document.getElementById('legalModalBody').innerHTML = _legalCache[url]
+      })
+    })
+  })
+</script>

@@ -122,9 +122,13 @@
       <!-- Legal links -->
       <div class="text-center mt-3">
         <small>
-          <a href="{{ url_for('mentions_legales') }}" class="text-muted text-decoration-none">{{ _('Legal notices') }}</a>
+          <a href="{{ url_for('mentions_legales') }}"
+             class="legal-modal-link text-muted text-decoration-none"
+             data-title="{{ _('Legal notices') }}">{{ _('Legal notices') }}</a>
           <span class="text-muted mx-1">·</span>
-          <a href="{{ url_for('cgu') }}" class="text-muted text-decoration-none">{{ _('Terms of Service') }}</a>
+          <a href="{{ url_for('cgu') }}"
+             class="legal-modal-link text-muted text-decoration-none"
+             data-title="{{ _('Terms of Service') }}">{{ _('Terms of Service') }}</a>
         </small>
       </div>
 
@@ -142,4 +146,6 @@
     </div>
   </div>
 </div>
+
+{% include '_legal_modal.html' %}
 {% endblock %}
