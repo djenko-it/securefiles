@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block navbar %}{% endblock %}
+
+{% block body %}
+<div class="user-layout">
+
+  <!-- ── Sidebar ─────────────────────────────────────────────────────────── -->
+  <aside class="admin-sidebar">
+    <div class="sidebar-brand">
+      <a href="/">
+        {% if has_logo %}<img src="/logo" height="28" alt="{{ settings.app_name }}">
+        {% else %}<i class="fas fa-shield-halved" style="color:var(--accent)"></i>{% endif %}
+        {{ settings.app_name }}
+      </a>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a href="{{ url_for('index') }}"
+         class="sidebar-link{% if request.endpoint == 'index' %} active{% endif %}">
+        <i class="fas fa-cloud-arrow-up"></i>{{ _('Send') }}
+      </a>
+      <a href="{{ url_for('dashboard') }}"
+         class="sidebar-link{% if request.endpoint == 'dashboard' %} active{% endif %}">
+        <i class="fas fa-share-nodes"></i>{{ _('My shares') }}
+        {% if files_count is defined and files_count > 0 %}
+          <span class="sidebar-badge">{{ files_count }}</span>
+        {% endif %}
+      </a>
+      <a href="{{ url_for('dashboard') }}#drops"
+         class="sidebar-link{% if request.endpoint == 'dashboard' and request.args.get('tab') == 'drops' %} active{% endif %}">
+        <i class="fas fa-inbox"></i>{{ _('Drop links') }}
+        {% if drops_count is defined and drops_count > 0 %}
+          <span class="sidebar-badge">{{ drops_count }}</span>
+        {% endif %}
+      </a>
+
+      <div class="sidebar-section-label">{{ _('My account') }}</div>
+      <a href="{{ url_for('profile') }}"
+         class="sidebar-link{% if request.endpoint == 'profile' %} active{% endif %}">
+        <i class="fas fa-user"></i>{{ _('My profile') }}
+      </a>
+
+      {% if current_user.is_admin %}
+      <div class="sidebar-section-label">{{ _('Administration') }}</div>
+      <a href="{{ url_for('admin_panel') }}" class="sidebar-link sidebar-link-admin">
+        <i class="fas fa-gear"></i>Admin
+      </a>
+      {% endif %}
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="dropdown">
+        <a class="user-avatar"
+           style="background:{{ user_avatar_color }};width:30px;height:30px;font-size:.75rem"
+           role="button" data-bs-toggle="dropdown" aria-expanded="false">
+          {{ user_avatar_letter }}
+        </a>
+        <ul class="dropdown-menu dropdown-menu-end">
+          <li>
+            <span class="dropdown-item-text text-muted" style="font-size:.8rem;padding:.4rem .75rem;">
+              {{ current_user.username }}
+            </span>
+          </li>
+          <li><hr class="dropdown-divider"></li>
+          <li>
+            <a class="dropdown-item" href="{{ url_for('profile') }}">
+              <i class="fas fa-user me-2"></i>{{ _('My profile') }}
+            </a>
+          </li>
+          {% if current_user.is_admin %}
+          <li>
+            <a class="dropdown-item" href="{{ url_for('admin_panel') }}" style="color:#f59e0b">
+              <i class="fas fa-gear me-2"></i>Admin
+            </a>
+          </li>
+          {% endif %}
+          <li><hr class="dropdown-divider"></li>
+          <li>
+            <a class="dropdown-item text-danger" href="{{ url_for('logout') }}">
+              <i class="fas fa-right-from-bracket me-2"></i>{{ _('Log out') }}
+            </a>
+          </li>
+        </ul>
+      </div>
+      <span class="text-muted" style="font-size:.82rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+        {{ current_user.username }}
+      </span>
+    </div>
+  </aside>
+
+  <!-- ── Main content ────────────────────────────────────────────────────── -->
+  <main class="admin-main">
+    <div class="p-4 pb-5">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for cat, msg in messages %}
+          <div class="alert alert-{{ cat }} alert-dismissible fade show py-2" role="alert">
+            {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+        {% endfor %}
+      {% endwith %}
+
+      {% block user_content %}{% endblock %}
+    </div>
+  </main>
+
+</div>
+{% endblock %}
+
+{% block footer %}{% endblock %}

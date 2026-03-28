@@ -1,22 +1,15 @@
-{% extends "base.html" %}
+{% extends "user_layout.html" %}
 
-{% block theme %}{{ user_theme }}{% endblock %}
+{% block title %}{{ settings.app_name }} — {{ _('My shares') }}{% endblock %}
 
 {% block head %}
-  <title>{{ settings.app_name }} — {{ _('Dashboard') }}</title>
+<style nonce="{{ csp_nonce }}">
+  body { overflow: hidden; }
+</style>
 {% endblock %}
 
-{% block navbar_right %}
-<div class="d-flex align-items-center gap-2">
-  <a href="{{ url_for('index') }}" class="btn btn-sm btn-outline-light">
-    <i class="fas fa-plus me-1"></i>{{ _('New') }}
-  </a>
-  {% include '_nav_user_dropdown.html' %}
-</div>
-{% endblock %}
-
-{% block body %}
-  <main class="container pb-5" style="max-width: 900px;">
+{% block user_content %}
+  <div style="max-width: 860px; margin: 0 auto;">
 
     <!-- Critical quota alert -->
     {% if quota.storage_pct is not none and quota.storage_pct >= 90 %}
@@ -317,7 +310,7 @@
         {% endif %}
       </div>
     </div>
-  </main>
+  </div>
 {% endblock %}
 
 {% block scripts %}

@@ -1,23 +1,15 @@
-{% extends "base.html" %}
+{% extends "user_layout.html" %}
 
 {% block title %}{{ settings.app_name }} — {{ _('My profile') }}{% endblock %}
 
-{% block navbar_right %}
-<div class="d-flex align-items-center gap-2">
-  {% include '_nav_user_dropdown.html' %}
-</div>
+{% block head %}
+<style nonce="{{ csp_nonce }}">
+  body { overflow: hidden; }
+</style>
 {% endblock %}
 
-{% block body %}
-<main class="container pb-5" style="max-width:680px;">
-
-  {% with messages = get_flashed_messages(with_categories=true) %}
-    {% for cat, msg in messages %}
-      <div class="alert alert-{{ cat }} alert-dismissible fade show py-2" role="alert">
-        {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-      </div>
-    {% endfor %}
-  {% endwith %}
+{% block user_content %}
+<div style="max-width:640px; margin:0 auto;">
 
   <!-- ── En-tête profil ── -->
   <div class="text-center mb-4">
@@ -276,13 +268,7 @@
   </div>
   {% endif %}
 
-</main>
-{% endblock %}
-
-{% block footer %}
-<footer>
-  <a href="mailto:{{ settings.contact_email }}">{{ settings.contact_email }}</a>
-</footer>
+</div>
 {% endblock %}
 
 {% block scripts %}
