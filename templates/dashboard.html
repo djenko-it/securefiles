@@ -2,11 +2,7 @@
 
 {% block title %}{{ settings.app_name }} — {{ _('My shares') }}{% endblock %}
 
-{% block head %}
-<style nonce="{{ csp_nonce }}">
-  body { overflow: hidden; }
-</style>
-{% endblock %}
+{% block head %}{% endblock %}
 
 {% block user_content %}
   <div style="max-width: 860px; margin: 0 auto;">
@@ -37,7 +33,7 @@
     {% endif %}
 
     <!-- Temporary drop links -->
-    <div class="card mb-4">
+    <div class="card mb-4" id="section-drops">
       <div class="card-body p-4">
         <div class="d-flex justify-content-between align-items-center mb-3">
           <p class="fw-semibold mb-0" style="font-size:.8rem; letter-spacing:.05em; text-transform:uppercase; color:#6c757d;">
@@ -334,5 +330,12 @@
         })
       })
     })
+
+    // Scroll to drops section if ?section=drops
+    if (new URLSearchParams(window.location.search).get('section') === 'drops') {
+      const el = document.getElementById('section-drops')
+      const container = document.querySelector('.admin-main')
+      if (el && container) container.scrollTo({ top: el.offsetTop - 16, behavior: 'smooth' })
+    }
   </script>
 {% endblock %}

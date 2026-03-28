@@ -640,8 +640,13 @@ footer a:hover { color: var(--accent); }
    ════════════════════════════ */
 .user-layout {
   display: flex;
-  height: 100vh;
+  flex: 1;
   overflow: hidden;
+  min-height: 0;
+}
+.user-layout .admin-sidebar,
+.user-layout .admin-main {
+  height: auto;
 }
 
 /* Sidebar anchor-based nav items (user sidebar uses <a> links, not <button> tabs) */

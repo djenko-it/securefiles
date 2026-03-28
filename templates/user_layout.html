@@ -1,7 +1,5 @@
 {% extends "base.html" %}
 
-{% block navbar %}{% endblock %}
-
 {% block body %}
 <div class="user-layout">
 
@@ -21,21 +19,13 @@
         <i class="fas fa-cloud-arrow-up"></i>{{ _('Send') }}
       </a>
       <a href="{{ url_for('dashboard') }}"
-         class="sidebar-link{% if request.endpoint == 'dashboard' %} active{% endif %}">
+         class="sidebar-link{% if request.endpoint == 'dashboard' and not request.args.get('section') %} active{% endif %}">
         <i class="fas fa-share-nodes"></i>{{ _('My shares') }}
-        {% if files_count is defined and files_count > 0 %}
-          <span class="sidebar-badge">{{ files_count }}</span>
-        {% endif %}
       </a>
-      <a href="{{ url_for('dashboard') }}#drops"
-         class="sidebar-link{% if request.endpoint == 'dashboard' and request.args.get('tab') == 'drops' %} active{% endif %}">
+      <a href="{{ url_for('dashboard') }}?section=drops"
+         class="sidebar-link{% if request.endpoint == 'dashboard' and request.args.get('section') == 'drops' %} active{% endif %}">
         <i class="fas fa-inbox"></i>{{ _('Drop links') }}
-        {% if drops_count is defined and drops_count > 0 %}
-          <span class="sidebar-badge">{{ drops_count }}</span>
-        {% endif %}
       </a>
-
-      <div class="sidebar-section-label">{{ _('My account') }}</div>
       <a href="{{ url_for('profile') }}"
          class="sidebar-link{% if request.endpoint == 'profile' %} active{% endif %}">
         <i class="fas fa-user"></i>{{ _('My profile') }}
