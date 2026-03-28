@@ -14,10 +14,36 @@
 {% block navbar %}
 <nav class="navbar navbar-dark mb-4">
   <div class="container">
+    {% if current_user.is_authenticated %}
+    <div class="dropdown">
+      <button class="navbar-app-switcher dropdown-toggle" type="button"
+              data-bs-toggle="dropdown" aria-expanded="false">
+        {% if has_logo %}<img src="/logo" height="28" class="align-middle" alt="{{ settings.app_name }}">
+        {% else %}<i class="fas fa-shield-halved"></i>{% endif %}
+        {{ settings.app_name }}
+      </button>
+      <ul class="dropdown-menu navbar-app-dropdown">
+        <li>
+          <a class="dropdown-item" href="{{ url_for('dashboard') }}">
+            <i class="fas fa-table-list"></i>{{ _('My shares') }}
+          </a>
+        </li>
+        {% if current_user.is_admin %}
+        <li><hr class="dropdown-divider"></li>
+        <li>
+          <a class="dropdown-item admin-item" href="{{ url_for('admin_panel') }}">
+            <i class="fas fa-gear"></i>Admin
+          </a>
+        </li>
+        {% endif %}
+      </ul>
+    </div>
+    {% else %}
     <a class="navbar-brand" href="/">
       {% if has_logo %}<img src="/logo" height="32" class="me-2 align-middle" alt="{{ settings.app_name }}">
       {% else %}<i class="fas fa-shield-halved me-2"></i>{% endif %}{{ settings.app_name }}
     </a>
+    {% endif %}
     {% block navbar_right %}{% endblock %}
   </div>
 </nav>

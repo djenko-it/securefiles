@@ -74,6 +74,52 @@ body {
   color: var(--text) !important;
 }
 
+/* ── App switcher dropdown ── */
+.navbar-app-switcher {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: transparent;
+  border: none;
+  padding: 0.3rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: -0.3px;
+  color: var(--text);
+  transition: background .12s, color .12s;
+  cursor: pointer;
+}
+.navbar-app-switcher:hover,
+.navbar-app-switcher:focus { background: var(--surface-2); color: var(--text); outline: none; }
+.navbar-app-switcher::after {
+  border-top-color: currentColor;
+  opacity: 0.5;
+  margin-left: 0.1rem;
+}
+.navbar-app-dropdown {
+  min-width: 190px;
+  padding: 0.4rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-md);
+  background: var(--surface);
+}
+.navbar-app-dropdown .dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: .9rem;
+  font-weight: 500;
+}
+.navbar-app-dropdown .dropdown-item:hover { background: var(--surface-2); color: var(--text); }
+.navbar-app-dropdown .dropdown-item i { width: 16px; text-align: center; color: var(--text-muted); }
+.navbar-app-dropdown .admin-item i { color: #f59e0b; }
+.navbar-app-dropdown .dropdown-divider { border-color: var(--border); margin: 0.3rem 0; }
+
 /* Navbar outline buttons adapted per theme */
 .navbar .btn-outline-light {
   color: var(--text-muted);
