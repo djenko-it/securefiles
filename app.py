@@ -2427,11 +2427,11 @@ def branding_css():
   --accent-rgb: {r},{g},{b};
 }}
 .btn-primary {{
-  background-color: var(--accent) !important;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%) !important;
   border-color: var(--accent) !important;
 }}
 .btn-primary:hover, .btn-primary:focus, .btn-primary:active {{
-  background-color: var(--accent-dark) !important;
+  background: linear-gradient(135deg, var(--accent-dark) 0%, {_darken_hex(dark)} 100%) !important;
   border-color: var(--accent-dark) !important;
 }}
 .btn-outline-primary {{
