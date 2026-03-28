@@ -61,16 +61,19 @@
     </nav>
 
     <div class="sidebar-footer">
-      <a href="{{ url_for('dashboard') }}"><i class="fas fa-table-list"></i>{{ _('My shares') }}</a>
       <div class="dropdown">
         <a class="user-avatar" style="background:{{ user_avatar_color }};width:30px;height:30px;font-size:.75rem"
            role="button" data-bs-toggle="dropdown" aria-expanded="false">{{ user_avatar_letter }}</a>
         <ul class="dropdown-menu dropdown-menu-end">
+          <li><span class="dropdown-item-text text-muted" style="font-size:.8rem;padding:.4rem .75rem;">{{ current_user.username }}</span></li>
+          <li><hr class="dropdown-divider"></li>
           <li><a class="dropdown-item" href="{{ url_for('profile') }}"><i class="fas fa-user me-2"></i>{{ _('My profile') }}</a></li>
+          <li><a class="dropdown-item" href="{{ url_for('dashboard') }}"><i class="fas fa-table-list me-2"></i>{{ _('My shares') }}</a></li>
           <li><hr class="dropdown-divider"></li>
           <li><a class="dropdown-item text-danger" href="{{ url_for('logout') }}"><i class="fas fa-right-from-bracket me-2"></i>{{ _('Log out') }}</a></li>
         </ul>
       </div>
+      <span class="text-muted" style="font-size:.82rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ current_user.username }}</span>
     </div>
   </aside>
 
