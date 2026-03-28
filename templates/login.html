@@ -62,13 +62,16 @@
   <div class="login-card-outer">
     <div class="login-card">
 
-      <!-- Logo -->
+      <!-- Logo + app name -->
       <div class="text-center mb-4">
         {% if has_logo %}
-          <img src="/logo" height="44" alt="{{ settings.app_name }}" class="mb-1">
+          <img src="/logo" height="44" alt="{{ settings.app_name }}" class="mb-2">
         {% else %}
           <i class="fas fa-shield-halved" style="font-size:2.4rem; color:#f97316;"></i>
         {% endif %}
+        <div class="fw-semibold mt-1" style="font-size:1rem; color:#6c757d; letter-spacing:.02em;">
+          {{ settings.app_name }}
+        </div>
       </div>
 
       <!-- Flash messages -->
@@ -109,11 +112,24 @@
       </div>
       {% endif %}
 
-      <!-- Footer links -->
-      <div class="d-flex justify-content-between mt-4">
-        <small>
-          <a href="{{ url_for('register') }}" class="text-muted text-decoration-none">{{ _('No account yet?') }}</a>
+      <!-- No account -->
+      <div class="text-center mt-3">
+        <small class="text-muted">{{ _('No account yet?') }}
+          <a href="{{ url_for('register') }}">{{ _('Sign up') }}</a>
         </small>
+      </div>
+
+      <!-- Legal links -->
+      <div class="text-center mt-3">
+        <small>
+          <a href="{{ url_for('mentions_legales') }}" class="text-muted text-decoration-none">{{ _('Legal notices') }}</a>
+          <span class="text-muted mx-1">·</span>
+          <a href="{{ url_for('cgu') }}" class="text-muted text-decoration-none">{{ _('Terms of Service') }}</a>
+        </small>
+      </div>
+
+      <!-- Lang switcher -->
+      <div class="text-center mt-2">
         <small>
           {% if current_lang == 'fr' %}
             <a href="{{ url_for('set_lang', lang='en') }}" class="text-muted text-decoration-none">EN</a>
