@@ -2167,7 +2167,7 @@ def drop_create():
     g.db.commit()
     audit_log('drop_create', target=token_id,
               details=f"label={label} expiry={expiry.strftime('%Y-%m-%d %H:%M')} max={max_files_int}")
-    return redirect(url_for('dashboard'))
+    return redirect(url_for('dashboard', section='drops'))
 
 
 @app.route('/profile/drop-delete/<token_id>', methods=['POST'])
@@ -2178,7 +2178,7 @@ def drop_delete(token_id):
                  (token_id, current_user.id))
     g.db.commit()
     audit_log('drop_delete', target=token_id)
-    return redirect(url_for('dashboard'))
+    return redirect(url_for('dashboard', section='drops'))
 
 
 # ── Zone de dépôt ─────────────────────────────────────────────────────────────
