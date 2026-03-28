@@ -199,10 +199,8 @@
         </div>
       </div>
     </div>
-    {% endif %}{# end drops section #}
 
-    {% if active_section != 'drops' %}
-    <!-- Received files -->
+    <!-- Received files (linked to drop links) -->
     {% set received = files | selectattr('deposited_by') | list %}
     {% if received %}
     <div class="card mb-4">
@@ -246,7 +244,9 @@
       </div>
     </div>
     {% endif %}
+    {% endif %}{# end drops section #}
 
+    {% if active_section != 'drops' %}
     <!-- My shares -->
     {% set shared = files | rejectattr('deposited_by') | list %}
     <div class="card">
