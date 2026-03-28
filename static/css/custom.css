@@ -540,8 +540,7 @@ footer a:hover { color: var(--accent); }
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden;
 }
 .admin-main {
   flex: 1;
@@ -573,6 +572,8 @@ footer a:hover { color: var(--accent); }
   display: flex;
   flex-direction: column;
   gap: 2px;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 .sidebar-section-label {
   padding: 0.65rem 0.6rem 0.25rem;
