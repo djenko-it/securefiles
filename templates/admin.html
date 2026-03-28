@@ -15,34 +15,214 @@
     .log-table td { font-size: .82rem; }
     .badge-action { font-size: .72rem; letter-spacing: .03em; }
     #log-filter { max-width: 220px; }
+
+    /* ── Admin sidebar layout ── */
+    body { overflow: hidden; }
+    .admin-layout {
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+    .admin-sidebar {
+      width: 220px;
+      min-width: 220px;
+      height: 100vh;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+    .admin-main {
+      flex: 1;
+      height: 100vh;
+      overflow-y: auto;
+      background: var(--bg);
+    }
+
+    /* Sidebar brand */
+    .sidebar-brand {
+      padding: 1rem 1rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .sidebar-brand a {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 700;
+      font-size: 1rem;
+      color: var(--text);
+      text-decoration: none;
+    }
+    .sidebar-brand a:hover { color: var(--accent); }
+
+    /* Sidebar nav */
+    .sidebar-nav {
+      flex: 1;
+      padding: 0.75rem 0.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .sidebar-section-label {
+      padding: 0.65rem 0.6rem 0.25rem;
+      font-size: .68rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--text-muted);
+    }
+    .sidebar-item {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.45rem 0.75rem;
+      border-radius: var(--radius-sm);
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: .88rem;
+      font-weight: 500;
+      cursor: pointer;
+      text-align: left;
+      width: 100%;
+      transition: background .12s, color .12s;
+    }
+    .sidebar-item:hover {
+      background: var(--surface-2);
+      color: var(--text);
+    }
+    .sidebar-item.active {
+      background: var(--surface-2);
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .sidebar-item i { width: 16px; text-align: center; flex-shrink: 0; }
+    .sidebar-item .sidebar-badge {
+      margin-left: auto;
+      background: var(--surface-2);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      font-size: .68rem;
+      padding: 1px 6px;
+      border-radius: 20px;
+    }
+    .sidebar-item.active .sidebar-badge {
+      background: rgba(249,115,22,.12);
+      color: var(--accent);
+      border-color: transparent;
+    }
+
+    /* Sidebar footer */
+    .sidebar-footer {
+      padding: 0.75rem;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .sidebar-footer a {
+      color: var(--text-muted);
+      font-size: .82rem;
+      text-decoration: none;
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .sidebar-footer a:hover { color: var(--text); }
   </style>
 </head>
 <body>
+<div class="admin-layout">
 
-<nav class="navbar navbar-dark mb-4">
-  <div class="container">
-    <a class="navbar-brand" href="/">{% if has_logo %}<img src="/logo" height="32" class="me-2 align-middle" alt="{{ settings.app_name }}">{% else %}<i class="fas fa-shield-halved me-2"></i>{% endif %}{{ settings.app_name }}</a>
-    <div class="d-flex align-items-center gap-2">
-      <a href="{{ url_for('admin_panel') }}" class="btn btn-sm btn-warning">
-        <i class="fas fa-screwdriver-wrench me-1"></i>Admin
-      </a>
-      <a href="{{ url_for('dashboard') }}" class="btn btn-sm btn-outline-light">
-        <i class="fas fa-table-list me-1"></i>{{ _('My shares') }}
-      </a>
-      <div class="dropdown">
-        <a class="user-avatar" style="background:{{ user_avatar_color }}" role="button"
-           data-bs-toggle="dropdown" aria-expanded="false">{{ user_avatar_letter }}</a>
-        <ul class="dropdown-menu dropdown-menu-end">
-          <li><a class="dropdown-item" href="{{ url_for('profile') }}"><i class="fas fa-user me-2"></i>{{ _('My profile') }}</a></li>
-          <li><hr class="dropdown-divider"></li>
-          <li><a class="dropdown-item text-danger" href="{{ url_for('logout') }}"><i class="fas fa-right-from-bracket me-2"></i>{{ _('Log out') }}</a></li>
-        </ul>
-      </div>
+<!-- ── Sidebar ──────────────────────────────────────────────────────────── -->
+<aside class="admin-sidebar">
+  <!-- Brand -->
+  <div class="sidebar-brand">
+    <a href="/">
+      {% if has_logo %}
+        <img src="/logo" height="28" alt="{{ settings.app_name }}">
+      {% else %}
+        <i class="fas fa-shield-halved" style="color:var(--accent)"></i>
+      {% endif %}
+      {{ settings.app_name }}
+    </a>
+  </div>
+
+  <!-- Navigation -->
+  <nav class="sidebar-nav" id="adminTabs" role="tablist">
+
+    <button class="sidebar-item active" id="tab-analytics-btn" data-bs-toggle="tab"
+            data-bs-target="#tab-analytics" type="button" role="tab">
+      <i class="fas fa-chart-line"></i>{{ _('Dashboard') }}
+    </button>
+
+    <button class="sidebar-item" id="tab-users-btn" data-bs-toggle="tab"
+            data-bs-target="#tab-users" type="button" role="tab">
+      <i class="fas fa-users"></i>{{ _('Users') }}
+      <span class="sidebar-badge">{{ users | length }}</span>
+    </button>
+
+    <div class="sidebar-section-label">{{ _('Configuration') }}</div>
+
+    <button class="sidebar-item" id="tab-settings-btn" data-bs-toggle="tab"
+            data-bs-target="#tab-settings" type="button" role="tab">
+      <i class="fas fa-sliders"></i>{{ _('Settings') }}
+    </button>
+
+    <button class="sidebar-item" id="tab-sso-btn" data-bs-toggle="tab"
+            data-bs-target="#tab-sso" type="button" role="tab">
+      <i class="fas fa-key"></i>SSO
+      {% if settings.sso_enabled == '1' %}
+        <span class="sidebar-badge" style="background:rgba(25,135,84,.12);color:#198754;border-color:transparent">{{ _('On') }}</span>
+      {% endif %}
+    </button>
+
+    <button class="sidebar-item" id="tab-s3-btn" data-bs-toggle="tab"
+            data-bs-target="#tab-s3" type="button" role="tab">
+      <i class="fas fa-cloud"></i>{{ _('Storage') }}
+      {% if settings.storage_backend == 's3' %}
+        <span class="sidebar-badge">S3</span>
+      {% endif %}
+    </button>
+
+    <button class="sidebar-item" id="tab-legal-btn" data-bs-toggle="tab"
+            data-bs-target="#tab-legal" type="button" role="tab">
+      <i class="fas fa-scale-balanced"></i>{{ _('Legal notices / ToS') }}
+    </button>
+
+    <div class="sidebar-section-label">{{ _('Monitoring') }}</div>
+
+    <button class="sidebar-item" id="tab-logs-btn" data-bs-toggle="tab"
+            data-bs-target="#tab-logs" type="button" role="tab">
+      <i class="fas fa-scroll"></i>{{ _('Audit log') }}
+      <span class="sidebar-badge">{{ logs | length }}</span>
+    </button>
+
+  </nav>
+
+  <!-- Footer -->
+  <div class="sidebar-footer">
+    <a href="{{ url_for('dashboard') }}">
+      <i class="fas fa-table-list"></i>{{ _('My shares') }}
+    </a>
+    <div class="dropdown">
+      <a class="user-avatar" style="background:{{ user_avatar_color }};width:30px;height:30px;font-size:.75rem" role="button"
+         data-bs-toggle="dropdown" aria-expanded="false">{{ user_avatar_letter }}</a>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li><a class="dropdown-item" href="{{ url_for('profile') }}"><i class="fas fa-user me-2"></i>{{ _('My profile') }}</a></li>
+        <li><hr class="dropdown-divider"></li>
+        <li><a class="dropdown-item text-danger" href="{{ url_for('logout') }}"><i class="fas fa-right-from-bracket me-2"></i>{{ _('Log out') }}</a></li>
+      </ul>
     </div>
   </div>
-</nav>
+</aside>
 
-<main class="container pb-5">
+<!-- ── Main content ─────────────────────────────────────────────────────── -->
+<main class="admin-main">
+  <div class="p-4 pb-5">
 
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% for cat, msg in messages %}
@@ -52,67 +232,10 @@
     {% endfor %}
   {% endwith %}
 
-  <h1 class="h4 fw-semibold mb-4">
-    <i class="fas fa-screwdriver-wrench me-2 text-warning"></i>{{ _('Administration') }}
-  </h1>
-
-  <ul class="nav nav-tabs mb-4" id="adminTabs" role="tablist">
-    <li class="nav-item">
-      <button class="nav-link active" id="tab-users-btn" data-bs-toggle="tab"
-              data-bs-target="#tab-users" type="button" role="tab">
-        <i class="fas fa-users me-1"></i>{{ _('Users') }}
-        <span class="badge bg-secondary ms-1">{{ users | length }}</span>
-      </button>
-    </li>
-    <li class="nav-item">
-      <button class="nav-link" id="tab-settings-btn" data-bs-toggle="tab"
-              data-bs-target="#tab-settings" type="button" role="tab">
-        <i class="fas fa-sliders me-1"></i>{{ _('Settings') }}
-      </button>
-    </li>
-    <li class="nav-item">
-      <button class="nav-link" id="tab-logs-btn" data-bs-toggle="tab"
-              data-bs-target="#tab-logs" type="button" role="tab">
-        <i class="fas fa-scroll me-1"></i>{{ _('Audit log') }}
-        <span class="badge bg-secondary ms-1">{{ logs | length }}</span>
-      </button>
-    </li>
-    <li class="nav-item">
-      <button class="nav-link" id="tab-sso-btn" data-bs-toggle="tab"
-              data-bs-target="#tab-sso" type="button" role="tab">
-        <i class="fas fa-key me-1"></i>SSO
-        {% if settings.sso_enabled == '1' %}
-          <span class="badge bg-success ms-1" style="font-size:.65rem">{{ _('Active') }}</span>
-        {% endif %}
-      </button>
-    </li>
-    <li class="nav-item">
-      <button class="nav-link" id="tab-s3-btn" data-bs-toggle="tab"
-              data-bs-target="#tab-s3" type="button" role="tab">
-        <i class="fas fa-cloud me-1"></i>{{ _('Storage') }}
-        {% if settings.storage_backend == 's3' %}
-          <span class="badge bg-info text-dark ms-1" style="font-size:.65rem">S3</span>
-        {% endif %}
-      </button>
-    </li>
-    <li class="nav-item">
-      <button class="nav-link" id="tab-legal-btn" data-bs-toggle="tab"
-              data-bs-target="#tab-legal" type="button" role="tab">
-        <i class="fas fa-scale-balanced me-1"></i>{{ _('Legal notices / ToS') }}
-      </button>
-    </li>
-    <li class="nav-item">
-      <button class="nav-link" id="tab-analytics-btn" data-bs-toggle="tab"
-              data-bs-target="#tab-analytics" type="button" role="tab">
-        <i class="fas fa-chart-line me-1"></i>{{ _('Dashboard') }}
-      </button>
-    </li>
-  </ul>
-
   <div class="tab-content" id="adminTabsContent">
 
     <!-- ── Onglet Utilisateurs ──────────────────────────────────────────── -->
-    <div class="tab-pane fade show active" id="tab-users" role="tabpanel">
+    <div class="tab-pane fade" id="tab-users" role="tabpanel">
       <div class="card shadow-sm">
         <div class="card-body p-0">
           <div class="table-responsive">
@@ -741,7 +864,7 @@
     </div>
 
     <!-- ── Onglet Tableau de bord ─────────────────────────────────────────── -->
-    <div class="tab-pane fade" id="tab-analytics" role="tabpanel">
+    <div class="tab-pane fade show active" id="tab-analytics" role="tabpanel">
 
       <!-- KPI cards -->
       <div class="row g-3 mb-4">
@@ -832,16 +955,23 @@
     </div><!-- /tab-analytics -->
 
   </div><!-- /tab-content -->
+  </div><!-- /p-4 -->
 </main>
 
-<footer>
-  <a href="mailto:{{ settings.contact_email }}">{{ settings.contact_email }}</a>
-</footer>
+</div><!-- /admin-layout -->
 
 <script nonce="{{ csp_nonce }}" src="/static/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
 <script nonce="{{ csp_nonce }}">
+  // Sync sidebar active state with Bootstrap tab events
+  document.querySelectorAll('.sidebar-item[data-bs-toggle="tab"]').forEach(btn => {
+    btn.addEventListener('shown.bs.tab', () => {
+      document.querySelectorAll('.sidebar-item').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+
   // Ouvre l'onglet correct selon le hash d'URL
-  const hashTabMap = { '#settings': 'tab-settings-btn', '#logs': 'tab-logs-btn', '#sso': 'tab-sso-btn', '#s3': 'tab-s3-btn', '#legal': 'tab-legal-btn', '#analytics': 'tab-analytics-btn' };
+  const hashTabMap = { '#users': 'tab-users-btn', '#settings': 'tab-settings-btn', '#logs': 'tab-logs-btn', '#sso': 'tab-sso-btn', '#s3': 'tab-s3-btn', '#legal': 'tab-legal-btn', '#analytics': 'tab-analytics-btn' };
   const targetBtn  = hashTabMap[window.location.hash];
   if (targetBtn) bootstrap.Tab.getOrCreateInstance(document.getElementById(targetBtn)).show();
 
@@ -1085,8 +1215,8 @@
     });
   });
 
-  // Si on arrive directement sur l'onglet via le hash, déclencher l'init
-  if (window.location.hash === '#analytics') {
+  // Analytics tab is now the default — init charts immediately if no other hash
+  if (!window.location.hash || window.location.hash === '#analytics') {
     document.getElementById('tab-analytics-btn').dispatchEvent(new Event('shown.bs.tab'));
   }
 })();
