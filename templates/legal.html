@@ -1,44 +1,18 @@
-<!DOCTYPE html>
-<html lang="{{ current_lang }}" data-bs-theme="{{ user_theme }}">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{ settings.app_name }} — {{ title }}</title>
-  <link href="/static/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css">
-  <link href="/static/css/custom.css" rel="stylesheet">
-  <link href="/branding.css" rel="stylesheet">
-</head>
-<body>
-  <nav class="navbar navbar-dark mb-4">
-    <div class="container">
-      <a class="navbar-brand" href="/">{% if has_logo %}<img src="/logo" height="32" class="me-2 align-middle" alt="{{ settings.app_name }}">{% else %}<i class="fas fa-shield-halved me-2"></i>{% endif %}{{ settings.app_name }}</a>
-    </div>
-  </nav>
+{% extends "base.html" %}
+{% block title %}{{ settings.app_name }} — {{ title }}{% endblock %}
 
-  <main class="container pb-5" style="max-width: 860px;">
-    <div class="card shadow-sm">
-      <div class="card-body p-4 p-md-5">
-        <div class="legal-content">
-          {{ content | safe }}
-        </div>
-        <hr class="mt-4">
-        <a href="/" class="btn btn-sm btn-outline-secondary">
-          <i class="fas fa-arrow-left me-1"></i>{{ _('Back') }}
-        </a>
+{% block body %}
+<main class="container pb-5" style="max-width: 860px;">
+  <div class="card shadow-sm">
+    <div class="card-body p-4 p-md-5">
+      <div class="legal-content">
+        {{ content | safe }}
       </div>
+      <hr class="mt-4">
+      <a href="/" class="btn btn-sm btn-outline-secondary">
+        <i class="fas fa-arrow-left me-1"></i>{{ _('Back') }}
+      </a>
     </div>
-  </main>
-
-  <footer>
-    {{ settings.app_name }} &mdash;
-    <a href="mailto:{{ settings.contact_email }}">{{ settings.contact_email }}</a>
-    &nbsp;·&nbsp;
-    <a href="{{ url_for('mentions_legales') }}">{{ _('Legal notices') }}</a>
-    &nbsp;·&nbsp;
-    <a href="{{ url_for('cgu') }}">{{ _('Terms of Service') }}</a>
-  </footer>
-
-  <script nonce="{{ csp_nonce }}" src="/static/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+  </div>
+</main>
+{% endblock %}

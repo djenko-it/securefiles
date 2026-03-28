@@ -1,0 +1,9 @@
+<div class="dropdown">
+  <a class="user-avatar" style="background:{{ user_avatar_color }}" role="button"
+     data-bs-toggle="dropdown" aria-expanded="false">{{ user_avatar_letter }}</a>
+  <ul class="dropdown-menu dropdown-menu-end">
+    <li><a class="dropdown-item" href="{{ url_for('profile') }}"><i class="fas fa-user me-2"></i>{{ _('My profile') }}</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item text-danger" href="{{ url_for('logout') }}"><i class="fas fa-right-from-bracket me-2"></i>{{ _('Log out') }}</a></li>
+  </ul>
+</div>

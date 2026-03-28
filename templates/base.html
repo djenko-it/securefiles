@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ current_lang }}" data-bs-theme="{{ user_theme }}">
+<html lang="{{ current_lang }}" data-bs-theme="{% block theme %}{{ user_theme }}{% endblock %}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,7 +11,27 @@
   {% block head %}{% endblock %}
 </head>
 <body>
+{% block navbar %}
+<nav class="navbar navbar-dark mb-4">
+  <div class="container">
+    <a class="navbar-brand" href="/">
+      {% if has_logo %}<img src="/logo" height="32" class="me-2 align-middle" alt="{{ settings.app_name }}">
+      {% else %}<i class="fas fa-shield-halved me-2"></i>{% endif %}{{ settings.app_name }}
+    </a>
+    {% block navbar_right %}{% endblock %}
+  </div>
+</nav>
+{% endblock %}
 {% block body %}{% endblock %}
+{% block footer %}
+<footer>
+  <a href="mailto:{{ settings.contact_email }}">{{ settings.contact_email }}</a>
+  &nbsp;·&nbsp;
+  <a href="{{ url_for('mentions_legales') }}">{{ _('Legal notices') }}</a>
+  &nbsp;·&nbsp;
+  <a href="{{ url_for('cgu') }}">{{ _('Terms of Service') }}</a>
+</footer>
+{% endblock %}
 <script nonce="{{ csp_nonce }}" src="/static/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
 {% block scripts %}{% endblock %}
 </body>
