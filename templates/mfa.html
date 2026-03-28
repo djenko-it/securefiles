@@ -1,23 +1,76 @@
 {% extends "base.html" %}
-{% block theme %}light{% endblock %}
-{% block title %}{{ _('Two-step verification') }}{% endblock %}
+{% block title %}{{ settings.app_name }} — {{ _('Two-step verification') }}{% endblock %}
+
+{% block navbar %}{% endblock %}
+{% block footer %}{% endblock %}
+
+{% block head %}
+<style>
+  body { margin: 0; padding: 0; }
+
+  .login-bg {
+    min-height: 100vh;
+    background:
+      radial-gradient(circle, rgba(255,255,255,0.10) 1px, transparent 1px),
+      linear-gradient(150deg, var(--accent) 0%, var(--accent-dark) 100%);
+    background-size: 22px 22px, 100% 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+  }
+
+  .login-card-outer {
+    padding: 10px;
+    border-radius: 26px;
+    background: rgba(255, 255, 255, 0.20);
+    box-shadow:
+      0 0 0 1px rgba(255,255,255,0.30),
+      0 24px 64px rgba(0,0,0,0.22);
+  }
+
+  .login-card {
+    background: #ffffff;
+    border-radius: 18px;
+    padding: 2.5rem 2.25rem 2rem;
+    width: 480px;
+    max-width: calc(100vw - 2rem);
+  }
+
+  [data-bs-theme="dark"] .login-card {
+    background: #1c1c2e;
+  }
+
+  .login-card .form-control {
+    border-radius: 10px;
+  }
+
+  .login-card .btn {
+    border-radius: 10px;
+  }
+</style>
+{% endblock %}
 
 {% block body %}
-<main class="container pb-5" style="max-width:420px;">
-  <div class="card">
-    <div class="card-body p-4 p-md-5">
+<div class="login-bg">
+  <div class="login-card-outer">
+    <div class="login-card">
+
+      <!-- Icon + title -->
       <div class="text-center mb-4">
-        <i class="fas fa-shield-halved fa-2x mb-3" style="color:var(--accent)"></i>
-        <h1 class="h4 fw-semibold">{{ _('Two-step verification') }}</h1>
-        <p class="text-muted small">{{ _('Confirm your identity to continue.') }}</p>
+        <i class="fas fa-shield-halved" style="font-size:2.4rem; color:var(--accent);"></i>
+        <h1 class="h5 fw-semibold mt-2 mb-1">{{ _('Two-step verification') }}</h1>
+        <p class="text-muted small mb-0">{{ _('Confirm your identity to continue.') }}</p>
       </div>
 
+      <!-- Flash messages -->
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% for cat, msg in messages %}
           <div class="alert alert-{{ cat }} py-2 small">{{ msg }}</div>
         {% endfor %}
       {% endwith %}
 
+      <!-- TOTP -->
       {% if 'totp' in methods %}
       <div class="mb-4">
         <p class="fw-semibold small text-uppercase text-muted mb-2">
@@ -34,11 +87,12 @@
       </div>
       {% endif %}
 
+      <!-- WebAuthn -->
       {% if 'webauthn' in methods and webauthn_available %}
       <div>
         {% if 'totp' in methods %}
           <hr class="my-3">
-          <p class="text-center text-muted small mb-3">ou</p>
+          <p class="text-center text-muted small mb-3">{{ _('or') }}</p>
         {% endif %}
         <p class="fw-semibold small text-uppercase text-muted mb-2">
           <i class="fas fa-fingerprint me-1"></i>{{ _('Security key') }}
@@ -50,6 +104,7 @@
       </div>
       {% endif %}
 
+      <!-- Recovery code -->
       {% if 'totp' in methods %}
       <hr class="my-3">
       <details class="text-center">
@@ -68,14 +123,18 @@
       </details>
       {% endif %}
 
+      <!-- Back to login -->
       <div class="text-center mt-4">
-        <a href="{{ url_for('login') }}" class="text-muted small">
-          <i class="fas fa-arrow-left me-1"></i>{{ _('Back to login') }}
-        </a>
+        <small>
+          <a href="{{ url_for('login') }}" class="text-muted text-decoration-none">
+            <i class="fas fa-arrow-left me-1"></i>{{ _('Back to login') }}
+          </a>
+        </small>
       </div>
+
     </div>
   </div>
-</main>
+</div>
 {% endblock %}
 
 {% block scripts %}
