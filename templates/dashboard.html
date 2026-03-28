@@ -5,6 +5,7 @@
 {% block head %}{% endblock %}
 
 {% block user_content %}
+  {% set active_section = request.args.get('section', 'shares') %}
   <div style="max-width: 860px; margin: 0 auto;">
 
     <!-- Critical quota alert -->
@@ -32,7 +33,58 @@
     </div>
     {% endif %}
 
+    <!-- Quota usage -->
+    <div class="card mb-4">
+      <div class="card-body p-3 px-4">
+        <p class="fw-semibold mb-3" style="font-size:.8rem; letter-spacing:.05em; text-transform:uppercase; color:#6c757d;">
+          <i class="fas fa-chart-pie me-2"></i>{{ _('Quotas') }}
+        </p>
+        <div class="row g-3 align-items-center">
+
+          <div class="col-sm-6">
+            <div class="d-flex justify-content-between mb-1">
+              <small class="text-muted"><i class="fas fa-hard-drive me-1"></i>{{ _('Storage') }}</small>
+              <small class="fw-semibold">
+                {{ quota.used_str }}{% if quota.max_storage_str %} / {{ quota.max_storage_str }}{% endif %}
+              </small>
+            </div>
+            {% if quota.storage_pct is not none %}
+              {% set sc = 'bg-danger' if quota.storage_pct >= 90 else ('bg-warning' if quota.storage_pct >= 70 else 'bg-success') %}
+              <div class="progress" style="height:6px;">
+                <div class="progress-bar {{ sc }}" style="width:{{ quota.storage_pct }}%" title="{{ quota.storage_pct }}%"></div>
+              </div>
+            {% else %}
+              <div class="progress" style="height:6px;">
+                <div class="progress-bar bg-secondary opacity-25" style="width:100%"></div>
+              </div>
+            {% endif %}
+          </div>
+
+          <div class="col-sm-6">
+            <div class="d-flex justify-content-between mb-1">
+              <small class="text-muted"><i class="fas fa-file me-1"></i>{{ _('Files') }}</small>
+              <small class="fw-semibold">
+                {{ quota.file_count }}{% if quota.max_files > 0 %} / {{ quota.max_files }}{% endif %}
+              </small>
+            </div>
+            {% if quota.file_pct is not none %}
+              {% set fc = 'bg-danger' if quota.file_pct >= 90 else ('bg-warning' if quota.file_pct >= 70 else 'bg-success') %}
+              <div class="progress" style="height:6px;">
+                <div class="progress-bar {{ fc }}" style="width:{{ quota.file_pct }}%" title="{{ quota.file_pct }}%"></div>
+              </div>
+            {% else %}
+              <div class="progress" style="height:6px;">
+                <div class="progress-bar bg-secondary opacity-25" style="width:100%"></div>
+              </div>
+            {% endif %}
+          </div>
+
+        </div>
+      </div>
+    </div>
+
     <!-- Temporary drop links -->
+    {% if active_section == 'drops' %}
     <div class="card mb-4" id="section-drops">
       <div class="card-body p-4">
         <div class="d-flex justify-content-between align-items-center mb-3">
@@ -147,54 +199,9 @@
         </div>
       </div>
     </div>
+    {% endif %}{# end drops section #}
 
-    <!-- Quota usage -->
-    <div class="card mb-4">
-      <div class="card-body p-3 px-4">
-        <div class="row g-3 align-items-center">
-
-          <div class="col-sm-6">
-            <div class="d-flex justify-content-between mb-1">
-              <small class="text-muted"><i class="fas fa-hard-drive me-1"></i>{{ _('Storage') }}</small>
-              <small class="fw-semibold">
-                {{ quota.used_str }}{% if quota.max_storage_str %} / {{ quota.max_storage_str }}{% endif %}
-              </small>
-            </div>
-            {% if quota.storage_pct is not none %}
-              {% set sc = 'bg-danger' if quota.storage_pct >= 90 else ('bg-warning' if quota.storage_pct >= 70 else 'bg-success') %}
-              <div class="progress" style="height:6px;">
-                <div class="progress-bar {{ sc }}" style="width:{{ quota.storage_pct }}%" title="{{ quota.storage_pct }}%"></div>
-              </div>
-            {% else %}
-              <div class="progress" style="height:6px;">
-                <div class="progress-bar bg-secondary opacity-25" style="width:100%"></div>
-              </div>
-            {% endif %}
-          </div>
-
-          <div class="col-sm-6">
-            <div class="d-flex justify-content-between mb-1">
-              <small class="text-muted"><i class="fas fa-file me-1"></i>{{ _('Files') }}</small>
-              <small class="fw-semibold">
-                {{ quota.file_count }}{% if quota.max_files > 0 %} / {{ quota.max_files }}{% endif %}
-              </small>
-            </div>
-            {% if quota.file_pct is not none %}
-              {% set fc = 'bg-danger' if quota.file_pct >= 90 else ('bg-warning' if quota.file_pct >= 70 else 'bg-success') %}
-              <div class="progress" style="height:6px;">
-                <div class="progress-bar {{ fc }}" style="width:{{ quota.file_pct }}%" title="{{ quota.file_pct }}%"></div>
-              </div>
-            {% else %}
-              <div class="progress" style="height:6px;">
-                <div class="progress-bar bg-secondary opacity-25" style="width:100%"></div>
-              </div>
-            {% endif %}
-          </div>
-
-        </div>
-      </div>
-    </div>
-
+    {% if active_section != 'drops' %}
     <!-- Received files -->
     {% set received = files | selectattr('deposited_by') | list %}
     {% if received %}
@@ -306,6 +313,7 @@
         {% endif %}
       </div>
     </div>
+    {% endif %}{# end shares section #}
   </div>
 {% endblock %}
 
@@ -330,12 +338,5 @@
         })
       })
     })
-
-    // Scroll to drops section if ?section=drops
-    if (new URLSearchParams(window.location.search).get('section') === 'drops') {
-      const el = document.getElementById('section-drops')
-      const container = document.querySelector('.admin-main')
-      if (el && container) container.scrollTo({ top: el.offsetTop - 16, behavior: 'smooth' })
-    }
   </script>
 {% endblock %}
