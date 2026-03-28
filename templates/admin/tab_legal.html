@@ -1,0 +1,49 @@
+<div class="tab-pane fade" id="tab-legal" role="tabpanel">
+  <div class="card shadow-sm">
+    <div class="card-body p-4">
+      <form method="post" action="{{ url_for('admin_save_legal') }}">
+        {{ legal_form.hidden_tag() }}
+
+        <p class="text-uppercase fw-semibold text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em">
+          <i class="fas fa-scale-balanced me-1"></i>Mentions légales &amp; CGU
+        </p>
+        <p class="text-muted small mb-4">
+          Le contenu est rédigé en <strong>Markdown</strong> et converti en HTML à l'affichage.<br>
+          Titres : <code>## Titre</code>, <code>### Sous-titre</code> —
+          Gras : <code>**texte**</code> — Italique : <code>*texte*</code> —
+          Lien : <code>[texte](url)</code> — Liste : ligne commençant par <code>-</code><br>
+          Les variables <code>{app_name}</code>, <code>{contact_email}</code> et
+          <code>{date}</code> (CGU uniquement) sont remplacées automatiquement.
+        </p>
+
+        <div class="mb-4">
+          <label class="form-label fw-semibold">
+            <i class="fas fa-gavel me-1"></i>{{ legal_form.legal_mentions.label.text }}
+          </label>
+          <div class="mb-1">
+            <a href="{{ url_for('mentions_legales') }}" target="_blank" class="btn btn-sm btn-outline-secondary">
+              <i class="fas fa-eye me-1"></i>Prévisualiser
+            </a>
+          </div>
+          {{ legal_form.legal_mentions(class="form-control font-monospace", rows=20, style="font-size:.82rem") }}
+        </div>
+
+        <div class="mb-4">
+          <label class="form-label fw-semibold">
+            <i class="fas fa-file-contract me-1"></i>{{ legal_form.terms_of_use.label.text }}
+          </label>
+          <div class="mb-1">
+            <a href="{{ url_for('cgu') }}" target="_blank" class="btn btn-sm btn-outline-secondary">
+              <i class="fas fa-eye me-1"></i>Prévisualiser
+            </a>
+          </div>
+          {{ legal_form.terms_of_use(class="form-control font-monospace", rows=20, style="font-size:.82rem") }}
+        </div>
+
+        <button type="submit" class="btn btn-primary">
+          <i class="fas fa-floppy-disk me-2"></i>{{ legal_form.submit.label.text }}
+        </button>
+      </form>
+    </div>
+  </div>
+</div>

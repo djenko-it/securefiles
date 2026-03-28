@@ -1,1140 +1,121 @@
-<!DOCTYPE html>
-<html lang="{{ current_lang }}" data-bs-theme="{{ user_theme }}">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{ settings.app_name }} — {{ _('Administration') }}</title>
-  <link href="/static/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css">
-  <link href="/static/css/custom.css" rel="stylesheet">
-  <link href="/branding.css" rel="stylesheet">
-  <style nonce="{{ csp_nonce }}">
-    .table th { font-size: .78rem; font-weight: 600; color: #6c757d; text-transform: uppercase; letter-spacing: .05em; }
-    .table td { vertical-align: middle; font-size: .9rem; }
-    .crown-gold { color: #f0a500; }
-    .log-table td { font-size: .82rem; }
-    .badge-action { font-size: .72rem; letter-spacing: .03em; }
-    #log-filter { max-width: 220px; }
+{% extends "base.html" %}
 
-    /* ── Admin sidebar layout ── */
-    body { overflow: hidden; }
-    .admin-layout {
-      display: flex;
-      height: 100vh;
-      overflow: hidden;
-    }
-    .admin-sidebar {
-      width: 220px;
-      min-width: 220px;
-      height: 100vh;
-      background: var(--surface);
-      border-right: 1px solid var(--border);
-      display: flex;
-      flex-direction: column;
-      overflow-y: auto;
-      overflow-x: hidden;
-    }
-    .admin-main {
-      flex: 1;
-      height: 100vh;
-      overflow-y: auto;
-      background: var(--bg);
-    }
+{% block title %}{{ settings.app_name }} — {{ _('Administration') }}{% endblock %}
 
-    /* Sidebar brand */
-    .sidebar-brand {
-      padding: 1rem 1rem 0.75rem;
-      border-bottom: 1px solid var(--border);
-    }
-    .sidebar-brand a {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      font-weight: 700;
-      font-size: 1rem;
-      color: var(--text);
-      text-decoration: none;
-    }
-    .sidebar-brand a:hover { color: var(--accent); }
+{% block head %}
+<style nonce="{{ csp_nonce }}">
+  body { overflow: hidden; }
+  .table th { font-size: .78rem; font-weight: 600; color: #6c757d; text-transform: uppercase; letter-spacing: .05em; }
+  .table td { vertical-align: middle; font-size: .9rem; }
+  .crown-gold { color: #f0a500; }
+  .log-table td { font-size: .82rem; }
+  .badge-action { font-size: .72rem; letter-spacing: .03em; }
+</style>
+{% endblock %}
 
-    /* Sidebar nav */
-    .sidebar-nav {
-      flex: 1;
-      padding: 0.75rem 0.5rem;
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-    .sidebar-section-label {
-      padding: 0.65rem 0.6rem 0.25rem;
-      font-size: .68rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: .08em;
-      color: var(--text-muted);
-    }
-    .sidebar-item {
-      display: flex;
-      align-items: center;
-      gap: 0.6rem;
-      padding: 0.45rem 0.75rem;
-      border-radius: var(--radius-sm);
-      border: none;
-      background: transparent;
-      color: var(--text-muted);
-      font-size: .88rem;
-      font-weight: 500;
-      cursor: pointer;
-      text-align: left;
-      width: 100%;
-      transition: background .12s, color .12s;
-    }
-    .sidebar-item:hover {
-      background: var(--surface-2);
-      color: var(--text);
-    }
-    .sidebar-item.active {
-      background: var(--surface-2);
-      color: var(--accent);
-      font-weight: 600;
-    }
-    .sidebar-item i { width: 16px; text-align: center; flex-shrink: 0; }
-    .sidebar-item .sidebar-badge {
-      margin-left: auto;
-      background: var(--surface-2);
-      color: var(--text-muted);
-      border: 1px solid var(--border);
-      font-size: .68rem;
-      padding: 1px 6px;
-      border-radius: 20px;
-    }
-    .sidebar-item.active .sidebar-badge {
-      background: rgba(249,115,22,.12);
-      color: var(--accent);
-      border-color: transparent;
-    }
-
-    /* Sidebar footer */
-    .sidebar-footer {
-      padding: 0.75rem;
-      border-top: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-    .sidebar-footer a {
-      color: var(--text-muted);
-      font-size: .82rem;
-      text-decoration: none;
-      flex: 1;
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-    }
-    .sidebar-footer a:hover { color: var(--text); }
-  </style>
-</head>
-<body>
+{% block body %}
 <div class="admin-layout">
 
-<!-- ── Sidebar ──────────────────────────────────────────────────────────── -->
-<aside class="admin-sidebar">
-  <!-- Brand -->
-  <div class="sidebar-brand">
-    <a href="/">
-      {% if has_logo %}
-        <img src="/logo" height="28" alt="{{ settings.app_name }}">
-      {% else %}
-        <i class="fas fa-shield-halved" style="color:var(--accent)"></i>
-      {% endif %}
-      {{ settings.app_name }}
-    </a>
-  </div>
-
-  <!-- Navigation -->
-  <nav class="sidebar-nav" id="adminTabs" role="tablist">
-
-    <button class="sidebar-item active" id="tab-analytics-btn" data-bs-toggle="tab"
-            data-bs-target="#tab-analytics" type="button" role="tab">
-      <i class="fas fa-chart-line"></i>{{ _('Dashboard') }}
-    </button>
-
-    <button class="sidebar-item" id="tab-users-btn" data-bs-toggle="tab"
-            data-bs-target="#tab-users" type="button" role="tab">
-      <i class="fas fa-users"></i>{{ _('Users') }}
-      <span class="sidebar-badge">{{ users | length }}</span>
-    </button>
-
-    <div class="sidebar-section-label">{{ _('Configuration') }}</div>
-
-    <button class="sidebar-item" id="tab-settings-btn" data-bs-toggle="tab"
-            data-bs-target="#tab-settings" type="button" role="tab">
-      <i class="fas fa-sliders"></i>{{ _('Settings') }}
-    </button>
-
-    <button class="sidebar-item" id="tab-sso-btn" data-bs-toggle="tab"
-            data-bs-target="#tab-sso" type="button" role="tab">
-      <i class="fas fa-key"></i>SSO
-      {% if settings.sso_enabled == '1' %}
-        <span class="sidebar-badge" style="background:rgba(25,135,84,.12);color:#198754;border-color:transparent">{{ _('On') }}</span>
-      {% endif %}
-    </button>
-
-    <button class="sidebar-item" id="tab-s3-btn" data-bs-toggle="tab"
-            data-bs-target="#tab-s3" type="button" role="tab">
-      <i class="fas fa-cloud"></i>{{ _('Storage') }}
-      {% if settings.storage_backend == 's3' %}
-        <span class="sidebar-badge">S3</span>
-      {% endif %}
-    </button>
-
-    <button class="sidebar-item" id="tab-legal-btn" data-bs-toggle="tab"
-            data-bs-target="#tab-legal" type="button" role="tab">
-      <i class="fas fa-scale-balanced"></i>{{ _('Legal notices / ToS') }}
-    </button>
-
-    <div class="sidebar-section-label">{{ _('Monitoring') }}</div>
-
-    <button class="sidebar-item" id="tab-logs-btn" data-bs-toggle="tab"
-            data-bs-target="#tab-logs" type="button" role="tab">
-      <i class="fas fa-scroll"></i>{{ _('Audit log') }}
-      <span class="sidebar-badge">{{ logs | length }}</span>
-    </button>
-
-  </nav>
-
-  <!-- Footer -->
-  <div class="sidebar-footer">
-    <a href="{{ url_for('dashboard') }}">
-      <i class="fas fa-table-list"></i>{{ _('My shares') }}
-    </a>
-    <div class="dropdown">
-      <a class="user-avatar" style="background:{{ user_avatar_color }};width:30px;height:30px;font-size:.75rem" role="button"
-         data-bs-toggle="dropdown" aria-expanded="false">{{ user_avatar_letter }}</a>
-      <ul class="dropdown-menu dropdown-menu-end">
-        <li><a class="dropdown-item" href="{{ url_for('profile') }}"><i class="fas fa-user me-2"></i>{{ _('My profile') }}</a></li>
-        <li><hr class="dropdown-divider"></li>
-        <li><a class="dropdown-item text-danger" href="{{ url_for('logout') }}"><i class="fas fa-right-from-bracket me-2"></i>{{ _('Log out') }}</a></li>
-      </ul>
-    </div>
-  </div>
-</aside>
-
-<!-- ── Main content ─────────────────────────────────────────────────────── -->
-<main class="admin-main">
-  <div class="p-4 pb-5">
-
-  {% with messages = get_flashed_messages(with_categories=true) %}
-    {% for cat, msg in messages %}
-      <div class="alert alert-{{ cat }} alert-dismissible fade show py-2" role="alert">
-        {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-      </div>
-    {% endfor %}
-  {% endwith %}
-
-  <div class="tab-content" id="adminTabsContent">
-
-    <!-- ── Onglet Utilisateurs ──────────────────────────────────────────── -->
-    <div class="tab-pane fade" id="tab-users" role="tabpanel">
-      <div class="card shadow-sm">
-        <div class="card-body p-0">
-          <div class="table-responsive">
-            <table class="table table-hover mb-0">
-              <thead class="table-light">
-                <tr>
-                  <th class="ps-4">{{ _('User') }}</th>
-                  <th>{{ _('Type') }}</th>
-                  <th>{{ _('Registered') }}</th>
-                  <th class="text-center">{{ _('Files') }}</th>
-                  <th class="text-center">{{ _('Storage') }}</th>
-                  <th class="text-end pe-4">{{ _('Actions') }}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for u in users %}
-                <tr>
-                  <td class="ps-4 fw-semibold">
-                    {% if u.is_admin %}
-                      <i class="fas fa-crown crown-gold me-1" title="{{ _('Administrator') }}"></i>
-                    {% endif %}
-                    {{ u.username }}
-                    {% if u.id == current_user.id %}
-                      <span class="badge bg-primary ms-1" style="font-size:.7rem">{{ _('you') }}</span>
-                    {% endif %}
-                  </td>
-                  <td>
-                    {% if u.sso_user %}
-                      <span class="badge bg-info text-dark" style="font-size:.7rem"><i class="fas fa-key me-1"></i>SSO</span>
-                    {% else %}
-                      <span class="badge bg-secondary" style="font-size:.7rem"><i class="fas fa-user me-1"></i>Local</span>
-                    {% endif %}
-                  </td>
-                  <td class="text-muted small">{{ u.created_at[:10] if u.created_at else '—' }}</td>
-                  <td class="text-center">
-                    <span class="badge bg-light text-dark border">{{ u.file_count }}</span>
-                  </td>
-                  <td class="text-center">
-                    <span class="badge bg-light text-dark border">{{ u.storage_mb }} Mo</span>
-                  </td>
-                  <td class="text-end pe-4">
-                    {% if u.id != current_user.id %}
-                      <form method="post"
-                            action="{{ url_for('admin_toggle_admin', user_id=u.id) }}"
-                            class="d-inline"
-                            onsubmit="return confirm('{{ _('Change admin rights for') }} {{ u.username }} ?')">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <button class="btn btn-sm {% if u.is_admin %}btn-warning{% else %}btn-outline-secondary{% endif %}"
-                                title="{{ _('Remove admin rights') if u.is_admin else _('Promote to administrator') }}">
-                          <i class="fas fa-crown"></i>
-                        </button>
-                      </form>
-                      {% if not u.sso_user %}
-                      <form method="post"
-                            action="{{ url_for('admin_reset_password', user_id=u.id) }}"
-                            class="d-inline"
-                            onsubmit="return confirm('{{ _('Reset password for') }} {{ u.username }} ? {{ _('A temporary password will be shown.') }}')">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <button class="btn btn-sm btn-outline-warning ms-1" title="{{ _('Reset password') }}">
-                          <i class="fas fa-key"></i>
-                        </button>
-                      </form>
-                      {% endif %}
-                      <form method="post"
-                            action="{{ url_for('admin_delete_user', user_id=u.id) }}"
-                            class="d-inline"
-                            onsubmit="return confirm('{{ _('Delete') }} {{ u.username }} {{ _('and all their files? This action is irreversible.') }}')">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <button class="btn btn-sm btn-outline-danger ms-1" title="{{ _('Delete') }}">
-                          <i class="fas fa-trash"></i>
-                        </button>
-                      </form>
-                    {% else %}
-                      <span class="text-muted small">—</span>
-                    {% endif %}
-                  </td>
-                </tr>
-                {% else %}
-                <tr>
-                  <td colspan="6" class="text-center text-muted py-4">{{ _('No users.') }}</td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
+  <!-- ── Sidebar ─────────────────────────────────────────────────────────── -->
+  <aside class="admin-sidebar">
+    <div class="sidebar-brand">
+      <a href="/">
+        {% if has_logo %}<img src="/logo" height="28" alt="{{ settings.app_name }}">
+        {% else %}<i class="fas fa-shield-halved" style="color:var(--accent)"></i>{% endif %}
+        {{ settings.app_name }}
+      </a>
     </div>
 
-    <!-- ── Onglet Paramètres ─────────────────────────────────────────────── -->
-    <div class="tab-pane fade" id="tab-settings" role="tabpanel">
-      <div class="card shadow-sm">
-        <div class="card-body p-4">
-          <form method="post" action="{{ url_for('admin_save_settings') }}" enctype="multipart/form-data">
-            {{ form.hidden_tag() }}
+    <nav class="sidebar-nav" id="adminTabs" role="tablist">
+      <button class="sidebar-item active" id="tab-analytics-btn" data-bs-toggle="tab" data-bs-target="#tab-analytics" type="button" role="tab">
+        <i class="fas fa-chart-line"></i>{{ _('Dashboard') }}
+      </button>
+      <button class="sidebar-item" id="tab-users-btn" data-bs-toggle="tab" data-bs-target="#tab-users" type="button" role="tab">
+        <i class="fas fa-users"></i>{{ _('Users') }}
+        <span class="sidebar-badge">{{ users | length }}</span>
+      </button>
 
-            <p class="text-uppercase fw-semibold text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em">
-              <i class="fas fa-tag me-1"></i>{{ _('Identity') }}
-            </p>
-            <div class="row g-3 mb-4">
-              <div class="col-md-6">
-                <label class="form-label">{{ form.app_name.label.text }}</label>
-                {{ form.app_name(class="form-control") }}
-              </div>
-              <div class="col-md-6">
-                <label class="form-label">{{ form.contact_email.label.text }}</label>
-                {{ form.contact_email(class="form-control", type="email") }}
-              </div>
-              <div class="col-12">
-                <label class="form-label">{{ form.welcome_banner.label.text }}</label>
-                {{ form.welcome_banner(class="form-control", rows="2", placeholder=_('Message displayed on the home page (leave empty to disable)')) }}
-                <div class="form-text">{{ _('Supports plain text. Leave empty to show no banner.') }}</div>
-              </div>
-            </div>
+      <div class="sidebar-section-label">{{ _('Configuration') }}</div>
+      <button class="sidebar-item" id="tab-settings-btn" data-bs-toggle="tab" data-bs-target="#tab-settings" type="button" role="tab">
+        <i class="fas fa-sliders"></i>{{ _('Settings') }}
+      </button>
+      <button class="sidebar-item" id="tab-sso-btn" data-bs-toggle="tab" data-bs-target="#tab-sso" type="button" role="tab">
+        <i class="fas fa-key"></i>SSO
+        {% if settings.sso_enabled == '1' %}
+          <span class="sidebar-badge" style="background:rgba(25,135,84,.12);color:#198754;border-color:transparent">{{ _('On') }}</span>
+        {% endif %}
+      </button>
+      <button class="sidebar-item" id="tab-s3-btn" data-bs-toggle="tab" data-bs-target="#tab-s3" type="button" role="tab">
+        <i class="fas fa-cloud"></i>{{ _('Storage') }}
+        {% if settings.storage_backend == 's3' %}<span class="sidebar-badge">S3</span>{% endif %}
+      </button>
+      <button class="sidebar-item" id="tab-legal-btn" data-bs-toggle="tab" data-bs-target="#tab-legal" type="button" role="tab">
+        <i class="fas fa-scale-balanced"></i>{{ _('Legal notices / ToS') }}
+      </button>
 
-            <hr class="my-3">
-            <p class="text-uppercase fw-semibold text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em">
-              <i class="fas fa-file me-1"></i>{{ _('Files') }}
-            </p>
-            <div class="row g-3 mb-4">
-              <div class="col-md-4">
-                <label class="form-label">{{ form.max_file_size_value.label.text }}</label>
-                <div class="input-group">
-                  {{ form.max_file_size_value(class="form-control") }}
-                  {{ form.max_file_size_unit(class="form-select", style="max-width:90px") }}
-                </div>
-              </div>
-              <div class="col-md-4">
-                <label class="form-label">{{ form.default_expiry.label.text }}</label>
-                {{ form.default_expiry(class="form-select") }}
-              </div>
-              <div class="col-md-4">
-                <label class="form-label">{{ form.blocked_extensions.label.text }}</label>
-                {{ form.blocked_extensions(class="form-control", placeholder="exe, bat, sh…") }}
-                <div class="form-text">{{ _('Separated by commas.') }}</div>
-              </div>
-            </div>
+      <div class="sidebar-section-label">{{ _('Monitoring') }}</div>
+      <button class="sidebar-item" id="tab-logs-btn" data-bs-toggle="tab" data-bs-target="#tab-logs" type="button" role="tab">
+        <i class="fas fa-scroll"></i>{{ _('Audit log') }}
+        <span class="sidebar-badge">{{ logs | length }}</span>
+      </button>
+    </nav>
 
-            <hr class="my-3">
-            <p class="text-uppercase fw-semibold text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em">
-              <i class="fas fa-gauge me-1"></i>{{ _('Per-user quotas') }}
-            </p>
-            <div class="row g-3 mb-4">
-              <div class="col-md-6">
-                <label class="form-label">{{ form.max_files_per_user.label.text }}</label>
-                <div class="input-group">
-                  {{ form.max_files_per_user(class="form-control") }}
-                  <span class="input-group-text">{{ _('files') }}</span>
-                </div>
-                <div class="form-text">{{ _('0 = no limit.') }}</div>
-              </div>
-              <div class="col-md-6">
-                <label class="form-label">{{ form.max_storage_value.label.text }}</label>
-                <div class="input-group">
-                  {{ form.max_storage_value(class="form-control") }}
-                  {{ form.max_storage_unit(class="form-select", style="max-width:5rem") }}
-                </div>
-                <div class="form-text">{{ _('0 = no limit.') }}</div>
-              </div>
-            </div>
-
-            <hr class="my-3">
-            <p class="text-uppercase fw-semibold text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em">
-              <i class="fas fa-lock me-1"></i>{{ _('Access') }}
-            </p>
-            <div class="mb-4">
-              <div class="form-check form-switch">
-                {{ form.allow_registration(class="form-check-input", role="switch", id="allowReg") }}
-                <label class="form-check-label" for="allowReg">{{ form.allow_registration.label.text }}</label>
-              </div>
-              <div class="form-text">{{ _('If disabled, only admins can create new accounts.') }}</div>
-            </div>
-
-            <hr class="my-3">
-            <p class="text-uppercase fw-semibold text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em">
-              <i class="fas fa-shield-halved me-1"></i>{{ _('End-to-end encryption (E2E)') }}
-            </p>
-            <div class="row g-3 mb-4">
-              <div class="col-md-8">
-                <label class="form-label">{{ form.e2e_mode.label.text }}</label>
-                {{ form.e2e_mode(class="form-select") }}
-                <div class="form-text">
-                  <strong>{{ _('Optional') }}</strong>: {{ _('the toggle is visible, the user decides.') }}
-                  <strong>{{ _('Disabled') }}</strong>: {{ _('the option is hidden (no E2E encryption possible).') }}
-                  <strong>{{ _('Required') }}</strong>: {{ _('encryption is forced and locked for all shares.') }}
-                </div>
-              </div>
-            </div>
-
-            <hr class="my-3">
-            <p class="text-uppercase fw-semibold text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em">
-              <i class="fas fa-scroll me-1"></i>{{ _('Audit log') }}
-            </p>
-            <div class="row g-3 mb-4">
-              <div class="col-md-4">
-                <label class="form-label">{{ form.audit_log_retention_days.label.text }}</label>
-                <div class="input-group">
-                  {{ form.audit_log_retention_days(class="form-control") }}
-                  <span class="input-group-text">{{ _('days') }}</span>
-                </div>
-                <div class="form-text">{{ _('0 = keep indefinitely. Cleanup runs on save and every 24h.') }}</div>
-              </div>
-            </div>
-
-            <hr class="my-3">
-            <p class="text-uppercase fw-semibold text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em">
-              <i class="fas fa-triangle-exclamation me-1"></i>{{ _('Maintenance mode') }}
-            </p>
-            <div class="mb-3">
-              <div class="form-check form-switch">
-                {{ form.maintenance_mode(class="form-check-input", role="switch", id="maintenanceMode") }}
-                <label class="form-check-label" for="maintenanceMode">{{ form.maintenance_mode.label.text }}</label>
-              </div>
-              <div class="form-text">{{ _('Shows a maintenance page to all non-admin users. /login, /logout and SSO routes remain accessible.') }}</div>
-            </div>
-            <div class="row g-3 mb-4">
-              <div class="col-md-8">
-                <label class="form-label">{{ form.maintenance_message.label.text }}</label>
-                {{ form.maintenance_message(class="form-control", rows="2", placeholder=_('The site is temporarily under maintenance…')) }}
-              </div>
-            </div>
-
-            <hr class="my-3">
-            <p class="text-uppercase fw-semibold text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em">
-              <i class="fas fa-shield-halved me-1"></i>{{ _('Security — 2FA') }}
-            </p>
-            <div class="mb-4">
-              <div class="form-check form-switch">
-                {{ form.mfa_required(class="form-check-input", role="switch", id="mfaRequired") }}
-                <label class="form-check-label" for="mfaRequired">{{ form.mfa_required.label.text }}</label>
-              </div>
-              <div class="form-text">{{ _('If enabled, any user without 2FA configured is redirected to their profile to set one up. SSO accounts are exempt (authentication delegated to the identity provider).') }}</div>
-            </div>
-
-            <hr class="my-3">
-            <p class="text-uppercase fw-semibold text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em">
-              <i class="fas fa-user-minus me-1"></i>{{ _('User account management') }}
-            </p>
-            <div class="mb-4">
-              <div class="form-check form-switch">
-                {{ form.allow_account_deletion(class="form-check-input", role="switch", id="allowAccountDeletion") }}
-                <label class="form-check-label" for="allowAccountDeletion">{{ form.allow_account_deletion.label.text }}</label>
-              </div>
-              <div class="form-text">
-                {{ _('If enabled, each user sees an option in their profile to permanently delete their account, files and activity logs (GDPR art. 17 — right to erasure). Disabled by default.') }}
-              </div>
-            </div>
-
-            <hr class="my-3">
-            <p class="text-uppercase fw-semibold text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em">
-              <i class="fas fa-palette me-1"></i>{{ _('Visual identity') }}
-            </p>
-
-            <!-- Logo -->
-            <div class="mb-4">
-              <label class="form-label fw-semibold">{{ _('Application logo') }}</label>
-              {% if has_logo %}
-              <div class="mb-2 d-flex align-items-center gap-3">
-                <img src="/logo?{{ range(9999)|random }}" height="40" alt="{{ _('Current logo') }}" class="rounded border">
-                <div class="form-check">
-                  <input class="form-check-input" type="checkbox" name="remove_logo" id="removeLogo" value="1">
-                  <label class="form-check-label text-danger small" for="removeLogo">
-                    <i class="fas fa-trash me-1"></i>{{ _('Remove logo') }}
-                  </label>
-                </div>
-              </div>
-              {% endif %}
-              <input type="file" class="form-control form-control-sm" name="logo" id="logoInput"
-                     accept="image/png,image/jpeg,image/svg+xml,image/webp" style="max-width:340px">
-              <div class="form-text">{{ _('PNG, JPG, SVG or WebP. Recommended height: 32–48 px.') }}</div>
-            </div>
-
-            <!-- Couleur d'accent -->
-            <div class="mb-4">
-              <label class="form-label fw-semibold">{{ _('Accent color') }}</label>
-              <div class="d-flex flex-wrap gap-2 align-items-center mb-2" id="color-swatches">
-                {% for c in ['#4361ee','#e63946','#f77f00','#ffbe0b','#06d6a0','#2ec4b6','#8338ec','#3a86ff','#212529'] %}
-                <button type="button"
-                        class="color-swatch-btn{% if settings.accent_color == c %} swatch-active{% endif %}"
-                        style="background:{{ c }}" data-color="{{ c }}"
-                        title="{{ c }}"></button>
-                {% endfor %}
-                <!-- Couleur personnalisée -->
-                <label class="color-swatch-btn swatch-custom{% if settings.accent_color not in ['#4361ee','#e63946','#f77f00','#ffbe0b','#06d6a0','#2ec4b6','#8338ec','#3a86ff','#212529'] %} swatch-active{% endif %}"
-                       title="{{ _('Custom color') }}" style="position:relative">
-                  <input type="color" id="customColorPicker"
-                         value="{{ settings.accent_color }}"
-                         style="opacity:0;width:100%;height:100%;position:absolute;top:0;left:0;cursor:pointer;border:0">
-                  <i class="fas fa-plus" style="font-size:.65rem;pointer-events:none"></i>
-                </label>
-              </div>
-              <input type="hidden" name="accent_color" id="accentColorInput"
-                     value="{{ settings.accent_color }}">
-              <div class="form-text">
-                {{ _('Color applied to the navigation bar, buttons and links.') }}
-                <a href="{{ url_for('branding_css') }}" target="_blank" class="ms-1">{{ _('Preview generated CSS') }}</a>
-              </div>
-            </div>
-
-            <button type="submit" class="btn btn-primary">
-              <i class="fas fa-floppy-disk me-2"></i>{{ form.submit.label.text }}
-            </button>
-          </form>
-        </div>
+    <div class="sidebar-footer">
+      <a href="{{ url_for('dashboard') }}"><i class="fas fa-table-list"></i>{{ _('My shares') }}</a>
+      <div class="dropdown">
+        <a class="user-avatar" style="background:{{ user_avatar_color }};width:30px;height:30px;font-size:.75rem"
+           role="button" data-bs-toggle="dropdown" aria-expanded="false">{{ user_avatar_letter }}</a>
+        <ul class="dropdown-menu dropdown-menu-end">
+          <li><a class="dropdown-item" href="{{ url_for('profile') }}"><i class="fas fa-user me-2"></i>{{ _('My profile') }}</a></li>
+          <li><hr class="dropdown-divider"></li>
+          <li><a class="dropdown-item text-danger" href="{{ url_for('logout') }}"><i class="fas fa-right-from-bracket me-2"></i>{{ _('Log out') }}</a></li>
+        </ul>
       </div>
     </div>
+  </aside>
 
-    <!-- ── Onglet Journal d'audit ────────────────────────────────────────── -->
-    <div class="tab-pane fade" id="tab-logs" role="tabpanel">
-      <div class="card shadow-sm">
-        <div class="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2 py-3">
-          <span class="fw-semibold">
-            <i class="fas fa-scroll me-1 text-muted"></i>Derniers {{ logs | length }} événements
-          </span>
-          <div class="d-flex gap-2 align-items-center flex-wrap">
-            <select id="log-filter" class="form-select form-select-sm">
-              <option value="">Toutes les actions</option>
-              <option value="login">login</option>
-              <option value="login_failed">login_failed</option>
-              <option value="logout">logout</option>
-              <option value="register">register</option>
-              <option value="upload">upload</option>
-              <option value="download">download</option>
-              <option value="delete_file">delete_file</option>
-              <option value="drop_upload">drop_upload</option>
-              <option value="admin_delete_user">admin_delete_user</option>
-              <option value="admin_toggle_admin">admin_toggle_admin</option>
-              <option value="admin_settings">admin_settings</option>
-              <option value="cleanup">cleanup</option>
-            </select>
-            <input id="log-search" type="search" class="form-control form-control-sm"
-                   placeholder="Utilisateur / détail…" style="max-width:200px">
+  <!-- ── Main content ────────────────────────────────────────────────────── -->
+  <main class="admin-main">
+    <div class="p-4 pb-5">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for cat, msg in messages %}
+          <div class="alert alert-{{ cat }} alert-dismissible fade show py-2" role="alert">
+            {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
           </div>
-        </div>
-        <div class="card-body p-0">
-          <div class="table-responsive" style="max-height:60vh;overflow-y:auto">
-            <table class="table table-hover table-sm log-table mb-0" id="log-table">
-              <thead class="table-light sticky-top">
-                <tr>
-                  <th class="ps-3">Horodatage</th>
-                  <th>Utilisateur</th>
-                  <th>Action</th>
-                  <th>Cible</th>
-                  <th>Détails</th>
-                  <th class="pe-3">IP</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for log in logs %}
-                <tr class="log-row" data-action="{{ log.action }}"
-                    data-search="{{ (log.username ~ ' ' ~ (log.details or '') ~ ' ' ~ (log.target or '')) | lower }}">
-                  <td class="ps-3 text-muted text-nowrap">
-                    {{ log.timestamp[:19] if log.timestamp else '—' }}
-                  </td>
-                  <td class="fw-semibold">{{ log.username or '—' }}</td>
-                  <td>
-                    {% set badge_map = {
-                      'login':              'bg-success',
-                      'login_failed':       'bg-danger',
-                      'logout':             'bg-secondary',
-                      'register':           'bg-info text-dark',
-                      'upload':             'bg-primary',
-                      'download':           'bg-success',
-                      'delete_file':        'bg-danger',
-                      'drop_upload':        'bg-info text-dark',
-                      'admin_delete_user':  'bg-danger',
-                      'admin_toggle_admin': 'bg-warning text-dark',
-                      'admin_settings':     'bg-warning text-dark',
-                      'sso_login':          'bg-success',
-                      'sso_register':       'bg-info text-dark',
-                      'cleanup':            'bg-secondary',
-                    } %}
-                    <span class="badge badge-action {{ badge_map.get(log.action, 'bg-light text-dark border') }}">
-                      {{ log.action }}
-                    </span>
-                  </td>
-                  <td class="text-muted font-monospace" style="font-size:.78rem;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
-                      title="{{ log.target or '' }}">
-                    {{ log.target or '—' }}
-                  </td>
-                  <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
-                      title="{{ log.details or '' }}">
-                    {{ log.details or '—' }}
-                  </td>
-                  <td class="pe-3 text-muted font-monospace" style="font-size:.78rem">
-                    {{ log.ip or '—' }}
-                  </td>
-                </tr>
-                {% else %}
-                <tr>
-                  <td colspan="6" class="text-center text-muted py-4">Aucun événement enregistré.</td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        {% endfor %}
+      {% endwith %}
+
+      <div class="tab-content" id="adminTabsContent">
+        {% include "admin/tab_analytics.html" %}
+        {% include "admin/tab_users.html" %}
+        {% include "admin/tab_settings.html" %}
+        {% include "admin/tab_logs.html" %}
+        {% include "admin/tab_sso.html" %}
+        {% include "admin/tab_s3.html" %}
+        {% include "admin/tab_legal.html" %}
       </div>
     </div>
+  </main>
 
-    <!-- ── Onglet SSO ─────────────────────────────────────────────────────── -->
-    <div class="tab-pane fade" id="tab-sso" role="tabpanel">
-      <div class="card shadow-sm">
-        <div class="card-body p-4">
-          <form method="post" action="{{ url_for('admin_save_sso') }}">
-            {{ sso_form.hidden_tag() }}
+</div>
+{% endblock %}
 
-            <p class="text-uppercase fw-semibold text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em">
-              <i class="fas fa-key me-1"></i>OpenID Connect (OIDC)
-            </p>
-            <p class="text-muted small mb-3">
-              Compatible avec Keycloak, Authentik, Authelia, Google Workspace, Azure AD, etc.
-              L'URL de découverte se termine généralement par <code>/.well-known/openid-configuration</code>.
-            </p>
-
-            <div class="mb-2">
-              <div class="form-check form-switch">
-                {{ sso_form.sso_enabled(class="form-check-input", role="switch", id="ssoEnabled") }}
-                <label class="form-check-label" for="ssoEnabled">{{ sso_form.sso_enabled.label.text }}</label>
-              </div>
-            </div>
-
-            <div class="mb-3 ms-4 ps-1" id="ssoForceWrapper">
-              <div class="form-check form-switch">
-                {{ sso_form.sso_force(class="form-check-input", role="switch", id="ssoForce") }}
-                <label class="form-check-label" for="ssoForce">{{ sso_form.sso_force.label.text }}</label>
-              </div>
-              <div class="form-text text-warning-emphasis">
-                <i class="fas fa-triangle-exclamation me-1"></i>
-                Quand activé, <code>/login</code> redirige directement vers le fournisseur SSO.
-                Les liens de partage et de dépôt restent accessibles sans compte.
-                Le premier compte créé via SSO obtient automatiquement les droits administrateur.
-              </div>
-            </div>
-
-            <hr class="my-3">
-
-            <div class="row g-3 mb-3">
-              <div class="col-md-4">
-                <label class="form-label">{{ sso_form.sso_provider_name.label.text }}</label>
-                {{ sso_form.sso_provider_name(class="form-control", placeholder="Mon organisation") }}
-                <div class="form-text">Texte affiché sur le bouton de connexion.</div>
-              </div>
-              <div class="col-md-8">
-                <label class="form-label">{{ sso_form.sso_discovery_url.label.text }}</label>
-                {{ sso_form.sso_discovery_url(class="form-control", placeholder="https://keycloak.example.com/realms/myrealm/.well-known/openid-configuration") }}
-              </div>
-            </div>
-
-            <div class="row g-3 mb-4">
-              <div class="col-md-6">
-                <label class="form-label">{{ sso_form.sso_client_id.label.text }}</label>
-                {{ sso_form.sso_client_id(class="form-control") }}
-              </div>
-              <div class="col-md-6">
-                <label class="form-label">{{ sso_form.sso_client_secret.label.text }}</label>
-                {{ sso_form.sso_client_secret(class="form-control", placeholder="••••••••") }}
-              </div>
-            </div>
-
-            <button type="submit" class="btn btn-primary">
-              <i class="fas fa-floppy-disk me-2"></i>{{ sso_form.submit.label.text }}
-            </button>
-          </form>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── Onglet Stockage S3 ────────────────────────────────────────────── -->
-    <div class="tab-pane fade" id="tab-s3" role="tabpanel">
-      <div class="card shadow-sm">
-        <div class="card-body p-4">
-          <form method="post" action="{{ url_for('admin_save_s3') }}">
-            {{ s3_form.hidden_tag() }}
-
-            <p class="text-uppercase fw-semibold text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em">
-              <i class="fas fa-cloud me-1"></i>Backend de stockage des fichiers
-            </p>
-            <p class="text-muted small mb-3">
-              Par défaut, les fichiers sont stockés localement (chiffrés). En activant S3, tous les
-              nouveaux fichiers seront stockés dans le bucket configuré. Les fichiers existants ne sont
-              <strong>pas migrés automatiquement</strong>.
-              Compatible AWS S3, MinIO, Cloudflare R2, et tout service compatible S3.
-            </p>
-
-            <div class="mb-3">
-              <label class="form-label fw-semibold">{{ s3_form.storage_backend.label.text }}</label>
-              {{ s3_form.storage_backend(class="form-select", id="storageBackend") }}
-            </div>
-
-            <div id="s3Fields" {% if settings.storage_backend != 's3' %}style="display:none"{% endif %}>
-              <hr class="my-3">
-              <p class="text-uppercase fw-semibold text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em">
-                Configuration S3
-              </p>
-
-              <div class="row g-3 mb-3">
-                <div class="col-md-6">
-                  <label class="form-label">{{ s3_form.s3_bucket.label.text }}</label>
-                  {{ s3_form.s3_bucket(class="form-control", placeholder="mon-bucket") }}
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">{{ s3_form.s3_region.label.text }}</label>
-                  {{ s3_form.s3_region(class="form-control", placeholder="eu-west-3") }}
-                  <div class="form-text">Laissez vide si non applicable (ex: MinIO, R2).</div>
-                </div>
-              </div>
-
-              <div class="mb-3">
-                <label class="form-label">{{ s3_form.s3_endpoint_url.label.text }}</label>
-                {{ s3_form.s3_endpoint_url(class="form-control", placeholder="https://s3.example.com  (vide = AWS S3 standard)") }}
-                <div class="form-text">Pour MinIO, Cloudflare R2 ou tout S3 compatible. Laisser vide pour AWS.</div>
-              </div>
-
-              <div class="row g-3 mb-3">
-                <div class="col-md-6">
-                  <label class="form-label">{{ s3_form.s3_access_key.label.text }}</label>
-                  {{ s3_form.s3_access_key(class="form-control", autocomplete="off") }}
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">{{ s3_form.s3_secret_key.label.text }}</label>
-                  {{ s3_form.s3_secret_key(class="form-control", placeholder="••••••••", autocomplete="new-password") }}
-                </div>
-              </div>
-
-              <div class="mb-3">
-                <label class="form-label">{{ s3_form.s3_prefix.label.text }}</label>
-                {{ s3_form.s3_prefix(class="form-control", placeholder="securefiles/uploads") }}
-                <div class="form-text">Optionnel — préfixe appliqué à toutes les clés d'objet dans le bucket.</div>
-              </div>
-
-              {% if settings.storage_backend == 's3' %}
-              <div class="alert alert-info d-flex align-items-center gap-2 py-2 mb-3">
-                <i class="fas fa-circle-info"></i>
-                <span>Le backend S3 est actuellement <strong>actif</strong>. Les nouveaux fichiers sont stockés dans le bucket <code>{{ settings.s3_bucket }}</code>.</span>
-              </div>
-              {% endif %}
-            </div>
-
-            <div class="d-flex align-items-center gap-3 mt-2 flex-wrap">
-              <button type="submit" class="btn btn-primary">
-                <i class="fas fa-floppy-disk me-2"></i>{{ s3_form.submit.label.text }}
-              </button>
-              <button type="button" class="btn btn-outline-secondary" id="btnTestS3">
-                <i class="fas fa-plug me-2"></i>Tester la connexion
-              </button>
-              <span id="s3TestResult" style="display:none" class="small fw-semibold"></span>
-            </div>
-          </form>
-        </div>
-      </div>
-
-      <!-- ── Statut ClamAV ─────────────────────────────────────────────────── -->
-      <div class="card shadow-sm mt-3">
-        <div class="card-body p-4">
-          <p class="text-uppercase fw-semibold text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em">
-            <i class="fas fa-shield-virus me-1"></i>Antivirus ClamAV
-          </p>
-          {% if clamav_active %}
-          <div class="d-flex align-items-center gap-2 text-success">
-            <i class="fas fa-circle-check"></i>
-            <span>ClamAV actif — tous les fichiers sont analysés à l'upload.</span>
-          </div>
-          {% else %}
-          <div class="d-flex align-items-center gap-2 text-muted">
-            <i class="fas fa-circle-xmark"></i>
-            <span>ClamAV non disponible — les fichiers ne sont pas analysés.
-              Pour l'activer, décommentez le service <code>clamav</code> dans <code>docker-compose.yml</code>.</span>
-          </div>
-          {% endif %}
-        </div>
-      </div>
-    </div>
-
-    <!-- ── Onglet Mentions légales / CGU ──────────────────────────────────── -->
-    <div class="tab-pane fade" id="tab-legal" role="tabpanel">
-      <div class="card shadow-sm">
-        <div class="card-body p-4">
-          <form method="post" action="{{ url_for('admin_save_legal') }}">
-            {{ legal_form.hidden_tag() }}
-
-            <p class="text-uppercase fw-semibold text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em">
-              <i class="fas fa-scale-balanced me-1"></i>Mentions légales &amp; CGU
-            </p>
-            <p class="text-muted small mb-4">
-              Le contenu est rédigé en <strong>Markdown</strong> et converti en HTML à l'affichage.<br>
-              Titres : <code>## Titre</code>, <code>### Sous-titre</code> —
-              Gras : <code>**texte**</code> — Italique : <code>*texte*</code> —
-              Lien : <code>[texte](url)</code> — Liste : ligne commençant par <code>-</code><br>
-              Les variables <code>{app_name}</code>, <code>{contact_email}</code> et
-              <code>{date}</code> (CGU uniquement) sont remplacées automatiquement.
-            </p>
-
-            <div class="mb-4">
-              <label class="form-label fw-semibold">
-                <i class="fas fa-gavel me-1"></i>{{ legal_form.legal_mentions.label.text }}
-              </label>
-              <div class="mb-1 d-flex gap-2">
-                <a href="{{ url_for('mentions_legales') }}" target="_blank" class="btn btn-sm btn-outline-secondary">
-                  <i class="fas fa-eye me-1"></i>Prévisualiser
-                </a>
-              </div>
-              {{ legal_form.legal_mentions(class="form-control font-monospace", rows=20,
-                 style="font-size:.82rem") }}
-            </div>
-
-            <div class="mb-4">
-              <label class="form-label fw-semibold">
-                <i class="fas fa-file-contract me-1"></i>{{ legal_form.terms_of_use.label.text }}
-              </label>
-              <div class="mb-1 d-flex gap-2">
-                <a href="{{ url_for('cgu') }}" target="_blank" class="btn btn-sm btn-outline-secondary">
-                  <i class="fas fa-eye me-1"></i>Prévisualiser
-                </a>
-              </div>
-              {{ legal_form.terms_of_use(class="form-control font-monospace", rows=20,
-                 style="font-size:.82rem") }}
-            </div>
-
-            <button type="submit" class="btn btn-primary">
-              <i class="fas fa-floppy-disk me-2"></i>{{ legal_form.submit.label.text }}
-            </button>
-          </form>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── Onglet Tableau de bord ─────────────────────────────────────────── -->
-    <div class="tab-pane fade show active" id="tab-analytics" role="tabpanel">
-
-      <!-- KPI cards -->
-      <div class="row g-3 mb-4">
-        {% set kpi = stats.kpi %}
-        <div class="col-6 col-lg">
-          <div class="card h-100 text-center shadow-sm">
-            <div class="card-body py-3">
-              <div class="text-primary mb-1"><i class="fas fa-users fa-lg"></i></div>
-              <div class="fs-3 fw-bold">{{ kpi.total_users }}</div>
-              <div class="text-muted small">Comptes</div>
-            </div>
-          </div>
-        </div>
-        <div class="col-6 col-lg">
-          <div class="card h-100 text-center shadow-sm">
-            <div class="card-body py-3">
-              <div class="text-success mb-1"><i class="fas fa-file fa-lg"></i></div>
-              <div class="fs-3 fw-bold">{{ kpi.active_files }}</div>
-              <div class="text-muted small">Fichiers actifs</div>
-            </div>
-          </div>
-        </div>
-        <div class="col-6 col-lg">
-          <div class="card h-100 text-center shadow-sm">
-            <div class="card-body py-3">
-              <div class="text-info mb-1"><i class="fas fa-upload fa-lg"></i></div>
-              <div class="fs-3 fw-bold">{{ kpi.total_uploads }}</div>
-              <div class="text-muted small">Envois totaux</div>
-            </div>
-          </div>
-        </div>
-        <div class="col-6 col-lg">
-          <div class="card h-100 text-center shadow-sm">
-            <div class="card-body py-3">
-              <div class="text-warning mb-1"><i class="fas fa-download fa-lg"></i></div>
-              <div class="fs-3 fw-bold">{{ kpi.total_downloads }}</div>
-              <div class="text-muted small">Téléchargements</div>
-            </div>
-          </div>
-        </div>
-        <div class="col-6 col-lg">
-          <div class="card h-100 text-center shadow-sm">
-            <div class="card-body py-3">
-              <div class="text-danger mb-1"><i class="fas fa-hard-drive fa-lg"></i></div>
-              <div class="fs-3 fw-bold" id="kpi-storage"></div>
-              <div class="text-muted small">Stockage utilisé</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Activité 30 jours -->
-      <div class="card shadow-sm mb-4">
-        <div class="card-body p-4">
-          <p class="fw-semibold mb-3"><i class="fas fa-chart-line me-2 text-primary"></i>Activité des 30 derniers jours</p>
-          <canvas id="chartDaily" height="90"></canvas>
-        </div>
-      </div>
-
-      <!-- Activité mensuelle + Répartition actions -->
-      <div class="row g-3 mb-4">
-        <div class="col-lg-8">
-          <div class="card shadow-sm h-100">
-            <div class="card-body p-4">
-              <p class="fw-semibold mb-3"><i class="fas fa-chart-bar me-2 text-success"></i>Activité mensuelle — 12 mois</p>
-              <canvas id="chartMonthly" height="130"></canvas>
-            </div>
-          </div>
-        </div>
-        <div class="col-lg-4">
-          <div class="card shadow-sm h-100">
-            <div class="card-body p-4">
-              <p class="fw-semibold mb-3"><i class="fas fa-chart-pie me-2 text-info"></i>Répartition des actions</p>
-              <canvas id="chartActions"></canvas>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Nouveaux comptes par mois -->
-      <div class="card shadow-sm mb-4">
-        <div class="card-body p-4">
-          <p class="fw-semibold mb-3"><i class="fas fa-user-plus me-2 text-warning"></i>Nouveaux comptes — 12 mois</p>
-          <canvas id="chartUsers" height="70"></canvas>
-        </div>
-      </div>
-
-    </div><!-- /tab-analytics -->
-
-  </div><!-- /tab-content -->
-  </div><!-- /p-4 -->
-</main>
-
-</div><!-- /admin-layout -->
-
-<script nonce="{{ csp_nonce }}" src="/static/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
-<script nonce="{{ csp_nonce }}">
-  // Sync sidebar active state with Bootstrap tab events
-  document.querySelectorAll('.sidebar-item[data-bs-toggle="tab"]').forEach(btn => {
-    btn.addEventListener('shown.bs.tab', () => {
-      document.querySelectorAll('.sidebar-item').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-    });
-  });
-
-  // Ouvre l'onglet correct selon le hash d'URL
-  const hashTabMap = { '#users': 'tab-users-btn', '#settings': 'tab-settings-btn', '#logs': 'tab-logs-btn', '#sso': 'tab-sso-btn', '#s3': 'tab-s3-btn', '#legal': 'tab-legal-btn', '#analytics': 'tab-analytics-btn' };
-  const targetBtn  = hashTabMap[window.location.hash];
-  if (targetBtn) bootstrap.Tab.getOrCreateInstance(document.getElementById(targetBtn)).show();
-
-  // Afficher/masquer le toggle "Forcer SSO" selon l'état du switch "Activer SSO"
-  const ssoEnabledSwitch = document.getElementById('ssoEnabled');
-  const ssoForceWrapper  = document.getElementById('ssoForceWrapper');
-  const ssoForceSwitch   = document.getElementById('ssoForce');
-  function updateSsoForceVisibility() {
-    if (ssoEnabledSwitch && ssoForceWrapper) {
-      ssoForceWrapper.style.display = ssoEnabledSwitch.checked ? '' : 'none';
-      if (!ssoEnabledSwitch.checked && ssoForceSwitch) ssoForceSwitch.checked = false;
-    }
-  }
-  if (ssoEnabledSwitch) {
-    updateSsoForceVisibility();
-    ssoEnabledSwitch.addEventListener('change', updateSsoForceVisibility);
-  }
-
-  // Afficher/masquer les champs S3 selon le backend sélectionné
-  const storageBackendSelect = document.getElementById('storageBackend');
-  const s3Fields             = document.getElementById('s3Fields');
-  function updateS3Fields() {
-    if (storageBackendSelect && s3Fields) {
-      s3Fields.style.display = storageBackendSelect.value === 's3' ? '' : 'none';
-    }
-  }
-  if (storageBackendSelect) {
-    storageBackendSelect.addEventListener('change', updateS3Fields);
-  }
-
-  // Bouton "Tester la connexion S3"
-  const btnTestS3    = document.getElementById('btnTestS3');
-  const s3TestResult = document.getElementById('s3TestResult');
-  if (btnTestS3) {
-    btnTestS3.addEventListener('click', async () => {
-      const form = btnTestS3.closest('form');
-      const payload = {
-        s3_bucket:       form.querySelector('[name="s3_bucket"]')?.value.trim()       || '',
-        s3_region:       form.querySelector('[name="s3_region"]')?.value.trim()       || '',
-        s3_endpoint_url: form.querySelector('[name="s3_endpoint_url"]')?.value.trim() || '',
-        s3_access_key:   form.querySelector('[name="s3_access_key"]')?.value.trim()   || '',
-        s3_secret_key:   form.querySelector('[name="s3_secret_key"]')?.value.trim()   || '',
-      };
-      btnTestS3.disabled = true;
-      btnTestS3.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Test…';
-      s3TestResult.style.display = 'none';
-      try {
-        const resp = await fetch('{{ url_for("admin_test_s3") }}', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': document.querySelector('input[name="csrf_token"]')?.value || '',
-          },
-          body: JSON.stringify(payload),
-        });
-        const data = await resp.json();
-        s3TestResult.textContent = data.message;
-        s3TestResult.className   = 'small fw-semibold ' + (data.ok ? 'text-success' : 'text-danger');
-        s3TestResult.style.display = '';
-      } catch (e) {
-        s3TestResult.textContent = 'Erreur réseau.';
-        s3TestResult.className   = 'small fw-semibold text-danger';
-        s3TestResult.style.display = '';
-      } finally {
-        btnTestS3.disabled = false;
-        btnTestS3.innerHTML = '<i class="fas fa-plug me-2"></i>Tester la connexion';
-      }
-    });
-  }
-
-  // Filtre côté client pour le journal d'audit
-  const filterSel  = document.getElementById('log-filter');
-  const searchInput = document.getElementById('log-search');
-
-  function filterLogs() {
-    const action  = filterSel.value.toLowerCase();
-    const keyword = searchInput.value.toLowerCase().trim();
-    document.querySelectorAll('#log-table .log-row').forEach(row => {
-      const matchAction  = !action  || row.dataset.action  === action;
-      const matchKeyword = !keyword || row.dataset.search.includes(keyword);
-      row.style.display  = (matchAction && matchKeyword) ? '' : 'none';
-    });
-  }
-
-  filterSel.addEventListener('change', filterLogs);
-  searchInput.addEventListener('input',  filterLogs);
-
-  // ── Color picker ───────────────────────────────────────────────────────────
-  const accentInput   = document.getElementById('accentColorInput');
-  const customPicker  = document.getElementById('customColorPicker');
-  const customLabel   = document.querySelector('.swatch-custom');
-  const presetSwatches = document.querySelectorAll('.color-swatch-btn:not(.swatch-custom)');
-
-  function setActive(color) {
-    accentInput.value = color;
-    presetSwatches.forEach(s => s.classList.toggle('swatch-active', s.dataset.color === color));
-    const isPreset = [...presetSwatches].some(s => s.dataset.color === color);
-    customLabel.classList.toggle('swatch-active', !isPreset);
-    if (!isPreset) {
-      customLabel.style.background = color;
-      customLabel.querySelector('i').style.display = 'none';
-    } else {
-      customLabel.style.background = '';
-      customLabel.querySelector('i').style.display = '';
-    }
-  }
-
-  presetSwatches.forEach(s => s.addEventListener('click', () => setActive(s.dataset.color)));
-  customPicker.addEventListener('input',  e => setActive(e.target.value));
-  customPicker.addEventListener('change', e => setActive(e.target.value));
-</script>
-
-<style nonce="{{ csp_nonce }}">
-.color-swatch-btn {
-  width: 32px; height: 32px; border-radius: 50%;
-  border: 2px solid transparent; cursor: pointer;
-  transition: transform .12s, box-shadow .12s;
-  display: flex; align-items: center; justify-content: center;
-}
-.color-swatch-btn:hover { transform: scale(1.15); }
-.color-swatch-btn.swatch-active {
-  box-shadow: 0 0 0 3px rgba(255,255,255,.9), 0 0 0 5px #6c757d;
-}
-.swatch-custom {
-  background: transparent;
-  border: 2px dashed #adb5bd;
-  color: #6c757d;
-  overflow: hidden;
-}
-.swatch-custom.swatch-active { border-style: solid; }
-</style>
-
-<!-- Chart.js -->
+{% block scripts %}
+<script nonce="{{ csp_nonce }}">window.ADMIN_S3_TEST_URL = '{{ url_for("admin_test_s3") }}';</script>
+<script nonce="{{ csp_nonce }}" src="/static/js/admin.js"></script>
 <script nonce="{{ csp_nonce }}" src="/static/vendor/chartjs/chart.umd.min.js"></script>
 <script nonce="{{ csp_nonce }}">
 (function () {
   const S = {{ stats | tojson }};
-
-  // ── Helper stockage ──────────────────────────────────────────────────────
-  function fmtBytes(b) {
-    if (b >= 1073741824) return (b / 1073741824).toFixed(2) + ' Go';
-    if (b >= 1048576)    return (b / 1048576).toFixed(1) + ' Mo';
-    if (b >= 1024)       return (b / 1024).toFixed(0) + ' Ko';
-    return b + ' o';
-  }
-  document.getElementById('kpi-storage').textContent = fmtBytes(S.kpi.storage_bytes);
-
-  // ── Palette ──────────────────────────────────────────────────────────────
-  const C = {
-    blue:   'rgba(67,97,238,1)',
-    blueA:  'rgba(67,97,238,0.15)',
-    green:  'rgba(46,196,182,1)',
-    greenA: 'rgba(46,196,182,0.15)',
-    warn:   'rgba(247,127,0,1)',
-    warnA:  'rgba(247,127,0,0.15)',
-    pie: [
-      '#4361ee','#2ec4b6','#f77f00','#e63946','#8338ec',
-      '#3a86ff','#fb5607','#06d6a0','#ffbe0b','#ef476f'
-    ],
-  };
-  const isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+  const isDark    = document.documentElement.getAttribute('data-bs-theme') === 'dark';
   const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.07)';
   const tickColor = isDark ? '#adb5bd' : '#6c757d';
+  const C = {
+    blue: 'rgba(67,97,238,1)',   blueA:  'rgba(67,97,238,0.15)',
+    green:'rgba(46,196,182,1)',  greenA: 'rgba(46,196,182,0.15)',
+    warn: 'rgba(247,127,0,1)',
+    pie:  ['#4361ee','#2ec4b6','#f77f00','#e63946','#8338ec','#3a86ff','#fb5607','#06d6a0','#ffbe0b','#ef476f'],
+  };
   const baseOpts = {
     responsive: true,
     plugins: { legend: { labels: { color: tickColor } } },
@@ -1144,82 +125,51 @@
     },
   };
 
-  // Initialise les graphes seulement quand l'onglet devient visible
+  function fmtBytes(b) {
+    if (b >= 1073741824) return (b / 1073741824).toFixed(2) + ' Go';
+    if (b >= 1048576)    return (b / 1048576).toFixed(1) + ' Mo';
+    if (b >= 1024)       return (b / 1024).toFixed(0) + ' Ko';
+    return b + ' o';
+  }
+  document.getElementById('kpi-storage').textContent = fmtBytes(S.kpi.storage_bytes);
+
   let chartsBuilt = false;
   document.getElementById('tab-analytics-btn').addEventListener('shown.bs.tab', function () {
     if (chartsBuilt) return;
     chartsBuilt = true;
-
-    // ── Ligne : activité 30 jours ──────────────────────────────────────────
     new Chart(document.getElementById('chartDaily'), {
       type: 'line',
-      data: {
-        labels: S.daily.labels,
-        datasets: [
-          { label: 'Envois',            data: S.daily.uploads,
-            borderColor: C.blue,  backgroundColor: C.blueA,  fill: true, tension: 0.3, pointRadius: 3 },
-          { label: 'Téléchargements',   data: S.daily.downloads,
-            borderColor: C.green, backgroundColor: C.greenA, fill: true, tension: 0.3, pointRadius: 3 },
-        ],
-      },
+      data: { labels: S.daily.labels, datasets: [
+        { label: 'Envois',          data: S.daily.uploads,   borderColor: C.blue,  backgroundColor: C.blueA,  fill: true, tension: 0.3, pointRadius: 3 },
+        { label: 'Téléchargements', data: S.daily.downloads, borderColor: C.green, backgroundColor: C.greenA, fill: true, tension: 0.3, pointRadius: 3 },
+      ]},
       options: { ...baseOpts },
     });
-
-    // ── Barres groupées : mensuel 12 mois ─────────────────────────────────
     new Chart(document.getElementById('chartMonthly'), {
       type: 'bar',
-      data: {
-        labels: S.monthly.labels,
-        datasets: [
-          { label: 'Envois',          data: S.monthly.uploads,
-            backgroundColor: C.blue,  borderRadius: 4 },
-          { label: 'Téléchargements', data: S.monthly.downloads,
-            backgroundColor: C.green, borderRadius: 4 },
-        ],
-      },
+      data: { labels: S.monthly.labels, datasets: [
+        { label: 'Envois',          data: S.monthly.uploads,   backgroundColor: C.blue,  borderRadius: 4 },
+        { label: 'Téléchargements', data: S.monthly.downloads, backgroundColor: C.green, borderRadius: 4 },
+      ]},
       options: { ...baseOpts },
     });
-
-    // ── Donut : répartition actions ───────────────────────────────────────
     new Chart(document.getElementById('chartActions'), {
       type: 'doughnut',
-      data: {
-        labels: S.actions.labels,
-        datasets: [{ data: S.actions.counts, backgroundColor: C.pie, hoverOffset: 6 }],
-      },
-      options: {
-        responsive: true,
-        plugins: {
-          legend: { position: 'bottom', labels: { color: tickColor, padding: 10, boxWidth: 12 } },
-        },
-      },
+      data: { labels: S.actions.labels, datasets: [{ data: S.actions.counts, backgroundColor: C.pie, hoverOffset: 6 }] },
+      options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { color: tickColor, padding: 10, boxWidth: 12 } } } },
     });
-
-    // ── Barres : nouveaux comptes par mois ────────────────────────────────
     new Chart(document.getElementById('chartUsers'), {
       type: 'bar',
-      data: {
-        labels: S.monthly.labels,
-        datasets: [
-          { label: 'Nouveaux comptes', data: S.monthly.users,
-            backgroundColor: C.warn, borderRadius: 4 },
-        ],
-      },
-      options: {
-        ...baseOpts,
-        scales: {
-          ...baseOpts.scales,
-          y: { ...baseOpts.scales.y, ticks: { ...baseOpts.scales.y.ticks, precision: 0 } },
-        },
-      },
+      data: { labels: S.monthly.labels, datasets: [
+        { label: 'Nouveaux comptes', data: S.monthly.users, backgroundColor: C.warn, borderRadius: 4 },
+      ]},
+      options: { ...baseOpts, scales: { ...baseOpts.scales, y: { ...baseOpts.scales.y, ticks: { ...baseOpts.scales.y.ticks, precision: 0 } } } },
     });
   });
 
-  // Analytics tab is now the default — init charts immediately if no other hash
   if (!window.location.hash || window.location.hash === '#analytics') {
     document.getElementById('tab-analytics-btn').dispatchEvent(new Event('shown.bs.tab'));
   }
 })();
 </script>
-</body>
-</html>
+{% endblock %}

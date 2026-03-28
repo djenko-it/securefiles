@@ -1,0 +1,104 @@
+<div class="tab-pane fade" id="tab-s3" role="tabpanel">
+  <div class="card shadow-sm">
+    <div class="card-body p-4">
+      <form method="post" action="{{ url_for('admin_save_s3') }}">
+        {{ s3_form.hidden_tag() }}
+
+        <p class="text-uppercase fw-semibold text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em">
+          <i class="fas fa-cloud me-1"></i>Backend de stockage des fichiers
+        </p>
+        <p class="text-muted small mb-3">
+          Par défaut, les fichiers sont stockés localement (chiffrés). En activant S3, tous les
+          nouveaux fichiers seront stockés dans le bucket configuré. Les fichiers existants ne sont
+          <strong>pas migrés automatiquement</strong>.
+          Compatible AWS S3, MinIO, Cloudflare R2, et tout service compatible S3.
+        </p>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">{{ s3_form.storage_backend.label.text }}</label>
+          {{ s3_form.storage_backend(class="form-select", id="storageBackend") }}
+        </div>
+
+        <div id="s3Fields" {% if settings.storage_backend != 's3' %}style="display:none"{% endif %}>
+          <hr class="my-3">
+          <p class="text-uppercase fw-semibold text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em">
+            Configuration S3
+          </p>
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">{{ s3_form.s3_bucket.label.text }}</label>
+              {{ s3_form.s3_bucket(class="form-control", placeholder="mon-bucket") }}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">{{ s3_form.s3_region.label.text }}</label>
+              {{ s3_form.s3_region(class="form-control", placeholder="eu-west-3") }}
+              <div class="form-text">Laissez vide si non applicable (ex: MinIO, R2).</div>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">{{ s3_form.s3_endpoint_url.label.text }}</label>
+            {{ s3_form.s3_endpoint_url(class="form-control", placeholder="https://s3.example.com  (vide = AWS S3 standard)") }}
+            <div class="form-text">Pour MinIO, Cloudflare R2 ou tout S3 compatible. Laisser vide pour AWS.</div>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">{{ s3_form.s3_access_key.label.text }}</label>
+              {{ s3_form.s3_access_key(class="form-control", autocomplete="off") }}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">{{ s3_form.s3_secret_key.label.text }}</label>
+              {{ s3_form.s3_secret_key(class="form-control", placeholder="••••••••", autocomplete="new-password") }}
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">{{ s3_form.s3_prefix.label.text }}</label>
+            {{ s3_form.s3_prefix(class="form-control", placeholder="securefiles/uploads") }}
+            <div class="form-text">Optionnel — préfixe appliqué à toutes les clés d'objet dans le bucket.</div>
+          </div>
+
+          {% if settings.storage_backend == 's3' %}
+          <div class="alert alert-info d-flex align-items-center gap-2 py-2 mb-3">
+            <i class="fas fa-circle-info"></i>
+            <span>Le backend S3 est actuellement <strong>actif</strong>. Les nouveaux fichiers sont stockés dans le bucket <code>{{ settings.s3_bucket }}</code>.</span>
+          </div>
+          {% endif %}
+        </div>
+
+        <div class="d-flex align-items-center gap-3 mt-2 flex-wrap">
+          <button type="submit" class="btn btn-primary">
+            <i class="fas fa-floppy-disk me-2"></i>{{ s3_form.submit.label.text }}
+          </button>
+          <button type="button" class="btn btn-outline-secondary" id="btnTestS3">
+            <i class="fas fa-plug me-2"></i>Tester la connexion
+          </button>
+          <span id="s3TestResult" style="display:none" class="small fw-semibold"></span>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Statut ClamAV -->
+  <div class="card shadow-sm mt-3">
+    <div class="card-body p-4">
+      <p class="text-uppercase fw-semibold text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em">
+        <i class="fas fa-shield-virus me-1"></i>Antivirus ClamAV
+      </p>
+      {% if clamav_ok %}
+      <div class="d-flex align-items-center gap-2 text-success">
+        <i class="fas fa-circle-check"></i>
+        <span>ClamAV actif — tous les fichiers sont analysés à l'upload.</span>
+      </div>
+      {% else %}
+      <div class="d-flex align-items-center gap-2 text-muted">
+        <i class="fas fa-circle-xmark"></i>
+        <span>ClamAV non disponible — les fichiers ne sont pas analysés.
+          Pour l'activer, décommentez le service <code>clamav</code> dans <code>docker-compose.yml</code>.</span>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>

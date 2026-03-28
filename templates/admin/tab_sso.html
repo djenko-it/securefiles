@@ -1,0 +1,66 @@
+<div class="tab-pane fade" id="tab-sso" role="tabpanel">
+  <div class="card shadow-sm">
+    <div class="card-body p-4">
+      <form method="post" action="{{ url_for('admin_save_sso') }}">
+        {{ sso_form.hidden_tag() }}
+
+        <p class="text-uppercase fw-semibold text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em">
+          <i class="fas fa-key me-1"></i>OpenID Connect (OIDC)
+        </p>
+        <p class="text-muted small mb-3">
+          Compatible avec Keycloak, Authentik, Authelia, Google Workspace, Azure AD, etc.
+          L'URL de découverte se termine généralement par <code>/.well-known/openid-configuration</code>.
+        </p>
+
+        <div class="mb-2">
+          <div class="form-check form-switch">
+            {{ sso_form.sso_enabled(class="form-check-input", role="switch", id="ssoEnabled") }}
+            <label class="form-check-label" for="ssoEnabled">{{ sso_form.sso_enabled.label.text }}</label>
+          </div>
+        </div>
+
+        <div class="mb-3 ms-4 ps-1" id="ssoForceWrapper">
+          <div class="form-check form-switch">
+            {{ sso_form.sso_force(class="form-check-input", role="switch", id="ssoForce") }}
+            <label class="form-check-label" for="ssoForce">{{ sso_form.sso_force.label.text }}</label>
+          </div>
+          <div class="form-text text-warning-emphasis">
+            <i class="fas fa-triangle-exclamation me-1"></i>
+            Quand activé, <code>/login</code> redirige directement vers le fournisseur SSO.
+            Les liens de partage et de dépôt restent accessibles sans compte.
+            Le premier compte créé via SSO obtient automatiquement les droits administrateur.
+          </div>
+        </div>
+
+        <hr class="my-3">
+
+        <div class="row g-3 mb-3">
+          <div class="col-md-4">
+            <label class="form-label">{{ sso_form.sso_provider_name.label.text }}</label>
+            {{ sso_form.sso_provider_name(class="form-control", placeholder="Mon organisation") }}
+            <div class="form-text">Texte affiché sur le bouton de connexion.</div>
+          </div>
+          <div class="col-md-8">
+            <label class="form-label">{{ sso_form.sso_discovery_url.label.text }}</label>
+            {{ sso_form.sso_discovery_url(class="form-control", placeholder="https://keycloak.example.com/realms/myrealm/.well-known/openid-configuration") }}
+          </div>
+        </div>
+
+        <div class="row g-3 mb-4">
+          <div class="col-md-6">
+            <label class="form-label">{{ sso_form.sso_client_id.label.text }}</label>
+            {{ sso_form.sso_client_id(class="form-control") }}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">{{ sso_form.sso_client_secret.label.text }}</label>
+            {{ sso_form.sso_client_secret(class="form-control", placeholder="••••••••") }}
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">
+          <i class="fas fa-floppy-disk me-2"></i>{{ sso_form.submit.label.text }}
+        </button>
+      </form>
+    </div>
+  </div>
+</div>

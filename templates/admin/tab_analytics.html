@@ -1,0 +1,86 @@
+<div class="tab-pane fade show active" id="tab-analytics" role="tabpanel">
+
+  <!-- KPI cards -->
+  <div class="row g-3 mb-4">
+    {% set kpi = stats.kpi %}
+    <div class="col-6 col-lg">
+      <div class="card h-100 text-center shadow-sm">
+        <div class="card-body py-3">
+          <div class="text-primary mb-1"><i class="fas fa-users fa-lg"></i></div>
+          <div class="fs-3 fw-bold">{{ kpi.total_users }}</div>
+          <div class="text-muted small">Comptes</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-lg">
+      <div class="card h-100 text-center shadow-sm">
+        <div class="card-body py-3">
+          <div class="text-success mb-1"><i class="fas fa-file fa-lg"></i></div>
+          <div class="fs-3 fw-bold">{{ kpi.active_files }}</div>
+          <div class="text-muted small">Fichiers actifs</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-lg">
+      <div class="card h-100 text-center shadow-sm">
+        <div class="card-body py-3">
+          <div class="text-info mb-1"><i class="fas fa-upload fa-lg"></i></div>
+          <div class="fs-3 fw-bold">{{ kpi.total_uploads }}</div>
+          <div class="text-muted small">Envois totaux</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-lg">
+      <div class="card h-100 text-center shadow-sm">
+        <div class="card-body py-3">
+          <div class="text-warning mb-1"><i class="fas fa-download fa-lg"></i></div>
+          <div class="fs-3 fw-bold">{{ kpi.total_downloads }}</div>
+          <div class="text-muted small">Téléchargements</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-lg">
+      <div class="card h-100 text-center shadow-sm">
+        <div class="card-body py-3">
+          <div class="text-danger mb-1"><i class="fas fa-hard-drive fa-lg"></i></div>
+          <div class="fs-3 fw-bold" id="kpi-storage"></div>
+          <div class="text-muted small">Stockage utilisé</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mb-4">
+    <div class="card-body p-4">
+      <p class="fw-semibold mb-3"><i class="fas fa-chart-line me-2 text-primary"></i>Activité des 30 derniers jours</p>
+      <canvas id="chartDaily" height="90"></canvas>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-lg-8">
+      <div class="card shadow-sm h-100">
+        <div class="card-body p-4">
+          <p class="fw-semibold mb-3"><i class="fas fa-chart-bar me-2 text-success"></i>Activité mensuelle — 12 mois</p>
+          <canvas id="chartMonthly" height="130"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="card shadow-sm h-100">
+        <div class="card-body p-4">
+          <p class="fw-semibold mb-3"><i class="fas fa-chart-pie me-2 text-info"></i>Répartition des actions</p>
+          <canvas id="chartActions"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mb-4">
+    <div class="card-body p-4">
+      <p class="fw-semibold mb-3"><i class="fas fa-user-plus me-2 text-warning"></i>Nouveaux comptes — 12 mois</p>
+      <canvas id="chartUsers" height="70"></canvas>
+    </div>
+  </div>
+
+</div>
